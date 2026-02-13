@@ -1,0 +1,541 @@
+/* ============================================
+   DAX Noob — Design System
+   A refined, editorial tech-blog aesthetic.
+   Teal palette · JetBrains Mono code ·
+   Inter body · Cinematic micro-interactions
+   ============================================ */
+
+/* ---------- Google Fonts ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+/* ---------- Design tokens ---------- */
+:root {
+  /* Brand palette — teal */
+  --dn-teal:          #3CBCB4;
+  --dn-teal-dark:     #2A9D8F;
+  --dn-teal-light:    #6ED4CB;
+  --dn-teal-ghost:    rgba(60, 188, 180, 0.08);
+  --dn-ocean:         #1A6B5A;
+  --dn-navy:          #2D4356;
+  --dn-steel:         #5A7A94;
+  --dn-mint:          #B2DFDB;
+  --dn-coral:         #FF8A65;
+  --dn-amber:         #FFB74D;
+  --dn-surface-glass: rgba(255, 255, 255, 0.80);
+  --dn-border-subtle: rgba(0, 0, 0, 0.08);
+  --dn-bg-warm:       #FAFAF7;
+
+  /* Typography */
+  --dn-font-body:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --dn-font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  --dn-font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Spacing rhythm */
+  --dn-space-xs: 0.25rem;
+  --dn-space-sm: 0.5rem;
+  --dn-space-md: 1rem;
+  --dn-space-lg: 2rem;
+  --dn-space-xl: 3rem;
+  --dn-space-2xl: 5rem;
+
+  /* Motion */
+  --dn-ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --dn-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dn-duration:    0.4s;
+
+  /* Elevation */
+  --dn-shadow-sm:  0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+  --dn-shadow-md:  0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.03);
+  --dn-shadow-lg:  0 12px 40px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+  --dn-shadow-glow: 0 0 30px rgba(60, 188, 180, 0.10);
+}
+
+/* Dark mode tokens — removed, light theme only */
+
+/* ---------- Global typography override ---------- */
+:root {
+  --md-text-font: "Inter";
+  --md-code-font: "JetBrains Mono";
+}
+
+body, .md-typeset {
+  font-family: var(--dn-font-body);
+  font-size: 0.92rem;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code, pre, .md-typeset code, .md-typeset pre {
+  font-family: var(--dn-font-mono);
+}
+
+/* ---------- Header refinement ---------- */
+.md-header {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: var(--dn-surface-glass) !important;
+  border-bottom: 1px solid var(--dn-border-subtle);
+  transition: background var(--dn-duration) var(--dn-ease-out),
+              box-shadow var(--dn-duration) var(--dn-ease-out);
+}
+
+.md-header .md-header__title,
+.md-header .md-header__topic,
+.md-header .md-header__title .md-ellipsis {
+  color: #1a1a2e !important;
+}
+
+.md-header .md-header__button,
+.md-header .md-search__icon {
+  color: #1a1a2e !important;
+}
+
+.md-header .md-source,
+.md-header .md-source__icon svg,
+.md-header .md-source__repository {
+  color: #1a1a2e !important;
+  fill: currentColor;
+}
+
+.md-header .md-header__button:hover {
+  opacity: 0.7;
+}
+
+.md-header[data-md-state="shadow"] {
+  box-shadow: var(--dn-shadow-md);
+}
+
+/* Header title — branded */
+.md-header__title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  font-size: 1rem;
+  font-family: var(--dn-font-body);
+}
+
+/* Header logo — square with slight rounding */
+.md-header .md-logo img {
+  border-radius: 6px !important;
+  height: 1.6rem !important;
+  width: auto !important;
+}
+
+/* Navigation tabs — refined underline animation */
+.md-tabs {
+  border-bottom: 1px solid var(--dn-border-subtle);
+}
+
+.md-tabs__link {
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  opacity: 0.6;
+  transition: opacity var(--dn-duration) var(--dn-ease-out),
+              background var(--dn-duration) var(--dn-ease-out),
+              color var(--dn-duration) var(--dn-ease-out);
+  position: relative;
+  border-radius: 6px;
+  padding: 0.35rem 0.75rem !important;
+  margin: 0.25rem 0.15rem;
+}
+
+.md-tabs__link::after {
+  display: none;
+}
+
+.md-tabs__link:hover {
+  opacity: 1;
+  background: var(--dn-teal-ghost);
+}
+
+.md-tabs__link--active {
+  opacity: 1;
+  background: rgba(60, 188, 180, 0.12);
+  color: var(--dn-teal-dark) !important;
+  font-weight: 600;
+}
+
+/* Light mode — tab and header text */
+.md-tabs {
+  background: var(--dn-bg-warm);
+}
+
+.md-tabs__link {
+  color: #1a1a2e !important;
+}
+
+/* ---------- Warm background ---------- */
+.md-main {
+  background: var(--dn-bg-warm);
+}
+
+/* ---------- Content area refinements ---------- */
+
+/* Slightly wider reading measure */
+.md-content__inner {
+  max-width: 52rem;
+}
+
+/* Article typography */
+.md-typeset {
+  line-height: 1.75;
+  font-size: 0.92rem;
+}
+
+/* Display headings with display font */
+.md-typeset h1 {
+  font-family: var(--dn-font-display);
+  font-weight: 700;
+  font-size: 2.2rem;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.md-typeset h2 {
+  font-weight: 600;
+  font-size: 1.55rem;
+  letter-spacing: -0.015em;
+  margin-top: 2.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: none;
+  position: relative;
+}
+
+/* Gradient underline on h2 — fades from teal to transparent */
+.md-typeset h2::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--dn-teal), transparent);
+  border-radius: 2px;
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+/* Links — teal with underline animation */
+.md-typeset a:not(.md-button):not(.md-nav__link):not(.md-post__link):not(.headerlink):not(.md-author):not(.glightbox) {
+  color: var(--dn-teal-dark);
+  text-decoration: none;
+  background-image: linear-gradient(var(--dn-teal-light), var(--dn-teal-light));
+  background-size: 0 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.3s var(--dn-ease-out),
+              color 0.2s var(--dn-ease-out);
+}
+
+.md-typeset a:not(.md-button):not(.md-nav__link):not(.md-post__link):not(.headerlink):not(.md-author):not(.glightbox):hover {
+  color: var(--dn-teal);
+  background-size: 100% 1px;
+}
+
+/* (dark mode link color removed — light only) */
+
+/* ---------- Code blocks - refined ---------- */
+.md-typeset pre {
+  border-radius: 0.6rem;
+  border: 1px solid var(--dn-border-subtle);
+  box-shadow: var(--dn-shadow-sm);
+}
+
+.md-typeset code {
+  border-radius: 0.3rem;
+  font-size: 0.88em;
+  padding: 0.15em 0.4em;
+}
+
+/* ---------- Admonitions - refined ---------- */
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 0.5rem;
+  border-left-width: 3px;
+  box-shadow: var(--dn-shadow-sm);
+  overflow: hidden;
+}
+
+.md-typeset .admonition pre,
+.md-typeset details pre {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.md-typeset .admonition .highlight,
+.md-typeset details .highlight {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* ---------- Tables ---------- */
+.md-typeset table:not([class]) {
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: var(--dn-shadow-sm);
+  border: 1px solid var(--dn-border-subtle);
+}
+
+.md-typeset table:not([class]) th {
+  font-weight: 600;
+  font-size: 0.88rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.md-typeset table:not([class]) td {
+  font-size: 0.88rem;
+}
+
+/* ---------- Scroll reveal animation ---------- */
+.dn-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s var(--dn-ease-out),
+              transform 0.6s var(--dn-ease-out);
+}
+
+.dn-reveal.dn-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Staggered children */
+.dn-reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s var(--dn-ease-out),
+              transform 0.5s var(--dn-ease-out);
+}
+
+.dn-reveal-stagger.dn-visible > *:nth-child(1) { transition-delay: 0s; }
+.dn-reveal-stagger.dn-visible > *:nth-child(2) { transition-delay: 0.06s; }
+.dn-reveal-stagger.dn-visible > *:nth-child(3) { transition-delay: 0.12s; }
+.dn-reveal-stagger.dn-visible > *:nth-child(4) { transition-delay: 0.06s; }
+.dn-reveal-stagger.dn-visible > *:nth-child(5) { transition-delay: 0.12s; }
+.dn-reveal-stagger.dn-visible > *:nth-child(6) { transition-delay: 0.18s; }
+
+.dn-reveal-stagger.dn-visible > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ---------- Footer refinement ---------- */
+.md-footer {
+  border-top: 3px solid transparent;
+  border-image: linear-gradient(90deg, var(--dn-teal), var(--dn-teal-light), transparent) 1;
+}
+
+.md-footer-meta {
+  font-size: 0.85rem;
+}
+
+/* ---------- Selection color ---------- */
+::selection {
+  background: rgba(60, 188, 180, 0.2);
+  color: inherit;
+}
+
+/* ---------- Scrollbar refinement (Webkit) ---------- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(60, 188, 180, 0.25);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(60, 188, 180, 0.45);
+}
+
+/* ---------- Reading progress bar ---------- */
+.dn-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--dn-teal), var(--dn-teal-light));
+  z-index: 999;
+  transition: width 0.1s linear;
+  pointer-events: none;
+}
+
+/* ---------- Grid cards polish ---------- */
+.md-typeset .grid.cards > ul > li,
+.md-typeset .grid.cards > ol > li {
+  border-radius: 0.6rem;
+  border: 1px solid var(--dn-border-subtle);
+  box-shadow: var(--dn-shadow-sm);
+  transition: transform var(--dn-duration) var(--dn-ease-spring),
+              box-shadow var(--dn-duration) var(--dn-ease-out);
+  will-change: transform;
+}
+
+.md-typeset .grid.cards > ul > li:hover,
+.md-typeset .grid.cards > ol > li:hover {
+  box-shadow: var(--dn-shadow-lg), var(--dn-shadow-glow);
+}
+
+/* ---------- Smooth page transitions ---------- */
+.md-content {
+  animation: dn-fadeIn 0.4s var(--dn-ease-out);
+}
+
+@keyframes dn-fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Keyboard-accessible focus rings ---------- */
+.dn-keyboard *:focus-visible {
+  outline: 2px solid var(--dn-teal) !important;
+  outline-offset: 2px !important;
+  border-radius: 3px;
+}
+
+.dn-pointer *:focus {
+  outline: none;
+}
+
+/* ---------- Search dialog polish ---------- */
+.md-search__form {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.md-search-result__link {
+  border-radius: 0.4rem;
+  transition: background 0.15s ease-out;
+}
+
+/* ---------- Announcement bar ---------- */
+.md-banner {
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- Table of Contents indicator ---------- */
+.md-nav__link--active {
+  position: relative;
+}
+
+.md-nav--secondary .md-nav__link--active::before {
+  content: '';
+  position: absolute;
+  left: -0.5rem;
+  top: 0.15rem;
+  bottom: 0.15rem;
+  width: 2px;
+  background: var(--dn-teal);
+  border-radius: 1px;
+}
+
+/* ---------- Admonition titles — tighter ---------- */
+.md-typeset .admonition-title,
+.md-typeset details > summary {
+  font-weight: 600;
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- Pagination polish ---------- */
+.md-typeset .md-pagination {
+  gap: 0.25rem;
+}
+
+.md-typeset .md-pagination a {
+  border-radius: 0.4rem;
+  transition: background 0.2s ease-out, color 0.2s ease-out;
+}
+
+.md-typeset .md-pagination a:hover {
+  background: var(--dn-teal-ghost);
+  color: var(--dn-teal);
+}
+
+/* ---------- Social links — hover glow ---------- */
+.md-social__link {
+  transition: transform 0.2s var(--dn-ease-spring),
+              opacity 0.2s ease-out;
+}
+
+.md-social__link:hover {
+  transform: translateY(-2px);
+  opacity: 1 !important;
+}
+
+/* ---------- Content tabs — teal active indicator ---------- */
+.md-typeset .tabbed-labels > label.tabbed-alternate[aria-selected="true"],
+.md-typeset .tabbed-labels > label[checked] {
+  border-bottom-color: var(--dn-teal) !important;
+  color: var(--dn-teal) !important;
+}
+
+.md-typeset .tabbed-set > input:checked + label {
+  border-bottom-color: var(--dn-teal) !important;
+  color: var(--dn-teal) !important;
+}
+
+/* ---------- Related links sidebar — underline animation ---------- */
+.md-sidebar--post .md-post__meta a.md-nav__link {
+  text-decoration: none;
+  background-image: linear-gradient(var(--dn-teal-light), var(--dn-teal-light)) !important;
+  background-size: 0 1px !important;
+  background-position: 0 100% !important;
+  background-repeat: no-repeat !important;
+  transition: background-size 0.3s var(--dn-ease-out),
+              color 0.2s var(--dn-ease-out) !important;
+}
+
+.md-sidebar--post .md-post__meta a.md-nav__link:hover {
+  background-size: 100% 1px !important;
+  color: var(--dn-teal) !important;
+}
+
+/* ---------- Responsive video embeds ---------- */
+.video-wrapper {
+  position: relative;
+  padding-bottom: 56.25%;          /* 16:9 aspect ratio */
+  height: 0;
+  overflow: hidden;
+  margin: 1.5rem 0;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.video-wrapper iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* ---------- Print cleanup ---------- */
+@media print {
+  .dn-progress,
+  .hero-banner {
+    display: none !important;
+  }
+}

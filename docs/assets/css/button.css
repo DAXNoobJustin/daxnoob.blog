@@ -1,0 +1,64 @@
+/* ============================================
+   Buttons — Teal accent, spring hover
+   ============================================ */
+:root {
+  --button-color: #3CBCB4;
+  --youtube-red: #FF0000;
+}
+
+.md-button {
+  border-radius: 0.5em !important;
+  background-color: color-mix(in srgb, var(--button-color) 8%, transparent) !important;
+  color: var(--button-color) !important;
+  border: 1.5px solid color-mix(in srgb, var(--button-color) 40%, transparent) !important;
+  stroke: var(--button-color);
+  opacity: 1;
+  font-size: 0.85em;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 0.3em 1em;
+  transition: all 0.3s var(--dn-ease-spring, cubic-bezier(0.34, 1.56, 0.64, 1));
+  position: relative;
+  overflow: hidden;
+}
+
+.md-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 40%, color-mix(in srgb, var(--button-color) 6%, transparent));
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+.md-button:hover,
+.md-button:focus {
+  background-color: color-mix(in srgb, var(--button-color) 15%, transparent) !important;
+  border-color: var(--button-color) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--button-color) 20%, transparent);
+}
+
+.md-button:hover::before {
+  opacity: 1;
+}
+
+/* YouTube */
+a[href*="youtube.com"].md-button,
+a[href*="youtu.be"].md-button {
+  --btn-c: var(--youtube-red);
+  background-color: color-mix(in srgb, var(--btn-c) 8%, transparent) !important;
+  color: var(--btn-c) !important;
+  border: 1.5px solid color-mix(in srgb, var(--btn-c) 40%, transparent) !important;
+  stroke: var(--btn-c);
+}
+
+a[href*="youtube.com"].md-button:hover,
+a[href*="youtube.com"].md-button:focus,
+a[href*="youtu.be"].md-button:hover,
+a[href*="youtu.be"].md-button:focus {
+  background-color: color-mix(in srgb, var(--youtube-red) 30%, transparent) !important;
+  border-color: var(--btn-c) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--btn-c) 20%, transparent);
+}

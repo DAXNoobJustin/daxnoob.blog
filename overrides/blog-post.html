@@ -1,0 +1,202 @@
+{#-
+  Override for blog post template — adds description, hero image header, and post sidebar
+-#}
+{% extends "main.html" %}
+{% import "partials/nav-item.html" as item with context %}
+
+{% block extrahead %}
+  <meta http-equiv="Cache-Control" content="max-age=300, must-revalidate" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  {# Resolve image path #}
+  {% if page.meta and page.meta.image %}
+    {% if page.meta.image is mapping %}
+      {% set og_image_raw = page.meta.image.path %}
+    {% else %}
+      {% set og_image_raw = page.meta.image %}
+    {% endif %}
+  {% endif %}
+  {% if og_image_raw %}
+    {% set og_image_url = config.site_url ~ og_image_raw.lstrip('/') %}
+    <link rel="preload" as="image" href="{{ og_image_raw | url }}">
+  {% endif %}
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="{{ page.canonical_url }}" />
+  <meta property="og:title" content="{{ page.title }} - {{ config.site_name }}" />
+  <meta property="og:description" content="{% if page.meta.description %}{{ page.meta.description }}{% else %}{{ config.site_description }}{% endif %}" />
+  <meta property="og:site_name" content="{{ config.site_name }}" />
+  {% if og_image_url %}
+  <meta property="og:image" content="{{ og_image_url }}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="{{ page.title }}" />
+  {% else %}
+  <meta property="og:image" content="{{ config.site_url }}assets/images/avatar.png" />
+  {% endif %}
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ page.title }} - {{ config.site_name }}" />
+  <meta name="twitter:description" content="{% if page.meta.description %}{{ page.meta.description }}{% else %}{{ config.site_description }}{% endif %}" />
+  {% if og_image_url %}
+  <meta name="twitter:image" content="{{ og_image_url }}" />
+  {% else %}
+  <meta name="twitter:image" content="{{ config.site_url }}assets/images/avatar.png" />
+  {% endif %}
+
+  <!-- Article meta -->
+  <meta property="article:author" content="{{ config.site_author }}" />
+  <meta property="article:published_time" content="{{ page.config.date.created }}" />
+  {% if page.categories %}
+  {% for category in page.categories %}
+  <meta property="article:tag" content="{{ category.title }}" />
+  {% endfor %}
+  {% endif %}
+{% endblock %}
+
+{% block container %}
+  {% if page.meta and page.meta.image %}
+    {% set image_path = page.meta.image.path if page.meta.image is mapping else page.meta.image %}
+    {% set image_alt = page.meta.image.alt if page.meta.image is mapping else page.title %}
+    <div class="hero-banner">
+      <div class="hero-banner__image" style="background-image: url('{{ image_path | url }}');"></div>
+      <div class="hero-banner__overlay"></div>
+      <div class="hero-banner__bottom-fade"></div>
+    </div>
+    <script>document.body.classList.add('has-hero-image');</script>
+  {% endif %}
+  <div class="md-content md-content--post" data-md-component="content">
+    <div class="md-sidebar md-sidebar--post" data-md-component="sidebar" data-md-type="navigation">
+      <div class="md-sidebar__scrollwrap">
+        <div class="md-sidebar__inner md-post">
+          <nav class="md-nav md-nav--primary">
+            <div class="md-post__back">
+              <div class="md-nav__title md-nav__container">
+                <a href="{{ page.parent.url | url }}" class="md-nav__link">
+                  {% include ".icons/material/arrow-left.svg" %}
+                  <span class="md-ellipsis">
+                    {{ lang.t("blog.index") }}
+                  </span>
+                </a>
+              </div>
+            </div>
+            {% if page.authors %}
+              <div class="md-post__authors md-typeset">
+                {% for author in page.authors %}
+                  <div class="md-profile md-post__profile">
+                    <span class="md-author md-author--long">
+                      <img src="{{ author.avatar | url }}" alt="{{ author.name }}">
+                    </span>
+                    <span class="md-profile__description">
+                      <strong>
+                        {% if author.url %}
+                          <a href="{{ author.url | url }}">{{ author.name }}</a>
+                        {% else %}
+                          {{ author.name }}
+                        {% endif %}
+                      </strong>
+                      <br>
+                      {{ author.description }}
+                    </span>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <ul class="md-post__meta md-nav__list">
+              <li class="md-nav__item md-nav__item--section">
+                <div class="md-post__title">
+                  <span class="md-ellipsis">
+                    {{ lang.t("blog.meta") }}
+                  </span>
+                </div>
+                <nav class="md-nav">
+                  <ul class="md-nav__list">
+                    <li class="md-nav__item">
+                      <div class="md-nav__link">
+                        {% include ".icons/material/calendar.svg" %}
+                        <time datetime="{{ page.config.date.created }}" class="md-ellipsis">
+                          {{- page.config.date.created | date -}}
+                        </time>
+                      </div>
+                    </li>
+                    {% if page.config.date.updated %}
+                      <li class="md-nav__item">
+                        <div class="md-nav__link">
+                          {% include ".icons/material/calendar-clock.svg" %}
+                          <time datetime="{{ page.config.date.updated }}" class="md-ellipsis">
+                            {{- page.config.date.updated | date -}}
+                          </time>
+                        </div>
+                      </li>
+                    {% endif %}
+                    {% if page.categories %}
+                      <li class="md-nav__item">
+                        <div class="md-nav__link">
+                          {% include ".icons/material/bookshelf.svg" %}
+                          <span class="md-ellipsis">
+                            {{ lang.t("blog.categories.in") }}
+                            {% for category in page.categories %}
+                              <a href="{{ category.url | url }}">
+                                {{- category.title -}}
+                              </a>
+                              {%- if loop.revindex > 1 %}, {% endif -%}
+                            {% endfor -%}
+                          </span>
+                        </div>
+                      </li>
+                    {% endif %}
+                    {% if page.config.readtime %}
+                      {% set time = page.config.readtime %}
+                      <li class="md-nav__item">
+                        <div class="md-nav__link">
+                          {% include ".icons/material/clock-outline.svg" %}
+                          <span class="md-ellipsis">
+                            {% if time == 1 %}
+                              {{ lang.t("readtime.one") }}
+                            {% else %}
+                              {{ lang.t("readtime.other") | replace("#", time) }}
+                            {% endif %}
+                          </span>
+                        </div>
+                      </li>
+                    {% endif %}
+                  </ul>
+                </nav>
+              </li>
+            </ul>
+            {% if page.config.links %}
+              <ul class="md-post__meta md-nav__list">
+                <li class="md-nav__item md-nav__item--section">
+                  <div class="md-post__title">
+                    <span class="md-ellipsis">
+                      {{ lang.t("blog.references") }}
+                    </span>
+                  </div>
+                  <nav class="md-nav">
+                    <ul class="md-nav__list">
+                      {% for nav_item in page.config.links %}
+                        {% set path = "__ref_" ~ loop.index %}
+                        {{ item.render(nav_item, path, 1) }}
+                      {% endfor %}
+                    </ul>
+                  </nav>
+                </li>
+              </ul>
+            {% endif %}
+          </nav>
+          {% if "toc.integrate" in features %}
+            {% include "partials/toc.html" %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <article class="md-content__inner md-typeset">
+      {% block content %}
+        {% include "partials/content.html" %}
+      {% endblock %}
+    </article>
+  </div>
+{% endblock %}

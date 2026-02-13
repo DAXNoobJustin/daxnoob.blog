@@ -1,0 +1,182 @@
+/* ============================================
+   Blog Post Cards — Editorial card layout
+   Glass-morphism · Teal accent glow · Staggered reveal
+   ============================================ */
+
+/* Blog post card */
+.md-post.md-post--excerpt {
+  background: #ffffff;
+  border: 1px solid var(--dn-border-subtle);
+  border-left: 3px solid transparent;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  margin-bottom: 16px;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.35s var(--dn-ease-out),
+              border-color 0.35s var(--dn-ease-out),
+              border-left-color 0.35s var(--dn-ease-out);
+  box-shadow: var(--dn-shadow-sm);
+  position: relative;
+}
+
+.md-post.md-post--excerpt:hover {
+  box-shadow: var(--dn-shadow-md);
+  border-color: var(--dn-border-subtle);
+  border-left-color: var(--dn-teal);
+}
+
+/* Dark mode — light only now */
+
+/* Featured image — diagonal clip */
+.md-post__image {
+  width: 280px;
+  min-height: 160px;
+  overflow: hidden;
+  background: var(--dn-bg-warm, #FAFAF7);
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 0 0.75rem 0.75rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* Diagonal clip overlay */
+.md-post__image::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -20px;
+  width: 40px;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    #ffffff,
+    transparent
+  );
+  z-index: 1;
+}
+
+.md-post__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s var(--dn-ease-out, ease-out);
+}
+
+/* Fallback logo images use contain to avoid stretching */
+.md-post__image img[alt="DAX Noob"] {
+  object-fit: contain;
+  padding: 1.5rem;
+}
+
+.md-post.md-post--excerpt:hover .md-post__image img {
+  transform: scale(1.04);
+}
+
+/* Link wrapper */
+.md-post__link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  height: 100%;
+}
+
+/* Blog post content area */
+.md-post__content {
+  padding: 1rem;
+  padding-right: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.md-post__text {
+  flex: 1;
+  min-width: 0;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Post title */
+.md-post__text h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--md-default-fg-color);
+  transition: color 0.25s var(--dn-ease-out, ease-out);
+}
+
+.md-post.md-post--excerpt:hover .md-post__text h3 {
+  color: var(--dn-teal-dark, #2A9D8F);
+}
+
+/* Description */
+.md-post__description {
+  color: var(--md-default-fg-color--light);
+  line-height: 1.55;
+  font-weight: 400;
+  font-size: 0.85rem;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  flex: 1;
+  margin-top: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+
+/* Date */
+.md-post__date {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--md-default-fg-color--light);
+  margin-top: auto;
+  letter-spacing: 0.02em;
+}
+
+.md-post__date svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  fill: currentColor;
+  opacity: 0.6;
+}
+
+/* Responsive */
+@media screen and (max-width: 44.9375em) {
+  .md-post__content {
+    flex-direction: column;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .md-post__image {
+    width: 100%;
+    order: -1;
+    height: 200px;
+    border-radius: 0.75rem 0.75rem 0 0;
+  }
+
+  .md-post__image::before {
+    display: none;
+  }
+
+  .md-post.md-post--excerpt {
+    height: auto;
+  }
+}

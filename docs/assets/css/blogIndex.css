@@ -1,0 +1,114 @@
+/* ============================================
+   Blog Index, Archive and Category Pages
+   ============================================ */
+
+/* Optimize image rendering on blog index */
+.md-post--excerpt img {
+  content-visibility: auto;
+  will-change: auto;
+}
+
+/* Hide titles on pages that have blog post listings */
+.md-content__inner > header.md-typeset > h1 {
+  display: none !important;
+}
+
+/* Hide the bare "Blog" sidebar link (top-level nav label) */
+.md-sidebar--primary > .md-sidebar__scrollwrap > .md-sidebar__inner > .md-nav > .md-nav__list > .md-nav__item:first-child > .md-nav__link:first-child {
+  display: none !important;
+}
+
+/* Sidebar logo above archive/categories */
+.md-sidebar--primary .md-sidebar__inner::before {
+  content: '';
+  display: block;
+  width: 120px;
+  height: 120px;
+  margin: 0.75rem 0 1rem;
+  background: url('/assets/images/logo.png') center / contain no-repeat;
+  border-radius: 8px;
+}
+
+/* Hide TOC on blog index, archive and category pages */
+body:has(.md-post--excerpt) .md-sidebar--secondary,
+body:has(.md-content__inner > header.md-typeset) .md-sidebar--secondary[data-md-type="toc"] {
+  display: none !important;
+}
+
+body:has(.md-post--excerpt) #__toc,
+body:has(.md-post--excerpt) label[for="__toc"] {
+  display: none !important;
+}
+
+/* LEFT SIDEBAR — Refined navigation */
+
+/* Section headers */
+.md-sidebar--primary label.md-nav__title[for="__nav_1_2"],
+.md-sidebar--primary label.md-nav__title[for="__nav_1_3"] {
+  font-size: 0.82rem !important;
+  font-family: var(--dn-font-body, var(--md-text-font-family)) !important;
+  font-weight: 500 !important;
+  color: var(--md-default-fg-color) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.md-sidebar--primary label.md-nav__link[for="__nav_1_2"],
+.md-sidebar--primary label.md-nav__link[for="__nav_1_3"] {
+  font-size: 0.78rem !important;
+  font-family: var(--dn-font-body, var(--md-text-font-family)) !important;
+  font-weight: 500 !important;
+  color: var(--md-default-fg-color) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Navigation items */
+.md-sidebar--primary .md-nav__list .md-nav__link,
+.md-sidebar--primary .md-nav__item .md-nav__link {
+  font-size: var(--post-sidebar-item-font-size) !important;
+  font-family: var(--dn-font-body, var(--md-text-font-family)) !important;
+  font-weight: var(--post-sidebar-item-weight) !important;
+  color: var(--md-default-fg-color--light) !important;
+  transition: color 0.2s var(--dn-ease-out, ease-out);
+}
+
+/* Hover */
+.md-sidebar--primary .md-nav__link:hover,
+.md-sidebar--primary a.md-nav__link:hover {
+  color: var(--dn-teal, var(--md-accent-fg-color)) !important;
+}
+
+/* Active */
+.md-sidebar--primary .md-nav__link--active,
+.md-sidebar--primary a.md-nav__link--active,
+.md-sidebar--primary .md-nav__item--active > .md-nav__link {
+  color: var(--md-default-fg-color) !important;
+  font-weight: 500 !important;
+}
+
+.md-sidebar--primary .md-nav__link--active:hover,
+.md-sidebar--primary a.md-nav__link--active:hover,
+.md-sidebar--primary .md-nav__item--active > .md-nav__link:hover {
+  color: var(--dn-teal, var(--md-accent-fg-color)) !important;
+}
+
+/* RIGHT SIDEBAR */
+.md-sidebar--secondary .md-nav__title {
+  font-size: 0.82rem !important;
+  font-weight: 500 !important;
+  color: var(--md-default-fg-color) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.md-sidebar--secondary .md-nav__link {
+  font-size: var(--post-sidebar-item-font-size) !important;
+  font-weight: var(--post-sidebar-item-weight) !important;
+  color: var(--md-default-fg-color--light) !important;
+  transition: color 0.2s var(--dn-ease-out, ease-out);
+}
+
+.md-sidebar--secondary .md-nav__link:hover {
+  color: var(--dn-teal, var(--md-accent-fg-color)) !important;
+}

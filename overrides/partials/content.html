@@ -1,0 +1,5 @@
+{# Content wrapper — includes post-header only for blog posts (have date in frontmatter) #}
+{% if page and page.meta and page.meta.date %}
+  {% include "partials/post-header.html" %}
+{% endif %}
+{{ page.content }}

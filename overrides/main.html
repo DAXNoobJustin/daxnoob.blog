@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  <!-- Cache Control -->
+  <meta http-equiv="Cache-Control" content="max-age=300, must-revalidate" />
+  <meta http-equiv="Expires" content="0" />
+
+  <!-- Google Fonts preconnect -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  {# Safely extract meta values #}
+  {% set meta = page.meta if page and page.meta else {} %}
+  {% set og_image_raw = meta.get('image', none) %}
+  {% set og_desc = meta.get('description', config.site_description) %}
+
+  {% set og_image_url = none %}
+  {% if og_image_raw %}
+    {% set og_image_url = config.site_url ~ og_image_raw.lstrip('/') %}
+    <link rel="preload" as="image" href="{{ og_image_raw | url }}">
+  {% endif %}
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="{{ page.canonical_url }}" />
+  <meta property="og:title" content="{% if page.title %}{{ page.title }} - {{ config.site_name }}{% else %}{{ config.site_name }}{% endif %}" />
+  <meta property="og:description" content="{{ og_desc }}" />
+  <meta property="og:site_name" content="{{ config.site_name }}" />
+  {% if og_image_url %}
+  <meta property="og:image" content="{{ og_image_url }}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="{{ page.title }}" />
+  {% else %}
+  <meta property="og:image" content="{{ config.site_url }}assets/images/avatar.png" />
+  <meta property="og:image:width" content="512" />
+  <meta property="og:image:height" content="512" />
+  {% endif %}
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{% if page.title %}{{ page.title }} - {{ config.site_name }}{% else %}{{ config.site_name }}{% endif %}" />
+  <meta name="twitter:description" content="{{ og_desc }}" />
+  {% if og_image_url %}
+  <meta name="twitter:image" content="{{ og_image_url }}" />
+  {% else %}
+  <meta name="twitter:image" content="{{ config.site_url }}assets/images/avatar.png" />
+  {% endif %}
+{% endblock %}

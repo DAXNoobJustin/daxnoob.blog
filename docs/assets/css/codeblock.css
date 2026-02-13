@@ -1,0 +1,24 @@
+/* ============================================
+   Code blocks — JetBrains Mono, refined sizing
+   ============================================ */
+.md-typeset pre > code,
+.md-typeset pre,
+.md-typeset .highlight {
+  font-family: var(--dn-font-mono, var(--md-code-font-family));
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+
+.md-typeset .highlight {
+  max-height: 500px;
+  overflow: auto;
+}
+
+/* Scale down code on wide viewports (full-screen) */
+@media (min-width: 1440px) {
+  .md-typeset pre > code,
+  .md-typeset pre,
+  .md-typeset .highlight {
+    font-size: 0.82rem;
+  }
+}

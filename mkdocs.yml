@@ -1,0 +1,153 @@
+site_name: DAX Noob
+site_url: https://daxnoob.blog/
+repo_url: https://github.com/daxnoob/daxnoob.github.io
+repo_name: daxnoob
+site_author: Justin Martin
+site_description: Just a guy who really likes Power BI.
+copyright: >
+    Copyright &copy; 2024 - 2026 Justin Martin -
+    <a href="/privacy/">Privacy Policy</a>
+
+theme:
+  name: material
+  custom_dir: overrides
+  language: en
+  favicon: assets/images/favicon.png
+  logo: assets/images/logo.png
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    scheme: default
+    primary: teal
+    accent: teal
+  features:
+    - content.code.annotate
+    - content.code.copy
+    - content.code.select
+    - content.tooltips
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - navigation.tracking
+    - navigation.path
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+
+extra:
+  social:
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/in/daxnoobjustin/
+      name: Justin Martin
+    - icon: fontawesome/brands/github
+      link: https://github.com/daxnoob
+      name: daxnoob
+    - icon: material/email
+      link: mailto:justin@daxnoob.blog
+      name: Email
+    - icon: material/rss
+      link: https://daxnoob.blog/feed_rss_created.xml
+      name: RSS Feed
+
+plugins:
+  - search
+  - glightbox
+  - tags
+  - blog:
+      post_url_format: "{slug}"
+      blog_dir: .
+  - rss:
+      match_path: "posts/.*"
+      date_from_meta:
+        as_creation: date.created
+        as_update: date.updated
+        datetime_format: "%Y-%m-%d"
+        default_time: "00:00"
+        default_timezone: "UTC"
+      categories:
+        - categories
+      image: https://daxnoob.blog/assets/images/avatar.png
+      json_feed_enabled: true
+      rss_feed_enabled: true
+      pretty_print: false
+      feed_ttl: 1440
+      length: 100
+      comments_path: "#__comments"
+      url_parameters:
+        utm_source: "rss-feed"
+        utm_medium: "RSS"
+        utm_campaign: "blog-syndication"
+
+extra_css:
+  - assets/css/extra.css
+  - assets/css/hero-image.css
+  - assets/css/codeblock.css
+  - assets/css/button.css
+  - assets/css/blogCards.css
+  - assets/css/posts.css
+  - assets/css/blogIndex.css
+  - assets/css/pages.css
+
+extra_javascript:
+  - assets/js/lazy-images.js
+  - assets/js/hero-scroll.js
+  - assets/js/interactions.js
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      normalize_issue_symbols: true
+      repo_url_shorthand: true
+      user: daxnoob
+      repo: daxnoob.github.io
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      auto_append:
+        - includes/mkdocs.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+nav:
+  - Blog:
+      - index.md
+  - Presentations: presentations.md
+  - Projects: projects.md
+  - DAXing with DAX Noob: daxing.md
+  - About: about.md

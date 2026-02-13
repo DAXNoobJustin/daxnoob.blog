@@ -1,0 +1,400 @@
+/* ============================================
+   Pages — About
+   Bespoke layouts for non-blog content pages.
+   ============================================ */
+
+/* ======================
+   ABOUT PAGE
+   ====================== */
+
+/* --- Hero profile section --- */
+.dn-profile {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 2.5rem 0 1.5rem;
+}
+
+.dn-profile__avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--dn-teal);
+  box-shadow: 0 0 0 6px var(--dn-teal-ghost),
+              var(--dn-shadow-md);
+  flex-shrink: 0;
+  transition: transform 0.4s var(--dn-ease-spring);
+}
+
+.dn-profile__avatar:hover {
+  transform: scale(1.06) rotate(-2deg);
+}
+
+.dn-profile__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dn-profile__name {
+  font-family: var(--dn-font-display);
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  margin: 0 0 0.25rem;
+  background: linear-gradient(135deg, var(--md-default-fg-color), var(--dn-teal-dark));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Dark mode removed — light only */
+
+.dn-profile__tagline {
+  font-size: 0.92rem;
+  font-weight: 400;
+  color: var(--md-default-fg-color--light);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.dn-profile__tagline strong {
+  font-weight: 500;
+  color: var(--dn-teal-dark);
+}
+
+/* Dark mode removed — light only */
+
+/* --- Role cards (about page grid) --- */
+.dn-roles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.dn-role {
+  position: relative;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  border: 1px solid var(--dn-border-subtle);
+  box-shadow: var(--dn-shadow-sm);
+  transition: box-shadow 0.35s var(--dn-ease-out),
+              border-color 0.35s var(--dn-ease-out);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dn-role:hover {
+  box-shadow: var(--dn-shadow-md);
+  border-color: color-mix(in srgb, var(--dn-teal) 20%, transparent);
+}
+
+.dn-role__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.dn-role__header h3 {
+  margin: 0;
+}
+
+.dn-role__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--md-default-fg-color) 6%, transparent);
+  color: var(--md-default-fg-color--light);
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.dn-role__icon svg,
+.dn-role__icon .twemoji svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: currentColor;
+}
+
+.dn-role__icon p {
+  margin: 0;
+  line-height: 1;
+}
+
+.dn-role__title {
+  font-weight: 600;
+  font-size: 0.92rem;
+  margin: 0 0 0.35rem;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+.dn-role__desc {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--md-default-fg-color--light);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.dn-role > p {
+  margin: 0;
+}
+
+.dn-role__actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--dn-border-subtle);
+}
+
+/* Dark mode removed — light only */
+
+/* --- Section dividers --- */
+.dn-section-divider {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--dn-teal), transparent);
+  margin: 2.5rem 0;
+  opacity: 0.3;
+}
+
+/* ======================
+   CONNECT CARDS
+   ====================== */
+
+.dn-connect-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.dn-connect-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  border: 1px solid var(--dn-border-subtle);
+  box-shadow: var(--dn-shadow-sm);
+  text-decoration: none !important;
+  color: var(--md-default-fg-color) !important;
+  transition: box-shadow 0.35s var(--dn-ease-out),
+              border-color 0.35s var(--dn-ease-out),
+              transform 0.35s var(--dn-ease-out);
+}
+
+.dn-connect-card:hover {
+  box-shadow: var(--dn-shadow-md);
+  border-color: color-mix(in srgb, var(--dn-teal) 30%, transparent);
+  transform: translateY(-2px);
+}
+
+.dn-connect-card svg {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  fill: var(--dn-teal-dark, #2A9D8F);
+  transition: fill 0.25s var(--dn-ease-out);
+}
+
+.dn-connect-card:hover svg {
+  fill: var(--dn-teal, #3CBCB4);
+}
+
+.dn-connect-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.dn-connect-card__label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+
+.dn-connect-card__handle {
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--md-default-fg-color--light);
+}
+
+/* --- Responsive --- */
+@media screen and (max-width: 44.9375em) {
+  .dn-profile {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+
+  .dn-roles {
+    grid-template-columns: 1fr;
+  }
+
+  .dn-connect-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dn-showcase-grid {
+    gap: 1rem;
+  }
+
+  .dn-showcase-card {
+    flex-direction: column !important;
+  }
+
+  .dn-showcase-card__image {
+    width: 100% !important;
+    height: 180px !important;
+    border-radius: 0.65rem 0.65rem 0 0 !important;
+  }
+}
+
+@media screen and (min-width: 44.9375em) and (max-width: 76.1875em) {
+  .dn-roles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dn-connect-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ======================
+   SHOWCASE CARDS
+   (Presentations, Projects, Daxing)
+   ====================== */
+
+.dn-showcase-intro {
+  font-size: 0.95rem;
+  color: var(--md-default-fg-color--light);
+  line-height: 1.65;
+  margin-bottom: 2rem;
+  max-width: 40rem;
+}
+
+.dn-showcase-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.dn-showcase-card {
+  display: flex;
+  align-items: stretch;
+  background: #ffffff;
+  border: 1px solid var(--dn-border-subtle);
+  border-left: 3px solid transparent;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  text-decoration: none !important;
+  color: var(--md-default-fg-color) !important;
+  box-shadow: var(--dn-shadow-sm);
+  transition: box-shadow 0.35s var(--dn-ease-out),
+              border-left-color 0.35s var(--dn-ease-out);
+}
+
+.dn-showcase-card:hover {
+  box-shadow: var(--dn-shadow-md);
+  border-left-color: var(--dn-teal);
+}
+
+.dn-showcase-card__content {
+  flex: 1;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dn-showcase-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dn-showcase-card__date {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--md-default-fg-color--light);
+  letter-spacing: 0.02em;
+}
+
+.dn-showcase-card__badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.55rem;
+  border-radius: 4px;
+  background: var(--dn-teal-ghost);
+  color: var(--dn-teal-dark);
+}
+
+.dn-showcase-card__title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.4rem;
+  line-height: 1.35;
+  color: var(--md-default-fg-color);
+  transition: color 0.25s var(--dn-ease-out);
+}
+
+.dn-showcase-card:hover .dn-showcase-card__title {
+  color: var(--dn-teal-dark);
+}
+
+.dn-showcase-card__desc {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--md-default-fg-color--light);
+  line-height: 1.55;
+  margin: 0;
+  flex: 1;
+}
+
+.dn-showcase-card__image {
+  width: 240px;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dn-bg-warm);
+}
+
+.dn-showcase-card__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s var(--dn-ease-out);
+}
+
+.dn-showcase-card:hover .dn-showcase-card__image img {
+  transform: scale(1.04);
+}
+
+.dn-showcase-card__image img.dn-showcase-logo {
+  object-fit: contain;
+  padding: 1.5rem;
+}

@@ -1,0 +1,7 @@
+site/
+*~
+__pycache__/
+.cache/
+*.pyc
+.env
+.venv/
