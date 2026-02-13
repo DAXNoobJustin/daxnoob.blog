@@ -1,145 +1,92 @@
-# DAX Noob Blog Migration — Session Context
+# DAX Noob Blog — Project Context
 
-> **Purpose:** Provide any new agent with full context to continue this project seamlessly.  
-> **Last Updated:** 2025-06-15
+> **Last Updated:** 2026-02-13
 
 ---
 
-## What We're Doing
+## Overview
 
-Migrating Justin Martin's blog **daxnoob.blog** from WordPress to **Material for MkDocs** hosted on **GitHub Pages**. The goals are:
+Justin Martin's blog **daxnoob.blog** built with **Material for MkDocs**, hosted on **GitHub Pages**. Migrated from WordPress.
 
-1. **Source-controlled blog** — all content in Git, hosted on GitHub
-2. **Markdown-first authoring** — write posts in VS Code, commit, auto-deploy
-3. **Modern, polished design** — inspired by Jake Duddy's blog (evaluationcontext.github.io)
+- **Repo:** https://github.com/DAXNoobJustin/daxnoob.github.io
+- **Live URL:** https://daxnoobjustin.github.io (pending custom domain setup)
+- **Custom domain:** daxnoob.blog (not yet configured)
 
-## Key Decisions Made
+## Architecture
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Static site generator | Material for MkDocs | Python-based, fast builds, excellent blog plugin, recommended by Jake Duddy |
-| Hosting | GitHub Pages | Free, auto-deploy via GitHub Actions, custom domain support |
-| GitHub repo name | `daxnoob.github.io` | User site — deploys to root URL |
-| Custom domain | `daxnoob.blog` | Already owned, will point DNS to GitHub Pages |
-| Accent color | Teal `#3CBCB4` | Matches the DAX Noob robot logo |
-| Secondary color | Steel Blue `#5A7A94` | From logo background |
-| Dark tone | Navy `#2D4356` | Dark mode base, from logo background |
-| Fonts | IBM Plex Sans / JetBrains Mono / Space Grotesk | Same as Jake's site, easy to change later |
-| Design inspiration | Jake Duddy's evaluationcontext.github.io | Forked approach — same architecture, our own colors/branding |
+- **Static site generator:** Material for MkDocs (v1.6.1)
+- **Hosting:** GitHub Pages via GitHub Actions (`.github/workflows/ci.yml`)
+- **Theme:** Light only (dark mode removed), teal primary `#3CBCB4`
+- **Blog plugin:** `blog_dir: .` (blog is root), post URL format: `"{slug}"`
+- **Plugins:** search, glightbox, tags, blog, rss
 
-## Architecture (from Jake's repo)
+## Design System
 
-```
-daxnoob.blog/
-├── .devcontainer/          # Dev container for local/Codespaces development
-│   └── devcontainer.json
-├── .github/workflows/
-│   └── ci.yml              # GitHub Actions: build mkdocs → deploy to gh-pages
-├── docs/
-│   ├── .authors.yml        # Blog author profiles
-│   ├── index.md            # Blog index (landing page)
-│   ├── about.md            # About page
-│   ├── privacy.md          # Privacy policy
-│   ├── assets/
-│   │   ├── css/            # Custom stylesheets (extra.css, blogCards.css, etc.)
-│   │   ├── images/         # Logo, avatar, favicon, blog post images
-│   │   └── js/             # Custom JavaScript (interactions, hero scroll, lazy images)
-│   └── posts/
-│       ├── 2024/           # Blog posts organized by year
-│       ├── 2025/           # Each post in its own folder: YYYY-MM-DD-slug/post.md
-│       └── 2026/
-├── overrides/              # Material theme template overrides
-│   ├── main.html           # Base template (OG meta, fonts)
-│   ├── blog-post.html      # Blog post template (hero image, sidebar, metadata)
-│   ├── 404.html            # Custom 404 page
-│   └── partials/
-│       ├── post.html       # Blog index card (how posts appear on the index)
-│       ├── post-header.html # Post header (description + divider)
-│       └── content.html    # Content wrapper
-├── mkdocs.yml              # Main configuration file
-├── requirements.txt        # Python dependencies
-├── TASKS.md                # Task tracker (see companion file)
-└── CONTEXT.md              # This file
-```
+- **Body font:** Inter (0.92rem)
+- **Code font:** JetBrains Mono (0.85rem)
+- **Display font:** Space Grotesk (headings only)
+- **Background:** Warm `#FAFAF7`
+- **Accent:** Teal `#3CBCB4`
+- **Nav tabs:** Pill-style highlight (background, not underline)
+- **h2 styling:** 60px gradient underline (teal to transparent)
+- **Card hover:** Left-border teal accent (not lift effect)
+- **Footer:** 3px gradient stripe (teal to transparent)
+- **Video embeds:** Responsive `.video-wrapper` class (16:9 aspect ratio)
 
-## Blog Post Format
+## Navigation
 
-Each blog post is a Markdown file with YAML frontmatter:
+- Blog (index.md)
+- Presentations (presentations.md)
+- Projects (projects.md)
+- DAXing with DAX Noob (daxing.md)
+- About (about.md)
+- Privacy (privacy.md — footer link only, not in nav tabs)
 
-```markdown
----
-title: Post Title Here
-description: A brief description for cards and meta tags
-image: /assets/images/blog/2025/2025-03-03-slug/header.png
-date: 2025-03-03
-authors:
-  - justinmartin
-comments: true
-categories:
-  - DAX
-  - Fabric
-slug: posts/my-post-slug
----
+## Content
 
-Post content in Markdown here...
-```
+- **26 blog posts** in `docs/posts/2024/` and `docs/posts/2025/`
+- **132 images** migrated from WordPress in `docs/assets/images/blog/`
+- **3 showcase pages** (Presentations, Projects, DAXing) with custom card layouts
 
-Posts live in `docs/posts/YYYY/YYYY-MM-DD-slug/post-name.md`.
+## Categories (5)
 
-## How Deployment Works
+DAX, Power Query, Data Modeling, Administration, Miscellaneous
 
-1. Author writes/edits Markdown in VS Code
-2. Commits and pushes to `master` (or `main`) branch
-3. GitHub Actions CI runs:
-   - Checks out code
-   - Installs Python + dependencies from `requirements.txt`
-   - Runs `mkdocs gh-deploy --force` (builds HTML → pushes to `gh-pages` branch)
-4. GitHub Pages serves the `gh-pages` branch
-5. Custom domain (`daxnoob.blog`) points to GitHub Pages via DNS
+## Tags
 
-## Color Palette
+Performance, Optimization, Semantic Model, M Functions, Data Quality, Data Modeling, Python, Microsoft Fabric, Fabric Notebook, KQL, MCP, Open Source, Power BI, RLS, Video, Workspace Monitoring
 
-Derived from the DAX Noob logo (teal robot on steel-blue background):
+## Key CSS Files
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `--dn-teal` | `#3CBCB4` | Primary accent (links, highlights, hover) |
-| `--dn-teal-dark` | `#2A9D8F` | Darker accent (link hover, active states) |
-| `--dn-teal-light` | `#6ED4CB` | Light accent (underline animations, subtle highlights) |
-| `--dn-teal-ghost` | `rgba(60, 188, 180, 0.08)` | Ghost backgrounds (tags, pills) |
-| `--dn-steel` | `#5A7A94` | Secondary (subtle backgrounds) |
-| `--dn-navy` | `#2D4356` | Dark mode base, dark backgrounds |
-| `--dn-slate` | `#1A2B3C` | Deepest dark (code bg in dark mode) |
+- `extra.css` — Design system (tokens, typography, nav, footer, video embeds)
+- `pages.css` — About page, Connect cards, Showcase card grid
+- `blogCards.css` — Blog index card styling
+- `blogIndex.css` — Blog index sidebar logo
+- `posts.css` — Post reading experience
+- `hero-image.css` — Hero banner for posts
+- `codeblock.css` — Code block font sizing
 
-## WordPress Posts to Migrate
+## Key Overrides
 
-26 posts from January 2024 to November 2025. Full audit in TASKS.md.
+- `overrides/main.html` — Base template with Open Graph meta
+- `overrides/blog-post.html` — Post template with hero image and sidebar
+- `overrides/partials/content.html` — Conditionally includes post-header (only for posts with `date` in frontmatter)
+- `overrides/partials/post.html` — Blog index card template
+- `overrides/partials/post-header.html` — Description + divider below post title
 
-Categories to standardize: DAX, Data Modeling, Power Query, Administration, Python, Visualization, Fabric, Video.
+## Deployment
+
+1. Push to `main` branch
+2. GitHub Actions builds with `mkdocs build`
+3. Uploads site artifact and deploys via `actions/deploy-pages@v4`
 
 ## Social Links
 
-- Email: justin@daxnoob.blog
 - LinkedIn: https://www.linkedin.com/in/daxnoobjustin/
-- Twitter/X: https://twitter.com/dax_noob_justin
+- YouTube: https://www.youtube.com/@DAXNoobJustin
+- GitHub: https://github.com/daxnoob
+- Email: justin@daxnoob.blog
 
-## Reference Repository
+## What's Left
 
-Jake Duddy's blog repo has been cloned locally for reference:
-- Local path: `c:\Users\justinmartin\Projects\evaluationcontext.github.io`
-- Remote: https://github.com/EvaluationContext/evaluationcontext.github.io
-- Key files to reference: `mkdocs.yml`, `overrides/`, `docs/assets/css/`, `docs/assets/js/`
-
-## Current Status
-
-**Phases 1-4 complete.** All project files have been created and the site builds and serves locally (`mkdocs build` succeeds, `mkdocs serve` runs on port 8000). A sample blog post ("Welcome to the New DAX Noob") validates the full pipeline.
-
-**Remaining work:**
-
-- **3.18** — Add the DAX Noob logo/avatar/favicon images to `docs/assets/images/` (Justin needs to provide these)
-- **Phase 5** — Initialize git, create GitHub repo (`daxnoob.github.io`), push, configure GitHub Pages
-- **Phase 6** — Configure custom domain DNS for `daxnoob.blog`
-- **Phase 7** — Export WordPress posts, convert to Markdown, standardize categories/tags, migrate images
-- **Phase 8** — Final polish, test responsiveness, validate RSS/OG/Twitter, go live
-
-See [TASKS.md](TASKS.md) for detailed progress tracking.
+See [TASKS.md](TASKS.md) — custom domain DNS setup and final polish before go-live.
