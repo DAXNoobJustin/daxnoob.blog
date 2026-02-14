@@ -55,6 +55,35 @@ plugins:
   - search
   - glightbox
   - tags
+  - redirects:
+      redirect_maps:
+        # WordPress URL redirects (old /YYYY/MM/DD/slug/ -> new /slug/)
+        "2024/01/10/hello-blogging-world/index.md": "posts/2024/hello-blogging-world.md"
+        "2024/01/11/intro-to-custom-m-functions/index.md": "posts/2024/intro-to-custom-m-functions.md"
+        "2024/01/14/custom-m-function-1-fxjoinandexpandtable/index.md": "posts/2024/custom-m-function-1-fxjoinandexpandtable.md"
+        "2024/01/21/custom-m-function-2-fxgeneratesurrogatekeycolumn/index.md": "posts/2024/custom-m-function-2-fxgeneratesurrogatekeycolumn.md"
+        "2024/01/28/underrated-power-bi-feature-measures-as-visual-filters/index.md": "posts/2024/underrated-power-bi-feature-measures-as-visual-filters.md"
+        "2024/02/04/custom-m-function-3-fxsplitcamelcasetext/index.md": "posts/2024/custom-m-function-3-fxsplitcamelcasetext.md"
+        "2024/02/13/custom-m-function-4-fxsetcolumntypesfromexample/index.md": "posts/2024/custom-m-function-4-fxsetcolumntypesfromexample.md"
+        "2024/02/25/power-query-level-up-exploring-the-advanced-editor-and-the-m-language/index.md": "posts/2024/power-query-level-up-exploring-the-advanced-editor-and-the-m-language.md"
+        "2024/03/02/custom-m-function-5-fxcumulativetoincremental/index.md": "posts/2024/custom-m-function-5-fxcumulativetoincremental.md"
+        "2024/03/19/you-dont-know-until-you-test-it-dax-optimization/index.md": "posts/2024/you-dont-know-until-you-test-it-dax-optimization.md"
+        "2024/03/31/custom-m-function-6-fxsplitcamelcasecolumns/index.md": "posts/2024/custom-m-function-6-fxsplitcamelcasecolumns.md"
+        "2024/04/13/custom-m-function-7-fxreplacewithdefaultvalue/index.md": "posts/2024/custom-m-function-7-fxreplacewithdefaultvalue.md"
+        "2024/04/29/enhancing-your-golden-semantic-model-with-user-input-tables/index.md": "posts/2024/enhancing-your-golden-semantic-model-with-user-input-tables.md"
+        "2024/05/17/reducing-semantic-model-size-with-creative-solutions/index.md": "posts/2024/reducing-semantic-model-size-with-creative-solutions.md"
+        "2024/06/05/sometimes-its-good-to-fail-raising-errors-with-data-quality-tests/index.md": "posts/2024/sometimes-its-good-to-fail-raising-errors-with-data-quality-tests.md"
+        "2024/06/23/creating-user-driven-default-slicer-selections/index.md": "posts/2024/creating-user-driven-default-slicer-selections.md"
+        "2024/12/30/optimizing-rolling-distinct-count-measures/index.md": "posts/2024/optimizing-rolling-distinct-count-measures.md"
+        "2025/03/03/fabric-tools-dax-performance-testing/index.md": "posts/2025/fabric-tools-dax-performance-testing.md"
+        "2025/03/12/fabric-toolbox-semantic-model-audit/index.md": "posts/2025/fabric-toolbox-semantic-model-audit.md"
+        "2025/03/29/daxing-with-dax-noob-episode-1/index.md": "posts/2025/daxing-with-dax-noob-episode-1.md"
+        "2025/04/04/daxing-with-dax-noob-episode-2/index.md": "posts/2025/daxing-with-dax-noob-episode-2.md"
+        "2025/05/30/extracting-semantic-model-source-tables-with-fabric-notebooks/index.md": "posts/2025/extracting-semantic-model-source-tables-with-fabric-notebooks.md"
+        "2025/06/17/daxing-with-dax-noob-episode-3/index.md": "posts/2025/daxing-with-dax-noob-episode-3.md"
+        "2025/06/18/identifying-semantic-model-capacity-spikes-using-workspace-monitoring/index.md": "posts/2025/identifying-semantic-model-capacity-spikes-using-workspace-monitoring.md"
+        "2025/10/21/mcp-server-dax-performance-tuner/index.md": "posts/2025/mcp-server-dax-performance-tuner.md"
+        "2025/11/04/semantic-model-optimization-theory-tips-and-tools/index.md": "posts/2025/semantic-model-optimization-theory-tips-and-tools.md"
   - blog:
       post_url_format: "{slug}"
       blog_dir: .
