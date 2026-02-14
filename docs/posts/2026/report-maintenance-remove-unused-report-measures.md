@@ -36,8 +36,8 @@ The new [PBIR format](https://learn.microsoft.com/en-us/power-bi/developer/proje
 
 I created two tools to handle this, depending on where your report lives:
 
-1. **[Python Script](https://github.com/DAXNoobJustin/daxnoob.github.io/blob/main/resources/remove-unused-measures/remove_unused_measures.py)** — For local PBIP projects with PBIR enabled. Run it against your `.Report` folder to find and remove unused measures.
-2. **[Fabric Notebook](https://github.com/DAXNoobJustin/daxnoob.github.io/blob/main/resources/remove-unused-measures/Remove%20Unused%20Measures.ipynb)** — For reports in the Fabric service. Uses a monkey-patched version of [Semantic Link Labs](https://github.com/microsoft/semantic-link-labs) to connect to a report and clean up unused measures directly.
+1. **[Python Script](https://github.com/DAXNoobJustin/daxnoob.blog/blob/main/resources/remove-unused-measures/remove_unused_measures.py)** — For local PBIP projects with PBIR enabled. Run it against your `.Report` folder to find and remove unused measures.
+2. **[Fabric Notebook](https://github.com/DAXNoobJustin/daxnoob.blog/blob/main/resources/remove-unused-measures/Remove%20Unused%20Measures.ipynb)** — For reports in the Fabric service. Uses a monkey-patched version of [Semantic Link Labs](https://github.com/microsoft/semantic-link-labs) to connect to a report and clean up unused measures directly.
 
 Both tools work the same way under the hood:
 

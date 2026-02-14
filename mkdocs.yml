@@ -1,6 +1,6 @@
 site_name: DAX Noob
 site_url: https://daxnoob.blog/
-repo_url: https://github.com/DAXNoobJustin/daxnoob.github.io
+repo_url: https://github.com/DAXNoobJustin/daxnoob.blog
 repo_name: DAXNoobJustin
 site_author: Justin Martin
 site_description: Just a guy who really likes Power BI.
@@ -152,7 +152,7 @@ markdown_extensions:
       normalize_issue_symbols: true
       repo_url_shorthand: true
       user: DAXNoobJustin
-      repo: daxnoob.github.io
+      repo: daxnoob.blog
   - pymdownx.mark
   - pymdownx.smartsymbols
   - pymdownx.snippets:
