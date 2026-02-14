@@ -25,7 +25,7 @@
   width: 120px;
   height: 120px;
   margin: 0.75rem 0 1rem;
-  background: url('/assets/images/logo.png') center / contain no-repeat;
+  background: url('../images/logo.png') center / contain no-repeat;
   border-radius: 8px;
 }
 
