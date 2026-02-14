@@ -33,7 +33,7 @@ This function splits a string stored in camel or pascal case into multiple words
 
 **Parameters:**
 
-**textToTransform**as text
+**textToTransform** as text
 The text stored in camel or pascal case.
 
 ## Function without documentation

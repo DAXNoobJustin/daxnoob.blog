@@ -50,12 +50,10 @@ My solution was as follows:
 **Step 2: Create many-to-many, single-direction relationships between the tables.**
 
 ![](../../assets/images/blog/2024/06/image-10.png)
-*(To enlarge, right-click the image and select “Open image in new tab.”)*
 
 **Step 3: Create an RLS rule on the RLS table filtering the user to be equal to the signed in use.**
 
 ![](../../assets/images/blog/2024/06/image-11.png)
-*(To enlarge, right-click the image and select “Open image in new tab.”)*
 
 **Step 4: Add a slicer to the report filtering the Store Display Name to be equal to "Home Store."**
 
@@ -82,17 +80,14 @@ Because each employee's home store can be different, selecting a specific value 
 Since each Store Name value will be the user's home store when filtering the Store Display Name to be equal to "Home Store," we can add a slicer to the report filtering the Store Display Name to be equal to "Home Store."
 
 ![](../../assets/images/blog/2024/06/image-18.png)
-*(To enlarge, right-click the image and select “Open image in new tab.”)*
 
 When the slicer selection is made, the user's home store value in the Store Name column will propagate down to the Sales table.
 
 As you can see below, employees from different stores (Manager A and Manager B) will see their home store's data when viewing the report because of the slicer selection.
 
 ![](../../assets/images/blog/2024/06/image-14.png)
-*(To enlarge, right-click the image and select “Open image in new tab.”)*
 
 ![](../../assets/images/blog/2024/06/image-13.png)
-*(To enlarge, right-click the image and select “Open image in new tab.”)*
 
 **Requirement 2, "the users need to see their own store as default when they first open the report," has been met.**
 
@@ -114,10 +109,8 @@ This allows the user to change the slicer selection from "Home Store" to another
 For example, Manager A, whose home store is "Store A" can see data from other stores.
 
 ![](../../assets/images/blog/2024/06/image-15.png)
-*(To enlarge, right-click the image and select “Open image in new tab.”)*
 
 ![](../../assets/images/blog/2024/06/image-19.png)
-*(To enlarge, right-click the image and select “Open image in new tab.”)*
 
 **Requirement 3, "the users need to still be able to filter to the other stores," has been met.**
 

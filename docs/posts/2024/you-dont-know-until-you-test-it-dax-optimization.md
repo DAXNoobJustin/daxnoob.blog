@@ -34,7 +34,6 @@ Below is a short recap of a recent attempt to optimize a measure I created while
 **The model:**
 
 ![](../../assets/images/blog/2024/03/image-26.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 ```dax
 The original measure:
@@ -100,19 +99,16 @@ EVALUATE
 In DAX Studio, you can enable server timings here:
 
 ![](../../assets/images/blog/2024/03/zoomit.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 And run a benchmark analysis here:
 
 ![](../../assets/images/blog/2024/03/zoomit-1.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 I ended up creating 6 versions of the measure. My notes are included below.
 
 Just to confirm that the results were the same for each measure:
 
 ![](../../assets/images/blog/2024/03/image-20.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 ## Measure 1
 
@@ -175,10 +171,8 @@ RETURN
 **Server Timings:**
 
 ![](../../assets/images/blog/2024/03/image-9.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 ![](../../assets/images/blog/2024/03/image-7.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 **Quick Observations:**
 Because each item can have a different discount and location adjustment, I took the existing logic, put it in a SUMX function, and then used the context transition feature of CALCULATE to get the discount and location adjustment for each item.
@@ -249,10 +243,8 @@ RETURN
 **Server Timings:**
 
 ![](../../assets/images/blog/2024/03/image-10.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 ![](../../assets/images/blog/2024/03/image-11.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 **Quick Observations:**
 I thought this one would be faster than Measure 1 because it was only iterating over the combinations of discounts and location adjustments, **but I was wrong.** There are three scan that, while returning fewer rows, take a longer amount of time.
@@ -314,10 +306,8 @@ RETURN
 **Server Timings:**
 
 ![](../../assets/images/blog/2024/03/image-12.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 ![](../../assets/images/blog/2024/03/image-13.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 **Quick Observations:**
 Moving the date window and snapshot date filters to the outer calculate reduced the scan size slightly. Performance it relatively better.
@@ -380,10 +370,8 @@ RETURN
 **Server Timings:**
 
 ![](../../assets/images/blog/2024/03/image-16.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 ![](../../assets/images/blog/2024/03/image-17.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 **Quick Observations:**
 I realized that I was too fixated on keeping a similar pattern I had in the original measure that I forgot to experiment with other patterns. Here, I tried to change up the algorithm more substantially by iterating over the fact table and getting the discount and location modifier by using the RELATED function. Also, I kept the date window and snapshot date filters to the outer calculate based on what I saw in Measure 3.
@@ -448,10 +436,8 @@ RETURN
 **Server Timings:**
 
 ![](../../assets/images/blog/2024/03/image-18.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 ![](../../assets/images/blog/2024/03/image-19.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 **Quick Observations:**
 By removing the DIVIDE function and simply using the division operator, the callback function was removed, and the DAX engine uses almost exclusively the storage engine to answer the query. Since I know that a local adjustment can't be 0, I am confident that this change won't return risk returning a divide by 0 answer.
@@ -500,10 +486,8 @@ RETURN
 **Server Timings:**
 
 ![](../../assets/images/blog/2024/03/image-23.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 ![](../../assets/images/blog/2024/03/image-24.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 **Quick Observations:**
 To improve performance even more, I tried to modify the code to avoid two scans of the Fact table. By moving the external location filter to the top and only having one SUMX function, I was able to significantly reduce the SE time.

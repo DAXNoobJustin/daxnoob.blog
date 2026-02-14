@@ -27,7 +27,7 @@ Image this... you open your computer to start a nice, productive day of semantic
 
 ![](../../assets/images/blog/2025/06/image.png)
 
-Whenever this happens to me, I immediately open the[Fabric Capacity Metrics app](https://learn.microsoft.com/en-us/fabric/enterprise/metrics-app) to try and figure out what and who caused the spike.
+Whenever this happens to me, I immediately open the [Fabric Capacity Metrics app](https://learn.microsoft.com/en-us/fabric/enterprise/metrics-app) to try and figure out what and who caused the spike.
 Using the utilization chart in the top right-hand section of the report, you can identify the time of the spike and drill down to see more details.
 
 ![](../../assets/images/blog/2025/06/asdf.png)

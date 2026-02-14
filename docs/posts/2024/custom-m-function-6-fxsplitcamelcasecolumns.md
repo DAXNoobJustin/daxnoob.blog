@@ -17,7 +17,7 @@ image: assets/images/blog/2024/03/image-27.png
 
 **Click [here](#overview-fxsplitcamelcasecolumns) to go straight to the function.**
 
-In a previous post, [I shared a custom function called fxSplitCamelCaseText](https://daxnoob.blog/2024/02/04/custom-m-function-3-fxsplitcamelcasetext/) that splits a string stored in camel or pascal case into multiple words separated by spaces.
+In a previous post, [I shared a custom function called fxSplitCamelCaseText](https://daxnoob.blog/custom-m-function-3-fxsplitcamelcasetext/) that splits a string stored in camel or pascal case into multiple words separated by spaces.
 
 That function was created primarily to be used in another function called fxSplitCamelCaseColumns that converts all camel/pascal case columns into proper case. In this post, I want to share that function with you.
 
@@ -29,17 +29,17 @@ This function splits all camel case column names in a table and converts them to
 
 **Parameters:**
 
-**tableToTransform**as table
+**tableToTransform** as table
 The table whose column names you want to transform.
 
-*optional***columnNameOverrides**as list
+*optional* **columnNameOverrides** as list
 A list of column name overrides to be used instead of the default transformation.
 
 ## Required Custom Functions
 
 This function is dependent on these additional custom functions. Copy them into your Power Query project for fxSplitCamelCaseColumns function to work.
 
-- [fxSplitCamelCaseText](https://daxnoob.blog/2024/02/04/custom-m-function-3-fxsplitcamelcasetext/)
+- [fxSplitCamelCaseText](https://daxnoob.blog/custom-m-function-3-fxsplitcamelcasetext/)
 
 ## Function without documentation
 
@@ -183,19 +183,16 @@ in
 Table with camel case column names:
 
 ![](../../assets/images/blog/2024/03/image-27.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 Using the custom function to transform the column names:
 
 ![](../../assets/images/blog/2024/03/image-28.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 **Example 2: Transformed columns with overrides**
 
 Using the custom function to transform the column names and provider alternate transformations for two columns:
 
 ![](../../assets/images/blog/2024/03/image-29.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 ## Conclusion
 

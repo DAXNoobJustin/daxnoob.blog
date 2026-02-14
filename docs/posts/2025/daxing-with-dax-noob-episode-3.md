@@ -16,7 +16,9 @@ slug: daxing-with-dax-noob-episode-3
 On this episode of DAXing with DAX Noob, we walk through two DAX problems posted on the Power BI Reddit channel and LinkedIn that involve some set functions and optimizing a Days of Supply measure.
 
 Links to the DAX challenges:
-[https://www.linkedin.com/posts/kubisco_dax-challenge-activity-7327966442144903168-g8I9](https://www.linkedin.com/posts/kubisco_dax-challenge-activity-7327966442144903168-g8I9) [https://www.reddit.com/r/PowerBI/comments/1kml57r/need_help_with_optimisation_of_a_measure/](https://www.reddit.com/r/PowerBI/comments/1kml57r/need_help_with_optimisation_of_a_measure/)
+
+- [LinkedIn — DAX Challenge by Kubisco](https://www.linkedin.com/posts/kubisco_dax-challenge-activity-7327966442144903168-g8I9)
+- [Reddit — Need help with optimisation of a measure](https://www.reddit.com/r/PowerBI/comments/1kml57r/need_help_with_optimisation_of_a_measure/)
 
 <div class="video-wrapper">
   <iframe src="https://www.youtube.com/embed/nulugi9kens" frameborder="0" allowfullscreen></iframe>

@@ -39,25 +39,25 @@ This function performs a left join on a source and target table and expands the 
 
 **Parameters:**
 
-**rowIntegritySetting**as number
+**rowIntegritySetting** as number
 0. Do nothing. 1. Check to see if the beginning and end row counts are the same in the source table after joining the target table. If not, throw an error. 2. Force a Table.Distinct on the join columns for the target table.
 
-**sourceTable**as table
+**sourceTable** as table
 The source table to be joined to.
 
-**targetTable**as table
+**targetTable** as table
 The target table to join.
 
- **sourceJoinColumns**as list
+**sourceJoinColumns** as list
 The list of column names to join. Must be the same in both tables if targetJoinColumns is null.
 
-**columnsToExpand**as list
+**columnsToExpand** as list
 The list of column names you want to expand from the target table.
 
-*optional***targetJoinColumns**as list
+*optional* **targetJoinColumns** as list
 Optional list of column names in the target table to join. Leave null if the column names are the same in the source table.
 
-*optional***alternateColumnsToExpand**as list
+*optional* **alternateColumnsToExpand** as list
 Optional list of column names to expand. Columns expanded in columnsToExpand will be renamed to this list when joined.
 
 ## Function without documentation

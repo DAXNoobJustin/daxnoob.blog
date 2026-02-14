@@ -56,13 +56,13 @@ This function replaces nulls and like null values with a default, standard value
 
 **Parameters:**
 
-**tableToTransform**as table
+**tableToTransform** as table
 The table you want to replace values on.
 
-**columnsToTransform**as list
+**columnsToTransform** as list
 The list of column names to perform the transformation on.
 
-*optional***replaceNumbers**as logical
+*optional* **replaceNumbers** as logical
 Boolean flag to determine if null numbers should be replaced with 0.
 
 ## Required Custom Functions

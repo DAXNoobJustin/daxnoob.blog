@@ -49,17 +49,17 @@ The table containing the cumulative columns to be transformed.
 **groupByColumns** as list
 The columns that, when taken together, the running total is applied to.
 
-**sortByColumn**as text
+**sortByColumn** as text
 The time/sort by column for the running total.
 
-**columnsToTransform**as list
+**columnsToTransform** as list
 The cumulative columns to be transformed to incremental.
 
 ## Required Custom Functions
 
 This function is dependent on these additional custom functions. Copy them into your Power Query project for fxCumulativeToIncremental function to work.
 
-- [fxSetColumnTypesFromModel](https://daxnoob.blog/2024/02/13/custom-m-function-4-fxsetcolumntypesfromexample/)
+- [fxSetColumnTypesFromModel](https://daxnoob.blog/custom-m-function-4-fxsetcolumntypesfromexample/)
 
 ## Function without documentation
 

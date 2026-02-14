@@ -74,14 +74,13 @@ While there are endless possibilities when it comes to adding data quality tests
 
 **Example 1:**
 
-The first one is included in one of the custom functions I wrote about earlier this year: [Custom M Function #1: fxJoinAndExpandTable – DAX Noob](https://daxnoob.blog/2024/01/14/custom-m-function-1-fxjoinandexpandtable/).
+The first one is included in one of the custom functions I wrote about earlier this year: [Custom M Function #1: fxJoinAndExpandTable – DAX Noob](https://daxnoob.blog/custom-m-function-1-fxjoinandexpandtable/).
 
 This function makes it easier to join two tables together. The function uses a left join, which has the potential to return more records than exist in the original left table. This can cause many issues in the quality of your data, including duplicating/inflating fact table records leading it incorrect reports.
 
 To avoid this, I run a test to ensure the row count before and after the join is the same.
 
 ![](../../assets/images/blog/2024/06/image-3.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 **Example 2:**
 
@@ -100,7 +99,6 @@ When I go to create a dimension table from _SKey A+B, A, B, and C and perform a 
 Adding a data quality test to ensure that the final row count equals the distinct count of the _SKey column ensures that this is not the case.
 
 ![](../../assets/images/blog/2024/06/image-4.png)
-*(To enlarge, right-click the image and select "Open image in new tab.")*
 
 ## Conclusion
 

@@ -52,7 +52,7 @@ This notebook takes an Excel file with DAX queries, runs them under cold, warm, 
 
 ## Getting Started
 
-1. [Download the notebook from GitHub](https://github.com/microsoft/fabric-tools/blob/main/Notebooks/DAX%20Performance%20Testing.ipynb) and upload to a Fabric workspace.
+1. [Download the notebook from GitHub](https://github.com/microsoft/fabric-toolbox/blob/main/tools/DAXPerformanceTesting/DAXPerformanceTesting.ipynb) and upload to a Fabric workspace.
 
 ![](../../assets/images/blog/2025/03/image-1.png)
 

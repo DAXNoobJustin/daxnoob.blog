@@ -61,20 +61,20 @@ This function takes a table, a new SKey column name, and an optional list of col
 
 **Parameters:**
 
-**tableToTransform**as table
+**tableToTransform** as table
 The table on which to generate a new surrogate key column.
 
-**newSKeyColumnName**as text
+**newSKeyColumnName** as text
 The new column name for the surrogate key. The input will be prefixed with "_SKey ".
 
-*optional***columnsToGroupBy**as list
+*optional* **columnsToGroupBy** as list
 The list of columns used to generate the surrogate key. A unique key will be generated for each unique combination of values. If left blank, each row will be considered unique.
 
 ## Required Custom Functions
 
 This function is dependent on these additional custom functions.  Copy them into your Power Query project for fxGenerateSurrogateKeyColumn function to work.
 
-- [fxJoinAndExpandTable](https://daxnoob.blog/2024/01/14/custom-m-function-1-fxjoinandexpandtable/)
+- [fxJoinAndExpandTable](https://daxnoob.blog/custom-m-function-1-fxjoinandexpandtable/)
 
 ## Function without documentation
 
