@@ -11,7 +11,7 @@ tags:
   - M Functions
   - Data Modeling
 slug: custom-m-function-5-fxcumulativetoincremental
-image: assets/images/blog/2024/03/image.png
+image: assets/images/posts/custom-m-function-5-fxcumulativetoincremental/image.png
 ---
 
 ## Introduction
@@ -366,19 +366,19 @@ in
 
 Let's say you start with the following table which columns a cumulative column called "Running Total" grouped by a column called "Group Column" and sorted by a column called "Sort by Column":
 
-![](../../assets/images/blog/2024/03/image.png)
+![](../../assets/images/posts/custom-m-function-5-fxcumulativetoincremental/image.png)
 
 As you can see, the value of Running Total increases for each Group Column over time. What we want is a column that just gets us the change in value for Running total over time for each value in Group Column.
 
 We can do just that using our new custom function:
 
-![](../../assets/images/blog/2024/03/image-1.png)
+![](../../assets/images/posts/custom-m-function-5-fxcumulativetoincremental/image-1.png)
 
 **Example: Multiple cumulative columns with multiple group by columns.**
 
 We can also use the function to transform multiple columns with multiple group by columns at once:
 
-![](../../assets/images/blog/2024/03/image-2.png)
+![](../../assets/images/posts/custom-m-function-5-fxcumulativetoincremental/image-2.png)
 
 ## Conclusion
 

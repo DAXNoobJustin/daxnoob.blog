@@ -10,7 +10,7 @@ authors:
 tags:
   - M Functions
 slug: custom-m-function-4-fxsetcolumntypesfromexample
-image: assets/images/blog/2024/02/image-6.png
+image: assets/images/posts/custom-m-function-4-fxsetcolumntypesfromexample/image-6.png
 ---
 
 ## Introduction
@@ -202,19 +202,19 @@ In this example, you want to union two tables together and keep the column types
 
 Table 1: Typed Table
 
-![](../../assets/images/blog/2024/02/image-6.png)
+![](../../assets/images/posts/custom-m-function-4-fxsetcolumntypesfromexample/image-6.png)
 
 Table 2: Untyped Table
 
-![](../../assets/images/blog/2024/02/image-7.png)
+![](../../assets/images/posts/custom-m-function-4-fxsetcolumntypesfromexample/image-7.png)
 
 The issue occurs when you union the tables together:
 
-![](../../assets/images/blog/2024/02/image-11.png)
+![](../../assets/images/posts/custom-m-function-4-fxsetcolumntypesfromexample/image-11.png)
 
 As you can see above, the data types of the first table have been lost. We can restore them using our fxSetColumnTypesFromModel function.
 
-![](../../assets/images/blog/2024/02/image-10.png)
+![](../../assets/images/posts/custom-m-function-4-fxsetcolumntypesfromexample/image-10.png)
 
 **As written, the function restores columns base type not the facet, but I'm sure you can modify the function to restore the facet as well.**
 

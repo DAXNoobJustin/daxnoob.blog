@@ -12,7 +12,7 @@ tags:
   - Semantic Model
   - Power BI
 slug: enhancing-your-golden-semantic-model-with-user-input-tables
-image: assets/images/blog/2024/04/zoomit.png
+image: assets/images/posts/enhancing-your-golden-semantic-model-with-user-input-tables/zoomit.png
 ---
 
 ## Introduction
@@ -85,7 +85,7 @@ Included below are some of the suggested User Input tables I recommend making av
 
 **Special Considerations:** You can create field parameters in the Modeling tab in the ribbon.
 
-![](../../assets/images/blog/2024/04/zoomit.png)
+![](../../assets/images/posts/enhancing-your-golden-semantic-model-with-user-input-tables/zoomit.png)
 
 ---
 
@@ -97,7 +97,7 @@ Included below are some of the suggested User Input tables I recommend making av
 
 **Special Considerations:** The inactive relationships are not necessary but can be useful in some situations.
 
-![](../../assets/images/blog/2024/04/zoomit-2.png)
+![](../../assets/images/posts/enhancing-your-golden-semantic-model-with-user-input-tables/zoomit-2.png)
 
 ---
 
@@ -178,7 +178,7 @@ SELECTCOLUMNS (
 
 **Special Considerations:** You can create numeric parameters in the Modeling tab in the ribbon.
 
-![](../../assets/images/blog/2024/04/zoomit-1.png)
+![](../../assets/images/posts/enhancing-your-golden-semantic-model-with-user-input-tables/zoomit-1.png)
 
 ## Conclusion
 

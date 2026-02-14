@@ -10,7 +10,7 @@ authors:
 tags:
   - M Functions
 slug: custom-m-function-1-fxjoinandexpandtable
-image: assets/images/blog/2024/01/image-2.png
+image: assets/images/posts/custom-m-function-1-fxjoinandexpandtable/image-2.png
 ---
 
 ## Introduction
@@ -21,7 +21,7 @@ If you are doing any type of dimensional modeling in Power BI using Power Query,
 
 Although the GUI is very useful, the resulting code may not be as efficient as it could be, especially if the join columns have the same names and you don't want to rename the columns you are expanding.
 
-![](../../assets/images/blog/2024/01/image-2.png)
+![](../../assets/images/posts/custom-m-function-1-fxjoinandexpandtable/image-2.png)
 
 Looking at the GUI generated code above, you can see what I am talking about:
 Green - The join columns are hard coded even though are both named "ProductKey."
@@ -245,19 +245,19 @@ in
 
 **Example 1: Keys are the same, no renaming expanded columns, no check on additional rows generated**
 
-![](../../assets/images/blog/2024/01/image-3.png)
+![](../../assets/images/posts/custom-m-function-1-fxjoinandexpandtable/image-3.png)
 
 **Example 2: Keys are the same, rename the expanded column, guarantee that no additional records will need to be added**
 
-![](../../assets/images/blog/2024/01/image-4.png)
+![](../../assets/images/posts/custom-m-function-1-fxjoinandexpandtable/image-4.png)
 
 **Example 3: Keys are different, **no renaming expanded columns**, check that no additional records will need to be added, no additional records are added**
 
-![](../../assets/images/blog/2024/01/image-5.png)
+![](../../assets/images/posts/custom-m-function-1-fxjoinandexpandtable/image-5.png)
 
 **Example 4: Keys are different, **no renaming expanded columns**, check that no additional records will need to be added, additional records are added**
 
-![](../../assets/images/blog/2024/01/image-6.png)
+![](../../assets/images/posts/custom-m-function-1-fxjoinandexpandtable/image-6.png)
 
 ## Conclusion
 

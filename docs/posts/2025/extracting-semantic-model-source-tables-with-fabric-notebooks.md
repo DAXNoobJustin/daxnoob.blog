@@ -13,7 +13,7 @@ tags:
 authors:
   - justinmartin
 slug: extracting-semantic-model-source-tables-with-fabric-notebooks
-image: assets/images/blog/2025/05/image.png
+image: assets/images/posts/extracting-semantic-model-source-tables-with-fabric-notebooks/image.png
 ---
 
 ## Introduction
@@ -28,11 +28,11 @@ When trying to identify the source table of a semantic model table, you need a w
 
 And depending on the table type, the source table will be found in different locations. For Direct Lake models, the source table name will be the "Entity Name" property found in the Entity partition associated with the semantic model table.
 
-![](../../assets/images/blog/2025/05/image.png)
+![](../../assets/images/posts/extracting-semantic-model-source-tables-with-fabric-notebooks/image.png)
 
 For Import Models, the source table name will be found somewhere in the M expression on the M partition.
 
-![](../../assets/images/blog/2025/05/image-1.png)
+![](../../assets/images/posts/extracting-semantic-model-source-tables-with-fabric-notebooks/image-1.png)
 
 As you can see, it is a little simpler to get the source table name from a Direct Lake table than an Import/Direct Query table because depending on your data source and how you wrote your M expressions, the source tables could show up in different ways.
 
@@ -140,13 +140,13 @@ After running the notebook, I get the following results:
 
 **Records from one of the Direct Lake models**
 
-![](../../assets/images/blog/2025/05/image-2.png)
+![](../../assets/images/posts/extracting-semantic-model-source-tables-with-fabric-notebooks/image-2.png)
 
 **Records from one of the Import models**
 
 As you can see here, many of the tables' M expressions had a matching pattern and the notebook was able to successfully extract the source table name. A few didn't have any matches, like the DIM_Date table which doesn't pull from an external source but is completely built in M.
 
-![](../../assets/images/blog/2025/05/image-3.png)
+![](../../assets/images/posts/extracting-semantic-model-source-tables-with-fabric-notebooks/image-3.png)
 
 ## Conclusion
 

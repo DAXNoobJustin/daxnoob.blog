@@ -12,8 +12,8 @@ theme:
   name: material
   custom_dir: overrides
   language: en
-  favicon: assets/images/favicon.png
-  logo: assets/images/logo.png
+  favicon: assets/images/shared/favicon.png
+  logo: assets/images/shared/logo.png
   icon:
     repo: fontawesome/brands/github
   palette:
@@ -68,7 +68,7 @@ plugins:
         default_timezone: "UTC"
       categories:
         - categories
-      image: https://daxnoob.blog/assets/images/avatar.png
+      image: https://daxnoob.blog/assets/images/shared/avatar.png
       json_feed_enabled: true
       rss_feed_enabled: true
       pretty_print: false

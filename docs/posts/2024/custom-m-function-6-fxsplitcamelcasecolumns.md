@@ -10,7 +10,7 @@ authors:
 tags:
   - M Functions
 slug: custom-m-function-6-fxsplitcamelcasecolumns
-image: assets/images/blog/2024/03/image-27.png
+image: assets/images/posts/custom-m-function-6-fxsplitcamelcasecolumns/image-27.png
 ---
 
 ## Introduction
@@ -182,17 +182,17 @@ in
 
 Table with camel case column names:
 
-![](../../assets/images/blog/2024/03/image-27.png)
+![](../../assets/images/posts/custom-m-function-6-fxsplitcamelcasecolumns/image-27.png)
 
 Using the custom function to transform the column names:
 
-![](../../assets/images/blog/2024/03/image-28.png)
+![](../../assets/images/posts/custom-m-function-6-fxsplitcamelcasecolumns/image-28.png)
 
 **Example 2: Transformed columns with overrides**
 
 Using the custom function to transform the column names and provider alternate transformations for two columns:
 
-![](../../assets/images/blog/2024/03/image-29.png)
+![](../../assets/images/posts/custom-m-function-6-fxsplitcamelcasecolumns/image-29.png)
 
 ## Conclusion
 

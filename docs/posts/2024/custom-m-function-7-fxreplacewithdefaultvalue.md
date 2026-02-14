@@ -11,7 +11,7 @@ tags:
   - M Functions
   - Data Quality
 slug: custom-m-function-7-fxreplacewithdefaultvalue
-image: assets/images/blog/2024/04/image-4.png
+image: assets/images/posts/custom-m-function-7-fxreplacewithdefaultvalue/image-4.png
 ---
 
 ## Introduction
@@ -24,7 +24,7 @@ My preference is to replace them with an alternative default value such as the s
 
 Blanks and nulls can cause confusion for users. Consider the image below:
 
-![](../../assets/images/blog/2024/04/image-4.png)
+![](../../assets/images/posts/custom-m-function-7-fxreplacewithdefaultvalue/image-4.png)
 
 As a user, I might be asking:
 
@@ -35,7 +35,7 @@ As a user, I might be asking:
 
 By replacing the nulls and blanks with "Unknown," the report looks cleaner and instills more trust for the user.
 
-![](../../assets/images/blog/2024/04/image-5.png)
+![](../../assets/images/posts/custom-m-function-7-fxreplacewithdefaultvalue/image-5.png)
 
 Unfortunately, blanks and nulls come in all shapes and sizes. Depending on the data source, any one of these values can be present:
 
@@ -317,17 +317,17 @@ in
 
 Original table with like null values:
 
-![](../../assets/images/blog/2024/04/image-1.png)
+![](../../assets/images/posts/custom-m-function-7-fxreplacewithdefaultvalue/image-1.png)
 
 Data cleaned with custom function:
 
-![](../../assets/images/blog/2024/04/image-2.png)
+![](../../assets/images/posts/custom-m-function-7-fxreplacewithdefaultvalue/image-2.png)
 
 **Example 2: **Cleaning table values and replacing numeric values****
 
 Data cleaned (including numeric columns) with custom function:
 
-![](../../assets/images/blog/2024/04/image-3.png)
+![](../../assets/images/posts/custom-m-function-7-fxreplacewithdefaultvalue/image-3.png)
 
 ## Conclusion
 

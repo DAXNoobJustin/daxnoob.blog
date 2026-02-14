@@ -12,7 +12,7 @@ tags:
   - Optimization
   - Semantic Model
 slug: optimizing-rolling-distinct-count-measures
-image: assets/images/blog/2024/12/image.png
+image: assets/images/posts/optimizing-rolling-distinct-count-measures/image.png
 ---
 
 ## Introduction
@@ -25,7 +25,7 @@ In my new role in Azure Data, I have spent a lot of time optimizing the performa
 
 The model is a simple star schema with a fact table (250+ million rows), date table, and one additional large dimension.
 
-![](../../assets/images/blog/2024/12/image.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image.png)
 
 ## The Initial Measure
 
@@ -70,13 +70,13 @@ __Result
 
 The query is quite slow, taking a staggering 508 seconds to complete. Taking a look at the server timings, there are a total of 216 storage engine queries, mostly representing one query for each day's 28-day distinct count over the past 6 months.
 
-![](../../assets/images/blog/2024/12/image-2.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-2.png)
 
-![](../../assets/images/blog/2024/12/image-4.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-4.png)
 
-![](../../assets/images/blog/2024/12/image-5.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-5.png)
 
-![](../../assets/images/blog/2024/12/image-6.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-6.png)
 
 ## Optimization 1: Moving the Query Execution to the Formula Engine
 
@@ -123,13 +123,13 @@ __Result
 
 By changing this one line, we see a significant improvement in performance. The total duration went from 508 seconds to just 49 seconds.  As you can see below, the majority of the processing is performed by the formula engine and there is now a large materialization of combinations of Things and days in one storage engine query.
 
-![](../../assets/images/blog/2024/12/image-7.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-7.png)
 
-![](../../assets/images/blog/2024/12/image-8.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-8.png)
 
-![](../../assets/images/blog/2024/12/image-9.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-9.png)
 
-![](../../assets/images/blog/2024/12/image-10.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-10.png)
 
 As noted above, this pattern is not a guaranteed performance improvement. The main factor in the gains we see here is the filter applied to the 'Large Dimension' table. When the filter is removed, the small storage engine events in the first pattern execute much quicker and the performance difference between the patterns is negligible. Nevertheless, we discovered that the pattern is indeed useful in our scenario. 🙂
 
@@ -194,25 +194,25 @@ The measure above first calculates the starting date by only taking into account
 
 While a little more complex, we see another substantial performance improvement. The total duration is now around 12 seconds, and we are still able to see the trend over time.
 
-![](../../assets/images/blog/2024/12/image-12.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-12.png)
 
-![](../../assets/images/blog/2024/12/image-13.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-13.png)
 
-![](../../assets/images/blog/2024/12/image-14.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-14.png)
 
-![](../../assets/images/blog/2024/12/image-11.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-11.png)
 
 ## Optimization 3: Calendar Window Table
 
 The final optimization takes the idea above one step forward and leverages a table that contains precomputed 28-day windows associated each date. For example, here is a sample of the table:
 
-![](../../assets/images/blog/2024/12/image-15.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-15.png)
 
 For the calendar window 11/19/2024, there are 28 associated calendar dates, starting on 11/19/2024 and going back 28 days (10/23/2024).
 
 I have also added some additional columns: WindowDaySize and WindowDayShift. The WindowDaySize allows you to have more than one window size to slice your data by, e.g. 28-days, 7-days, etc. The WindowDayShift allows you to perform easier time intelligence with the CalendarWindow table. For example, if I want to get the rolling 28-day window for last year, I can filter the CalendarWindow table where WindowDaySize = 28 and WindowDayShift = -365 as shown below:
 
-![](../../assets/images/blog/2024/12/image-16.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-16.png)
 
 Here is a small notebook that allows you to create a customized CalendarWindow table from your main date table in your Fabric Lakehouse:
 
@@ -283,7 +283,7 @@ df.write.mode("overwrite").format("delta") \
 
 After the CalendarWindow table has been created, create a many-to-many relationship between the new table and your fact table:
 
-![](../../assets/images/blog/2024/12/image-17.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-17.png)
 
 With the new table now in the model, we can use a similar pattern as before, now leveraging the precomputed windows.
 
@@ -349,11 +349,11 @@ Similarly to the second optimization, the measure above computes valid windows b
 
 Again, we see a great performance gain with the total duration around 2 seconds. With the introduction of the new many-to-many relationship and precomputed windows, the normal left 0uter join pattern is replaced with a semi-join batch pattern that, in this scenario, reduces the combination of Things and dates materialized which speeds up the calculation.
 
-![](../../assets/images/blog/2024/12/image-18.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-18.png)
 
-![](../../assets/images/blog/2024/12/image-19.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-19.png)
 
-![](../../assets/images/blog/2024/12/image-20.png)
+![](../../assets/images/posts/optimizing-rolling-distinct-count-measures/image-20.png)
 
 Here is the main batch xmSQL generated:
 

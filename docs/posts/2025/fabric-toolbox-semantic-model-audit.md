@@ -14,7 +14,7 @@ tags:
 authors:
   - justinmartin
 slug: fabric-toolbox-semantic-model-audit
-image: assets/images/blog/2025/03/image-11.png
+image: assets/images/posts/fabric-toolbox-semantic-model-audit/image-11.png
 ---
 
 ## Introduction
@@ -38,9 +38,9 @@ The tool consists of three main components:
 3. **The PowerPoint File:**
     - Contains the background images and design elements used in the Power BI template.
 
-![](../../assets/images/blog/2025/03/image-11.png)
+![](../../assets/images/posts/fabric-toolbox-semantic-model-audit/image-11.png)
 
-![](../../assets/images/blog/2025/03/image-12.png)
+![](../../assets/images/posts/fabric-toolbox-semantic-model-audit/image-12.png)
 
 ## Requirements
 
@@ -83,27 +83,27 @@ The tool consists of three main components:
 
 Download the notebook from GitHub and upload to a Fabric workspace.
 
-![](../../assets/images/blog/2025/03/image-13.png)
+![](../../assets/images/posts/fabric-toolbox-semantic-model-audit/image-13.png)
 
 Attach a Lakehouse that will be used to save the logs.
 
-![](../../assets/images/blog/2025/03/image-14.png)
+![](../../assets/images/posts/fabric-toolbox-semantic-model-audit/image-14.png)
 
 Update the list of models you want to audit.
 
-![](../../assets/images/blog/2025/03/image-15.png)
+![](../../assets/images/posts/fabric-toolbox-semantic-model-audit/image-15.png)
 
 Configure the rest of the settings in the config cell. There are a lot of options, so read carefully. 🙂
 
-![](../../assets/images/blog/2025/03/image-16.png)
+![](../../assets/images/posts/fabric-toolbox-semantic-model-audit/image-16.png)
 
 Run the notebook and collect the logs. Under the collect_model_statistics() cell, you can track along with the testing if you want to understand what is happening.
 
-![](../../assets/images/blog/2025/03/image-17.png)
+![](../../assets/images/posts/fabric-toolbox-semantic-model-audit/image-17.png)
 
 After the first run has finished, download the PBIT file and connect to your lakehouse.
 
-![](../../assets/images/blog/2025/03/image-18.png)
+![](../../assets/images/posts/fabric-toolbox-semantic-model-audit/image-18.png)
 
 ## Conclusion
 

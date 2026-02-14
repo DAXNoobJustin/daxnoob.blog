@@ -11,7 +11,7 @@ tags:
   - Data Quality
   - M Functions
 slug: sometimes-its-good-to-fail-raising-errors-with-data-quality-tests
-image: assets/images/blog/2024/06/image-1.png
+image: assets/images/posts/sometimes-its-good-to-fail-raising-errors-with-data-quality-tests/image-1.png
 ---
 
 ## Introduction
@@ -58,9 +58,9 @@ It might look something like this. Consider this function that adds two unequal 
         _test_result
 ```
 
-![](../../assets/images/blog/2024/06/image-1.png)
+![](../../assets/images/posts/sometimes-its-good-to-fail-raising-errors-with-data-quality-tests/image-1.png)
 
-![](../../assets/images/blog/2024/06/image-2.png)
+![](../../assets/images/posts/sometimes-its-good-to-fail-raising-errors-with-data-quality-tests/image-2.png)
 
 While it is a silly example, it shows how you can test to make sure that the expected output occurs. If it does not, you can raise an error and send a custom message to the developer.
 
@@ -80,7 +80,7 @@ This function makes it easier to join two tables together. The function uses a l
 
 To avoid this, I run a test to ensure the row count before and after the join is the same.
 
-![](../../assets/images/blog/2024/06/image-3.png)
+![](../../assets/images/posts/sometimes-its-good-to-fail-raising-errors-with-data-quality-tests/image-3.png)
 
 **Example 2:**
 
@@ -98,7 +98,7 @@ When I go to create a dimension table from _SKey A+B, A, B, and C and perform a 
 
 Adding a data quality test to ensure that the final row count equals the distinct count of the _SKey column ensures that this is not the case.
 
-![](../../assets/images/blog/2024/06/image-4.png)
+![](../../assets/images/posts/sometimes-its-good-to-fail-raising-errors-with-data-quality-tests/image-4.png)
 
 ## Conclusion
 

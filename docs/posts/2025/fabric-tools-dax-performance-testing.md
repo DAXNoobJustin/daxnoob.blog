@@ -14,7 +14,7 @@ tags:
 authors:
   - justinmartin
 slug: fabric-tools-dax-performance-testing
-image: assets/images/blog/2025/03/image-1.png
+image: assets/images/posts/fabric-tools-dax-performance-testing/image-1.png
 ---
 
 ## Introduction
@@ -54,33 +54,33 @@ This notebook takes an Excel file with DAX queries, runs them under cold, warm, 
 
 1. [Download the notebook from GitHub](https://github.com/microsoft/fabric-toolbox/blob/main/tools/DAXPerformanceTesting/DAXPerformanceTesting.ipynb) and upload to a Fabric workspace.
 
-![](../../assets/images/blog/2025/03/image-1.png)
+![](../../assets/images/posts/fabric-tools-dax-performance-testing/image-1.png)
 
 2. Attach a Lakehouse that will be used to save the logs and host the query list.
 
-![](../../assets/images/blog/2025/03/image-2.png)
+![](../../assets/images/posts/fabric-tools-dax-performance-testing/image-2.png)
 
 3. Add an Excel file with your query list to the Lakehouse. One column must be named "queryId" and there can be as many other columns as you want containing the DAX queries. You will assign one query column to each model. The same column can be used for multiple models. Update the excel file path the with correct file name and worksheet name.
 
-![](../../assets/images/blog/2025/03/image-8.png)
+![](../../assets/images/posts/fabric-tools-dax-performance-testing/image-8.png)
 
-![](../../assets/images/blog/2025/03/image-4.png)
+![](../../assets/images/posts/fabric-tools-dax-performance-testing/image-4.png)
 
 4. Update the list of models you want to test.
 
-![](../../assets/images/blog/2025/03/image-5.png)
+![](../../assets/images/posts/fabric-tools-dax-performance-testing/image-5.png)
 
 5. Configure the rest of the settings in the config cell. You can leave the capacity settings blank if you are not testing cold-cache from Import and/or Direct Query. There are a lot of options, so read carefully. 🙂
 
-![](../../assets/images/blog/2025/03/image-6.png)
+![](../../assets/images/posts/fabric-tools-dax-performance-testing/image-6.png)
 
 6. Run the notebook and collect the logs. Under the run_dax_queries() cell, you can track along with the testing if you want to understand what is happening.
 
-![](../../assets/images/blog/2025/03/image-7.png)
+![](../../assets/images/posts/fabric-tools-dax-performance-testing/image-7.png)
 
 7. Analyze the logs saved in your Lakehouse to compare query results across query versions, cache-states, models, etc.
 
-![](../../assets/images/blog/2025/03/image-9.png)
+![](../../assets/images/posts/fabric-tools-dax-performance-testing/image-9.png)
 
 ## Conclusion
 

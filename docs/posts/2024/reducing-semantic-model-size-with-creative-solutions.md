@@ -12,7 +12,7 @@ tags:
   - Semantic Model
   - Optimization
 slug: reducing-semantic-model-size-with-creative-solutions
-image: assets/images/blog/2024/05/image.png
+image: assets/images/posts/reducing-semantic-model-size-with-creative-solutions/image.png
 ---
 
 ## Introduction
@@ -37,7 +37,7 @@ Unfortunately, including the key posed a bit of a challenge. That one column rep
 
 (I am using a sample model as an example; our real model was much larger).
 
-![](../../assets/images/blog/2024/05/image.png)
+![](../../assets/images/posts/reducing-semantic-model-size-with-creative-solutions/image.png)
 
 Our model was approaching the capacity limits and refreshing it would be a challenge.
 
@@ -57,11 +57,11 @@ With this information, our proposed solution was to replace the SalesKey column 
 
 As you can see below, all keys for years before 2020 have been replaced with "Historical Key."
 
-![](../../assets/images/blog/2024/05/zoomit.png)
+![](../../assets/images/posts/reducing-semantic-model-size-with-creative-solutions/zoomit.png)
 
 By drastically reducing the cardinality of the SalesKey column, the column takes up much less memory (from 94.94 MB to 6.74 MB), and the model size has been drastically reduced (from 168.42 MB to 85.39 MB).
 
-![](../../assets/images/blog/2024/05/image-1.png)
+![](../../assets/images/posts/reducing-semantic-model-size-with-creative-solutions/image-1.png)
 
 ## The Solution Expanded
 
@@ -71,21 +71,21 @@ Let's assume that after further discussion, you discover that you only need cust
 
 Here are the current statistics for the Customer table:
 
-![](../../assets/images/blog/2024/05/image-5.png)
+![](../../assets/images/posts/reducing-semantic-model-size-with-creative-solutions/image-5.png)
 
 To replace the address information for old customers, we can get the list of customer keys that only have sales before 2020-03-01 (the current month in the dataset). Then we can replace all the address information for those keys with a default value.
 
-![](../../assets/images/blog/2024/05/image-3.png)
+![](../../assets/images/posts/reducing-semantic-model-size-with-creative-solutions/image-3.png)
 
 Again, reducing the cardinality of the high cardinality column reduces the total model size (from 85.39 MB to 80.88 MB):
 
-![](../../assets/images/blog/2024/05/image-8.png)
+![](../../assets/images/posts/reducing-semantic-model-size-with-creative-solutions/image-8.png)
 
-![](../../assets/images/blog/2024/05/image-9.png)
+![](../../assets/images/posts/reducing-semantic-model-size-with-creative-solutions/image-9.png)
 
 Finally, we can create a new "Historical Customer" record and remap all Sales before 2020 to that new record. Then we can also remove customer records from the Customer table for CustomerKeys that don't have sales within the past year. Once we do that, here are the new model statistics:
 
-![](../../assets/images/blog/2024/05/image-10.png)
+![](../../assets/images/posts/reducing-semantic-model-size-with-creative-solutions/image-10.png)
 
 ## Conclusion
 

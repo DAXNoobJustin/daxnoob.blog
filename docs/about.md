@@ -6,7 +6,7 @@ hide:
 ---
 
 <div class="dn-profile" markdown>
-  <img src="../assets/images/avatar.png" alt="Justin Martin" class="dn-profile__avatar">
+  <img src="../assets/images/shared/avatar.png" alt="Justin Martin" class="dn-profile__avatar">
   <div class="dn-profile__info">
     <h1 class="dn-profile__name">Justin Martin</h1>
   </div>

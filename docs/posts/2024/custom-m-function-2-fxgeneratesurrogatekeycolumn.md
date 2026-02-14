@@ -11,7 +11,7 @@ tags:
   - M Functions
   - Data Modeling
 slug: custom-m-function-2-fxgeneratesurrogatekeycolumn
-image: assets/images/blog/2024/01/image-7.png
+image: assets/images/posts/custom-m-function-2-fxgeneratesurrogatekeycolumn/image-7.png
 ---
 
 ## Introduction
@@ -30,19 +30,19 @@ To address the issues above, you can create a new column to serve as a substitut
 
 For example, let's say you want to create a slowly changing employee dimension table where the natural key is the employee id. The original table is shown below:
 
-![](../../assets/images/blog/2024/01/image-7.png)
+![](../../assets/images/posts/custom-m-function-2-fxgeneratesurrogatekeycolumn/image-7.png)
 
 So far so good.
 
 But look what happens when you start to snapshot the data:
 
-![](../../assets/images/blog/2024/01/image-8.png)
+![](../../assets/images/posts/custom-m-function-2-fxgeneratesurrogatekeycolumn/image-8.png)
 
 We have captured the changed value for Kim's favorite color, but the Employee_ID is no longer unique and can't serve as the primary key.
 
 **Insert surrogate key:**
 
-![](../../assets/images/blog/2024/01/image-9.png)
+![](../../assets/images/posts/custom-m-function-2-fxgeneratesurrogatekeycolumn/image-9.png)
 
 The new _SKey_Employee column has one unique value for each combination of Employee_ID and Snapshot_Date. Now, when creating any fact table that needs to have a relationship with the employee dimension, you can bring the _SKey_Employee into the fact by joining on both the Employee_ID and Snapshot_Date.
 
@@ -242,15 +242,15 @@ in
 
 Snapshotted table without surrogate key:
 
-![](../../assets/images/blog/2024/01/image-10.png)
+![](../../assets/images/posts/custom-m-function-2-fxgeneratesurrogatekeycolumn/image-10.png)
 
 Create surrogate key column:
 
-![](../../assets/images/blog/2024/01/image-11.png)
+![](../../assets/images/posts/custom-m-function-2-fxgeneratesurrogatekeycolumn/image-11.png)
 
 Select dimension columns and remove duplicates:
 
-![](../../assets/images/blog/2024/01/image-12.png)
+![](../../assets/images/posts/custom-m-function-2-fxgeneratesurrogatekeycolumn/image-12.png)
 
 ## Conclusion
 

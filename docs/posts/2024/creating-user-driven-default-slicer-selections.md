@@ -12,7 +12,7 @@ tags:
   - Power BI
   - Data Modeling
 slug: creating-user-driven-default-slicer-selections
-image: assets/images/blog/2024/06/image-6.png
+image: assets/images/posts/creating-user-driven-default-slicer-selections/image-6.png
 ---
 
 ## Introduction
@@ -31,7 +31,7 @@ The requirements were:
 
 To simplify the demo, let's assume that the original model consists of one sales table that contains the store name.
 
-![](../../assets/images/blog/2024/06/image-6.png)
+![](../../assets/images/posts/creating-user-driven-default-slicer-selections/image-6.png)
 
 ## The Solution
 
@@ -40,24 +40,24 @@ My solution was as follows:
 **Step 1: Create two additional tables**
 
 1. An RLS table consisting of the user's email address/user principal name and the name of their home store.
-![](../../assets/images/blog/2024/06/screenshot-2024-06-23-155832.png)
+![](../../assets/images/posts/creating-user-driven-default-slicer-selections/screenshot-2024-06-23-155832.png)
 2. A table consisting of:
 - The cartesian product of store names (Home Store Name and Store Name)
 - Store Display Name column whose value is "Home Store" when the Home Store Name is equal to the Store Name
 - A Store Display Name Sort column to use as a sort by column for the Store Display Name column.
-![](../../assets/images/blog/2024/06/screenshot-2024-06-23-153849.png)
+![](../../assets/images/posts/creating-user-driven-default-slicer-selections/screenshot-2024-06-23-153849.png)
 
 **Step 2: Create many-to-many, single-direction relationships between the tables.**
 
-![](../../assets/images/blog/2024/06/image-10.png)
+![](../../assets/images/posts/creating-user-driven-default-slicer-selections/image-10.png)
 
 **Step 3: Create an RLS rule on the RLS table filtering the user to be equal to the signed in use.**
 
-![](../../assets/images/blog/2024/06/image-11.png)
+![](../../assets/images/posts/creating-user-driven-default-slicer-selections/image-11.png)
 
 **Step 4: Add a slicer to the report filtering the Store Display Name to be equal to "Home Store."**
 
-![](../../assets/images/blog/2024/06/image-9.png)
+![](../../assets/images/posts/creating-user-driven-default-slicer-selections/image-9.png)
 
 ## The Solution Explained
 
@@ -69,36 +69,36 @@ When the user signs in, the RLS table is filtered, and their Home Store Name val
 When the Store Display table is filtered to a particular home store, the results are as follows:
 
 - Store A:
-    - ![](../../assets/images/blog/2024/06/screenshot-2024-06-23-161426.png)
+    - ![](../../assets/images/posts/creating-user-driven-default-slicer-selections/screenshot-2024-06-23-161426.png)
 - Store B:
-    - ![](../../assets/images/blog/2024/06/screenshot-2024-06-23-161527.png)
+    - ![](../../assets/images/posts/creating-user-driven-default-slicer-selections/screenshot-2024-06-23-161527.png)
 - Store C:
-    - ![](../../assets/images/blog/2024/06/screenshot-2024-06-23-161608.png)
+    - ![](../../assets/images/posts/creating-user-driven-default-slicer-selections/screenshot-2024-06-23-161608.png)
 
 Because each employee's home store can be different, selecting a specific value like "Store A" will only meet the requirement for those employees whose home store is "Store A," but not all employees.
 
 Since each Store Name value will be the user's home store when filtering the Store Display Name to be equal to "Home Store," we can add a slicer to the report filtering the Store Display Name to be equal to "Home Store."
 
-![](../../assets/images/blog/2024/06/image-18.png)
+![](../../assets/images/posts/creating-user-driven-default-slicer-selections/image-18.png)
 
 When the slicer selection is made, the user's home store value in the Store Name column will propagate down to the Sales table.
 
 As you can see below, employees from different stores (Manager A and Manager B) will see their home store's data when viewing the report because of the slicer selection.
 
-![](../../assets/images/blog/2024/06/image-14.png)
+![](../../assets/images/posts/creating-user-driven-default-slicer-selections/image-14.png)
 
-![](../../assets/images/blog/2024/06/image-13.png)
+![](../../assets/images/posts/creating-user-driven-default-slicer-selections/image-13.png)
 
 **Requirement 2, "the users need to see their own store as default when they first open the report," has been met.**
 
 Going back to the different possibilities of filtered Store Display tables:
 
 - Store A:
-    - ![](../../assets/images/blog/2024/06/screenshot-2024-06-23-161426.png)
+    - ![](../../assets/images/posts/creating-user-driven-default-slicer-selections/screenshot-2024-06-23-161426.png)
 - Store B:
-    - ![](../../assets/images/blog/2024/06/screenshot-2024-06-23-161527.png)
+    - ![](../../assets/images/posts/creating-user-driven-default-slicer-selections/screenshot-2024-06-23-161527.png)
 - Store C:
-    - ![](../../assets/images/blog/2024/06/screenshot-2024-06-23-161608.png)
+    - ![](../../assets/images/posts/creating-user-driven-default-slicer-selections/screenshot-2024-06-23-161608.png)
 
 For each possibility above, all store name values exist in the Store Name column.
 
@@ -108,9 +108,9 @@ This allows the user to change the slicer selection from "Home Store" to another
 
 For example, Manager A, whose home store is "Store A" can see data from other stores.
 
-![](../../assets/images/blog/2024/06/image-15.png)
+![](../../assets/images/posts/creating-user-driven-default-slicer-selections/image-15.png)
 
-![](../../assets/images/blog/2024/06/image-19.png)
+![](../../assets/images/posts/creating-user-driven-default-slicer-selections/image-19.png)
 
 **Requirement 3, "the users need to still be able to filter to the other stores," has been met.**
 

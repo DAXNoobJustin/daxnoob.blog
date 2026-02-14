@@ -10,7 +10,7 @@ authors:
 tags:
   - M Functions
 slug: custom-m-function-3-fxsplitcamelcasetext
-image: assets/images/blog/2024/02/image.png
+image: assets/images/posts/custom-m-function-3-fxsplitcamelcasetext/image.png
 ---
 
 ## Introduction
@@ -213,17 +213,17 @@ in
 
 **Example 1: Transforming a simple string**
 
-![](../../assets/images/blog/2024/02/image.png)
+![](../../assets/images/posts/custom-m-function-3-fxsplitcamelcasetext/image.png)
 
 **Example 2: Rename All Columns**
 
 Starting table:
 
-![](../../assets/images/blog/2024/02/image-1.png)
+![](../../assets/images/posts/custom-m-function-3-fxsplitcamelcasetext/image-1.png)
 
 Renaming all columns at once leveraging the fxSplitCamelCaseText function:
 
-![](../../assets/images/blog/2024/02/image-3.png)
+![](../../assets/images/posts/custom-m-function-3-fxsplitcamelcasetext/image-3.png)
 
 ## Conclusion
 

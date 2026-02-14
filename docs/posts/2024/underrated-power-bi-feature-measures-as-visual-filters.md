@@ -10,7 +10,7 @@ authors:
 tags:
   - Power BI
 slug: underrated-power-bi-feature-measures-as-visual-filters
-image: assets/images/blog/2024/01/image-13.png
+image: assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-13.png
 ---
 
 ## Introduction
@@ -19,13 +19,13 @@ One of the features I love in Power BI that I don't think gets enough love is th
 
 For example, let's say I only want to display a list of brands and their total sales but only include brands that have had over $100M in sales. You can do so by adding a filter condition on the measure like shown below:
 
-![](../../assets/images/blog/2024/01/image-13.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-13.png)
 
 You might be asking... so what?
 
 Well, hold on to your hats! You can also remove Sales Amount from the visual and the filter still applies! 🤯
 
-![](../../assets/images/blog/2024/01/image-14.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-14.png)
 
 You still might be asking... so what?
 
@@ -37,7 +37,7 @@ I've included a couple of those patterns below.
 
 By default, you can apply a Top N filter on a field based on another measure like shown below:
 
-![](../../assets/images/blog/2024/01/image-16.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-16.png)
 
 But what if you want to, for example, only display the brands that have greater than the average total sales amount.
 
@@ -45,23 +45,23 @@ You could create new Sales Amount and Total Quantity measures that only return v
 
 ... OR you could just create **one**measure that you can use as a visual filter.
 
-![](../../assets/images/blog/2024/01/image-22.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-22.png)
 
-![](../../assets/images/blog/2024/01/image-23.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-23.png)
 
 ## Pattern 2: Limiting Slicer Selections
 
 It is often the case that you have two slicers with columns from two different tables on your report.
 
-![](../../assets/images/blog/2024/01/image-26.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-26.png)
 
 The problem is, when you select a value from one slicer, the other slicer is unaffected.
 
-![](../../assets/images/blog/2024/01/image-27.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-27.png)
 
 This occurs because the filter is not passed from the Customer table to the Product table, resulting in the user having to randomly select values from the second slicer hoping to find a valid selection (talk about a terrible user experience).
 
-![](../../assets/images/blog/2024/01/image-31.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-31.png)
 
 A common choice made to solve this is to enable bi-directional filters. Unless you want to make Marco and Alberto sad, **don't do this**.
 
@@ -69,15 +69,15 @@ SQLBI has a great article explaining some of the problems that occur when using 
 
 A better way to dynamically limit the slicer selections is to apply a visual level filter that checks if there are records in the fact table.
 
-![](../../assets/images/blog/2024/01/image-29.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-29.png)
 
-![](../../assets/images/blog/2024/01/image-30.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-30.png)
 
 You can achieve the same result by creating a measure that performs a simple aggregation on the fact table, adding it to the visual filter section and set the filter condition to IS NOT BLANK.
 
-![](../../assets/images/blog/2024/01/image-32.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-32.png)
 
-![](../../assets/images/blog/2024/01/image-33.png)
+![](../../assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-33.png)
 
 SQLBI also has a great article that goes over this pattern in depth. You can find it [here](https://www.sqlbi.com/articles/syncing-slicers-in-power-bi/).
 
