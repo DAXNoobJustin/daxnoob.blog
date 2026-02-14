@@ -3,6 +3,11 @@
    Bespoke layouts for non-blog content pages.
    ============================================ */
 
+/* Hide permalink anchors on page-level h1 headings */
+h1 .headerlink {
+  display: none !important;
+}
+
 /* ======================
    ABOUT PAGE
    ====================== */
