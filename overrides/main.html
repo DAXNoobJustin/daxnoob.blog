@@ -48,6 +48,13 @@
   {% endif %}
 {% endblock %}
 
+{% block footer %}
+  {{ super() }}
+  <a href="https://buttondown.com/daxnoob" target="_blank" rel="noopener" class="dn-footer-subscribe">
+    &#9993; Subscribe to new posts
+  </a>
+{% endblock %}
+
 {% block scripts %}
   {{ super() }}
   <script data-goatcounter="https://daxnoob.goatcounter.com/count"

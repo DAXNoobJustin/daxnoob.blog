@@ -1,0 +1,106 @@
+/* ============================================
+   Subscribe CTA — end-of-post + footer link
+   ============================================ */
+
+/* --- Box wrapper --- */
+.dn-subscribe {
+  margin: 3rem 0 1rem;
+  padding: 1.5rem 1.75rem;
+  border: 1px solid var(--dn-border-subtle);
+  border-left: 4px solid var(--dn-teal);
+  border-radius: .75rem;
+  background: var(--dn-teal-ghost);
+}
+
+.dn-subscribe__inner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* --- Copy --- */
+.dn-subscribe__title {
+  font-family: var(--dn-font-display);
+  font-size: 1.05rem;
+  color: var(--dn-navy);
+}
+.dn-subscribe__desc {
+  display: block;
+  margin-top: .25rem;
+  font-size: .85rem;
+  color: var(--dn-steel);
+}
+
+/* --- Form --- */
+.dn-subscribe__form {
+  display: flex;
+  gap: .5rem;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.dn-subscribe__input {
+  flex: 1;
+  padding: .55rem .85rem;
+  border: 1px solid var(--dn-border-subtle);
+  border-radius: .5rem;
+  font-family: var(--dn-font-body);
+  font-size: .88rem;
+  background: #fff;
+  outline: none;
+  transition: border-color .2s;
+}
+.dn-subscribe__input:focus {
+  border-color: var(--dn-teal);
+  box-shadow: 0 0 0 3px var(--dn-teal-ghost);
+}
+.dn-subscribe__input::placeholder {
+  color: #aaa;
+}
+
+.dn-subscribe__btn {
+  padding: .55rem 1.25rem;
+  border: none;
+  border-radius: .5rem;
+  background: var(--dn-teal);
+  color: #fff;
+  font-family: var(--dn-font-display);
+  font-weight: 600;
+  font-size: .88rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .2s, transform .1s;
+}
+.dn-subscribe__btn:hover {
+  background: var(--dn-teal-dark);
+  transform: translateY(-1px);
+}
+.dn-subscribe__btn:active {
+  transform: translateY(0);
+}
+
+/* --- Footer link --- */
+.dn-footer-subscribe {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .78rem;
+  color: var(--dn-steel);
+  text-decoration: none;
+  transition: color .2s;
+}
+.dn-footer-subscribe:hover {
+  color: var(--dn-teal);
+}
+
+/* --- Responsive --- */
+@media (max-width: 600px) {
+  .dn-subscribe__inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dn-subscribe__form {
+    flex-direction: column;
+  }
+}

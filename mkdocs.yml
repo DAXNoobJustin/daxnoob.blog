@@ -118,6 +118,7 @@ extra_css:
   - assets/css/posts.css
   - assets/css/blogIndex.css
   - assets/css/pages.css
+  - assets/css/subscribe.css
 
 extra_javascript:
   - assets/js/lazy-images.js
@@ -180,3 +181,4 @@ nav:
   - Projects: projects.md
   - DAXing with DAX Noob: daxing.md
   - About: about.md
+  - Subscribe: https://buttondown.com/daxnoob

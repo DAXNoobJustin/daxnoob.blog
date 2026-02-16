@@ -4,3 +4,21 @@
 {% endif %}
 {{ page.content }}
 
+{# Subscribe CTA — only on blog posts #}
+{% if page and page.meta and page.meta.date %}
+<div class="dn-subscribe">
+  <div class="dn-subscribe__inner">
+    <div class="dn-subscribe__text">
+      <strong class="dn-subscribe__title">Subscribe</strong>
+      <span class="dn-subscribe__desc">Get notified when I publish new articles.</span>
+    </div>
+    <form class="dn-subscribe__form"
+          action="https://buttondown.com/api/emails/embed-subscribe/daxnoob"
+          method="post">
+      <input type="email" name="email" placeholder="you@example.com" required aria-label="Email address" class="dn-subscribe__input" />
+      <button type="submit" class="dn-subscribe__btn">Subscribe</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
