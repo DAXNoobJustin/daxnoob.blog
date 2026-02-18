@@ -46,6 +46,9 @@ This feature sets up a Kusto database that gives you the ability to query your s
 
 After you have collected the model's name and rough the timepoint where the spike occurred, you can use the following KQL query that you can run to get more information on the events:
 
+!!! info "Update (February 2026)"
+    The Capacity Metrics app (v47+) now exposes an **OperationId** column on the Timepoint Detail page, so you can drill down to a specific operation. For more examples, check out [Chris Webb's blog](https://blog.crossjoin.co.uk/2025/09/14/how-to-get-the-details-of-power-bi-operations-seen-in-the-capacity-metrics-app/).
+
 ```kql
 let hour_offset = 5; // Update your UTC offset here to match how you set up your Capacity Metrics app
 let model_name = ""; // Enter your model name here
