@@ -26,7 +26,7 @@ image: assets/images/posts/extending-fabric-cicd-with-pre-post-processing/mind-b
 
 Even though our team developed the library, it took us a while to adopt it fully because of some limitations.
 
-We build our semenatic model deployment process around using the [Tabular Editor](https://tabulareditor.com/) command line, which allows you to run C# scripts before and after deployment to do things like generate measures, run Best Practice Analyzer checks, refresh the model, and transform definitions per environment. For example, instead of source controlling your various time intelligence (TI) measures for each of your base measures, you can simply add an annotation for each of the base measures you want TI measures for and then have a C# script create them all for you on deployment.
+We build our semantic model deployment process around using the [Tabular Editor](https://tabulareditor.com/) command line, which allows you to run C# scripts before and after deployment to do things like generate measures, run Best Practice Analyzer checks, refresh the model, and transform definitions per environment. For example, instead of source controlling your various time intelligence (TI) measures for each of your base measures, you can simply add an annotation for each of the base measures you want TI measures for and then have a C# script create them all for you on deployment.
 
 fabric-cicd handles the deployment, but doesn't easily provide a way to perform pre or post-processing operations, so I put together a lightweight framework that does just that. In this post, I'll walk through the framework and then demo how we used it to extend our fabric-cicd semantic model deployments with Tabular Editor scripts.
 
@@ -149,7 +149,7 @@ Why would you want to do this? Let's say your semantic model has 10 base measure
 Instead, keep your base measures in source control and **generate the TI variants automatically during deployment**.
 
 The `tabular_editor.py` module in `operations/` wraps the [Tabular Editor](https://tabulareditor.com/) CLI and exposes two operations:
-- **`run_model_script`**: runs a C# script against the local TMDL model definition (pre-process)
+- **`run_model_script`**: runs a C# script against the local model definition (pre-process)
 - **`refresh_model`**: refreshes the published semantic model via XMLA (post-process)
 
 The module handles downloading the Tabular Editor portable CLI automatically if it's not already present and builds the XMLA connection string from the deployment context.
@@ -187,8 +187,8 @@ foreach(var m in Model.AllMeasures
 
 The full script is in the [sample repo](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/extending-fabric-cicd).
 
-!!! tip
-    See [Tabular Editor's script snippets documentation](https://docs.tabulareditor.com/en/features/Useful-script-snippets.html#generate-time-intelligence-measures) for more helpful scripts.
+!!! note
+    See [Tabular Editor's script documentation](https://docs.tabulareditor.com/en/features/csharp-scripts.html) for help and ideas.
 
 ## Running It
 
@@ -211,7 +211,7 @@ Here's what the output looks like:
 
 ## Wrapping Up
 
-Now that we have this functionality, our team can use fabric-cicd for all of our deployments and start performing other pre and post-processing operations for other item types.
+Now that we have this functionality, our team can use fabric-cicd for all of our deployments and start applying other pre and post-processing operations for other item types.
 
 The full source code for the framework and the Time Intelligence example is on [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/extending-fabric-cicd). 
 
