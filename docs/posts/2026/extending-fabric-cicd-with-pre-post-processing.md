@@ -15,9 +15,12 @@ tags:
 authors:
   - justinmartin
 slug: extending-fabric-cicd-with-pre-post-processing
+image: assets/images/posts/extending-fabric-cicd-with-pre-post-processing/mind-blowing.png
 ---
 
 ## Introducing the problem
+
+![](../../assets/images/posts/extending-fabric-cicd-with-pre-post-processing/mind-blowing.png)
 
 [fabric-cicd](https://github.com/microsoft/fabric-cicd) is a great, code-first method to deploy items to your Fabric workspaces. If you haven't used it yet, [check out this article I put together](https://learn.microsoft.com/en-us/power-bi/developer/projects/projects-deploy-fabric-cicd) that will help you get started.
 
@@ -202,26 +205,9 @@ Add `--interactive` for local development (browser auth) or leave it off for CI/
 
 Here's what the output looks like:
 
-```text
-============================================================
-PRE-PROCESS
-============================================================
+![](../../assets/images/posts/extending-fabric-cicd-with-pre-post-processing/pre-processing.png)
 
-  SampleReport.SemanticModel
-    run_model_script
-      Generated 6 Time Intelligence measures for: Total Sales
-      Generated 6 Time Intelligence measures for: Total Profit
-      Total: 12 measures from 2 base measure(s).
-
-[fabric-cicd publishing output...]
-
-============================================================
-POST-PROCESS
-============================================================
-
-  SampleReport.SemanticModel
-    refresh_model
-```
+![](../../assets/images/posts/extending-fabric-cicd-with-pre-post-processing/post-processing.png)
 
 ## Wrapping Up
 
