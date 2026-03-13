@@ -1,0 +1,11 @@
+orchestration:
+  SemanticModel:
+    pre_process:
+      - operation: run_model_script
+        script_path: .deploy/scripts/generateTimeIntelligence.csx
+        failure_mode: abort
+
+    post_process:
+      - operation: refresh_model
+        refresh_type: calculate
+        failure_mode: continue
