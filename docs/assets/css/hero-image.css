@@ -58,7 +58,8 @@
 .has-hero-image .md-content--post {
   position: relative;
   z-index: 1;
-  padding-top: calc(60vh - 340px);
+  /* Use min() so the offset never exceeds what max-height allows. */
+  padding-top: calc(min(60vh, 520px) - 340px);
 }
 
 /* --- Sidebars --- */
@@ -73,7 +74,7 @@
 }
 
 .has-hero-image .md-sidebar--secondary {
-  margin-top: calc(60vh - 340px);
+  margin-top: calc(min(60vh, 520px) - 340px);
   position: sticky;
   top: calc(var(--md-header-height, 3rem) + 0.6rem);
   align-self: flex-start;
@@ -92,10 +93,10 @@
     max-height: 420px;
   }
   .has-hero-image .md-content--post {
-    padding-top: calc(48vh - 280px);
+    padding-top: calc(min(48vh, 420px) - 280px);
   }
   .has-hero-image .md-sidebar--secondary {
-    margin-top: calc(48vh - 280px);
+    margin-top: calc(min(48vh, 420px) - 280px);
   }
 }
 
@@ -106,7 +107,7 @@
     max-height: 360px;
   }
   .has-hero-image .md-content--post {
-    padding-top: calc(40vh - 220px);
+    padding-top: calc(min(40vh, 360px) - 220px);
   }
   .has-hero-image .md-sidebar--secondary {
     margin-top: 0;
