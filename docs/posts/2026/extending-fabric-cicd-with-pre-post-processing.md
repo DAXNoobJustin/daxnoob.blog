@@ -1,9 +1,9 @@
 ---
 title: "Extending fabric-cicd with Pre and Post-Processing Operations"
 description: "A lightweight framework for running custom pre and post-processing operations around fabric-cicd deployments."
-draft: true
+draft: false
 date:
-  created: 2026-03-12
+  created: 2026-03-16
 categories:
   - DevOps
 tags:
@@ -22,13 +22,13 @@ image: assets/images/posts/extending-fabric-cicd-with-pre-post-processing/mind-b
 
 ![](../../assets/images/posts/extending-fabric-cicd-with-pre-post-processing/mind-blowing.png)
 
-[fabric-cicd](https://github.com/microsoft/fabric-cicd) is a great, code-first method to deploy items to your Fabric workspaces. If you haven't used it yet, [check out this article I put together](https://learn.microsoft.com/en-us/power-bi/developer/projects/projects-deploy-fabric-cicd) that will help you get started.
+[fabric-cicd](https://github.com/microsoft/fabric-cicd) is a great, code-first method to deploy items to your Fabric workspaces. If you haven't used it yet, [check out this article](https://learn.microsoft.com/en-us/power-bi/developer/projects/projects-deploy-fabric-cicd) that will help you get started.
 
 Even though our team developed the library, it took us a while to adopt it fully because of some limitations.
 
-We build our semantic model deployment process around using the [Tabular Editor](https://tabulareditor.com/) command line, which allows you to run C# scripts before and after deployment to do things like generate measures, run Best Practice Analyzer checks, refresh the model, and transform definitions per environment. For example, instead of source controlling your various time intelligence (TI) measures for each of your base measures, you can simply add an annotation for each of the base measures you want TI measures for and then have a C# script create them all for you on deployment.
+We build our semantic model deployment process around using the [Tabular Editor](https://tabulareditor.com/) command line, which allows you to run C# scripts before and after deployment to do things like generate measures, run Best Practice Analyzer checks, refresh the model, and other object definitions per environment. For example, instead of source controlling your various time intelligence (TI) measures for each of your base measures, you can simply add an annotation for each of the base measures you want TI measures for and then have a C# script create them all for you on deployment.
 
-fabric-cicd handles the deployment, but doesn't easily provide a way to perform pre or post-processing operations, so I put together a lightweight framework that does just that. In this post, I'll walk through the framework and then demo how we used it to extend our fabric-cicd semantic model deployments with Tabular Editor scripts.
+fabric-cicd handles the deployment, but doesn't easily provide a way to perform pre or post-processing operations, so we put together a lightweight framework that does just that. In this post, I'll walk through the framework and then demo how we used it to extend our fabric-cicd semantic model deployments with Tabular Editor scripts.
 
 The full source code for the framework and example is on [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/extending-fabric-cicd).
 
@@ -36,7 +36,7 @@ The full source code for the framework and example is on [GitHub](https://github
 
 ## How the Framework Works
 
-The idea is simple, just add two phases around fabric-cicd's publish step:
+The framework adds two phases around fabric-cicd's publish step:
 
 ```mermaid
 flowchart LR
@@ -60,10 +60,10 @@ flowchart LR
 2. **Publish** uses fabric-cicd to push items to Fabric.
 3. **Post-process** runs against the *published* workspace. Refresh models, run live validations, etc.
 
-Everything is driven by a YAML config, so you can customize operations per item type without changing any code. The framework works with **any item type** that fabric-cicd supports, not just semantic models.
+Everything is driven by a YAML config, so you can customize operations per item type in a central location. The framework works with **any item type** that fabric-cicd supports, not just semantic models.
 
 !!! warning "Pre-process runs locally and modifies your files"
-    Pre-process operations run against the *local* item definitions on disk, then fabric-cicd publishes, then post-process runs against the *published* workspace. This means pre-process scripts write changes back to your files. Make sure everything is committed to source control before running locally so you can easily `git checkout` to revert. In CI/CD pipelines this isn't an issue because the agent's working copy is disposable.
+    Pre-process operations run against the *local* item definitions on disk, then fabric-cicd publishes, then post-process runs against the *published* workspace. This means pre-process scripts write changes back to your files. Make sure everything is committed to source control before running locally so you can easily `git checkout` to revert and not mess up your directory. In CI/CD pipelines this isn't an issue because the agent's working copy is disposable.
 
 Full source is in the [sample repo](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/extending-fabric-cicd).
 
@@ -85,7 +85,7 @@ your-repo/
     │   └── tabular_editor.py        # example operation
     ├── configs/                     # per-workspace YAML configs
     │   └── SampleWorkspace.yml
-    └── scripts/                     # scripts referenced by operations (not needed if operations are self contained)
+    └── scripts/                     # scripts referenced by operations (not part of the base framework - custom for the tabular_editor operations)
         ├── generateTimeIntelligence.csx
         └── refreshModel.csx
 ```
@@ -110,7 +110,7 @@ orchestration:
         failure_mode: continue
 ```
 
-Each operation specifies a `failure_mode`: `abort` stops the entire deployment, `skip` skips the remaining operations for that item, and `continue` logs a warning and keeps going. Any additional properties like `script_path` or `refresh_type` get passed directly to the operation function as keyword arguments.
+Each operation specifies a `failure_mode`: `abort` stops the entire deployment, `skip` skips the remaining operations for that item but continues the rest of the items, and `continue` logs a warning and keeps going. Any additional properties like `script_path` or `refresh_type` get passed directly to the operation function as keyword arguments.
 
 To process other item types, add another key under `orchestration` with the matching item type name.
 
@@ -144,7 +144,7 @@ Add it to the `operations/` directory, register it in the `OPERATIONS` dictionar
 
 Now that we have the framework, we can extend fabric-cicd with the ability to run Tabular Editor C# scripts before and after deployment.
 
-Why would you want to do this? Let's say your semantic model has 10 base measures and you want standard TI variants  (YTD, PY, YoY, YoY%, QTD, MTD) added that will always follow the same pattern. If you source control them, that's an additional **60** measures to maintain. If your logic for YoY changes, you'll need to update 10 measures.
+Why would you want to do this? Let's say your semantic model has 10 base measures and you want standard TI variants (YTD, PY, YoY, YoY%, QTD, MTD) added that will always follow the same pattern. If you source control them, that's an additional **60** measures to maintain. If your logic for YoY changes, you'll need to update 10 measures.
 
 Instead, keep your base measures in source control and **generate the TI variants automatically during deployment**.
 
