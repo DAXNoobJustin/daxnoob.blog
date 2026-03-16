@@ -1,0 +1,21 @@
+Segment,Country,Product,Discount Band,Units Sold,Manufacturing Price,Sale Price,Gross Sales,Discounts,Sales,COGS,Profit,Date,Month Number,Month Name,Year
+Government,Canada,Carretera,None,1618.5,3,20,32370,0,32370,16185,16185,2014-01-01,1,January,2014
+Government,Germany,Carretera,None,1321,3,20,26420,0,26420,13210,13210,2014-01-01,1,January,2014
+Midmarket,France,Carretera,None,2178,3,15,32670,0,32670,21780,10890,2014-06-01,6,June,2014
+Midmarket,Mexico,Carretera,None,888,3,15,13320,0,13320,8880,4440,2014-06-01,6,June,2014
+Government,Germany,Montana,Low,1513,5,20,30260,1210.4,29049.6,22695,6354.6,2013-03-01,3,March,2013
+Channel Partners,Canada,Montana,None,2518,5,12,30216,0,30216,12590,17626,2013-03-01,3,March,2013
+Government,France,Montana,None,1899,5,20,37980,0,37980,28485,9495,2013-06-01,6,June,2013
+Enterprise,Mexico,Montana,High,2470,5,125,308750,92625,216125,61750,154375,2014-10-01,10,October,2014
+Small Business,Germany,Paseo,None,2821,10,20,56420,0,56420,42315,14105,2013-04-01,4,April,2013
+Government,Canada,Paseo,None,1006,10,20,20120,0,20120,15090,5030,2013-04-01,4,April,2013
+Enterprise,France,Paseo,Medium,2776,10,125,347000,17350,329650,69400,260250,2013-12-01,12,December,2013
+Channel Partners,Mexico,Paseo,None,2481,10,12,29772,0,29772,24810,4962,2013-12-01,12,December,2013
+Midmarket,Canada,Velo,Low,2397,250,20,47940,1917.6,46022.4,35955,10067.4,2014-02-01,2,February,2014
+Government,Germany,Velo,None,1673,250,7,11711,0,11711,8365,3346,2014-02-01,2,February,2014
+Small Business,France,VTT,None,2530,5,20,50600,0,50600,37950,12650,2014-08-01,8,August,2014
+Enterprise,Canada,VTT,Medium,957,5,125,119625,5981.25,113643.75,23925,89718.75,2014-08-01,8,August,2014
+Government,Mexico,Amarilla,None,1105,260,20,22100,0,22100,16575,5525,2013-09-01,9,September,2013
+Small Business,Germany,Amarilla,High,2021,260,350,707350,212205,495145,101050,394095,2013-09-01,9,September,2013
+Channel Partners,France,Amarilla,None,2168,260,12,26016,0,26016,13040,12976,2014-11-01,11,November,2014
+Midmarket,Canada,Amarilla,Low,1390,260,15,20850,834,20016,13900,6116,2014-11-01,11,November,2014
