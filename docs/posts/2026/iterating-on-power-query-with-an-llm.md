@@ -195,6 +195,10 @@ The same CLI runs in build pipelines. Pre-deploy validation, regression tests us
 
 Code samples are in the [resources folder for this post on GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/iterating-on-power-query-with-an-llm) — the `.pq` files including the failing examples, a credential bootstrap script, a wrapper that pretty-prints results, and the prompt I use to drive the loop with an agent.
 
-## Wrap
+## Wrapping Up
 
-The friction of "I need to refresh the model to see what my Power Query produces" has been baked into how we work with Power Query for so long that it took an LLM use case to make me look for something better. The answer was bundled inside a VS Code extension the whole time.
+The friction of "I need to refresh the model to see what my Power Query produces" has been baked into how we work with Power Query for so long that it took an LLM use case to make me look for something better. PQTest was the answer the whole time, bundled inside a VS Code extension most of us only ever use when writing a custom connector.
+
+If your team is doing anything serious with Power Query, give it a try. Even without an LLM in the loop, just being able to evaluate an M expression and see the output without a model attached is a nice quality-of-life improvement.
+
+Like always, if you have any questions or feedback, please reach out. I'd love to hear from you!
