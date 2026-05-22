@@ -44,7 +44,7 @@ Then I went looking for something simpler.
 
 If you have installed the [Power Query SDK extension](https://marketplace.visualstudio.com/items?itemName=PowerQuery.vscode-powerquery-sdk) in VS Code, you already have a CLI called `PQTest.exe` bundled inside it. It evaluates any `.pq` file headlessly and prints JSON.
 
-The official docs are mostly written for custom-connector authors, but the CLI works for any M expression. A few other people have written about using it standalone — [fzeba](https://fzeba.com/power-query-sdk-standalone) has a nice walkthrough, and the [MS Learn overview](https://learn.microsoft.com/power-query/sdk-tools/pqtest-overview) is decent if you can ignore the connector focus. Nobody I found is using it as the test harness for an LLM loop, which is the part I think is interesting.
+The [official docs](https://learn.microsoft.com/power-query/sdk-tools/pqtest-overview) are mostly written for custom-connector authors, but the CLI works for any M expression — regardless of whether it is going to end up in a PBIX, a semantic model, a dataflow, or a notebook. The destination does not matter; you can iterate on the transformation first and pick where it lives after.
 
 Install it:
 
