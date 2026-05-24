@@ -171,25 +171,9 @@ flowchart LR
 
 A typical inner loop is a few seconds. For the user-group consolidation work, the LLM landed the final transformation in around 20 iterations over maybe ten minutes of wall time. The source PBIX was never touched.
 
-## Where the result lives
-
-PQTest is the iteration tool. When the M is good, you still need to put it somewhere it actually runs. A few sensible options:
-
-- **Push it into a PBIX or semantic model** via the modeling MCP's named-expression and partition operations.
-- **Publish it as a Fabric Dataflow Gen2** if it needs to be shareable, scheduled, or queried by multiple consumers.
-- **Have your PBIX connect to a published dataflow** if you want one canonical source feeding several reports.
-
-The point is that iteration is decoupled from the destination. Test fast and locally, decide where it lives last.
-
-## Bonus: PQTest in CI
-
-The same CLI runs in build pipelines. Pre-deploy validation, regression tests using `PQTest compare` against an expected `.pqout` file, schema contracts — all worth wiring up if your team is treating Power Query like real code.
-
-## What I'm shipping with this post
-
-Code samples are in the [resources folder for this post on GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/iterating-on-power-query-with-an-llm): the `.pq` files (including the failing examples above), a credential bootstrap script, a wrapper that pretty-prints results, and the prompt I use to drive the loop with an agent.
-
 ## Wrapping Up
+
+Code samples are in the [resources folder for this post on GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/iterating-on-power-query-with-an-llm): the `.pq` files (including the failing examples above), a credential bootstrap script, a wrapper that pretty-prints results, and the prompt I use to drive the loop with an agent. The same CLI also runs in build pipelines if you want pre-deploy validation or regression tests on your M.
 
 The friction of "I need to refresh the model to see what my Power Query produces" has been baked into how we work with Power Query for so long that it took an LLM use case to push me to look for something better. PQTest was the answer the whole time, bundled inside a VS Code extension most of us only ever crack open when writing a custom connector.
 
