@@ -18,8 +18,6 @@ slug: agentic-power-query-development
 image: assets/images/posts/agentic-power-query-development/hero.png
 ---
 
-<!-- TODO: hero image — diagram of M file -> PQTest -> JSON -> LLM loop, or terminal screenshot of a passing PQTest run -->
-
 ## The problem
 
 A teammate recently sent me a PBIX with four source tables full of overlapping data that needed to be reshaped into a clean star schema. There were no clean keys to join on, so identifying the same entity across sources meant trying a sequence of matches: first columns A and B, then a fuzzy match on C if that didn't hit, and so on.
@@ -28,7 +26,7 @@ I hadn't used Power Query in a while, and I have been leaning on GitHub Copilot 
 
 ## What I tried first
 
-I knew I could use the [Power BI modeling MCP](https://github.com/microsoft/fabric-pbi-modeling-mcp) since it can read and write a model's partitions and named expressions, but it requires you to apply the change and refresh the model, possibly breaking the report sitting on top.
+I knew I could use the [Power BI modeling MCP](https://github.com/microsoft/fabric-pbi-modeling-mcp) since it can read and write a model's partitions and M expressions, but it requires you to apply the change and refresh the model, possibly breaking the report sitting on top.
 
 So I spun up a sandbox Fabric Dataflow Gen2 and let the LLM use the [public APIs](https://learn.microsoft.com/fabric/data-factory/dataflow-gen2-public-apis) to push new M definitions and trigger refreshes. It worked really well - the LLM did the full build of the consolidated queries inside the dataflow, and once everything looked right I copied the final M back into the PBIX.
 
@@ -54,9 +52,17 @@ The binary lands at a path like:
 
 (Versions change; the pattern is stable.)
 
+Grab it into a variable so the rest of the snippets in this post work as-is:
+
+```powershell
+$pqtest = Get-ChildItem "$env:USERPROFILE\.vscode\extensions\powerquery.vscode-powerquery-sdk-*\.nuget\Microsoft.PowerQuery.SdkTools.*\tools\PQTest.exe" |
+          Sort-Object FullName -Descending |
+          Select-Object -First 1 -ExpandProperty FullName
+```
+
 ## Hello world
 
-```powershell title="hello.pq"
+```text title="hello.pq"
 let
     Source = #table({"id", "name", "score"}, {
         {1, "Alice",   95},
@@ -90,8 +96,6 @@ The important part is that `Output` is the materialized result of evaluating the
 ## Connecting to real data
 
 For anything that hits a remote source, you have to register a credential first. For a Fabric warehouse with Entra auth, I grab a token with Az PowerShell and pass it in as an `OAuth2` credential:
-
-<!-- TODO: screenshot — terminal output of PQTest running against a warehouse, showing real rows in the Output array -->
 
 ```powershell
 Import-Module Az.Accounts
@@ -154,29 +158,12 @@ When the query fails, PQTest returns a structured error the LLM can parse and se
 
 The LLM can fix and retry without another round trip to ask you what went wrong.
 
-## The loop
-
-```mermaid
-flowchart LR
-    A[LLM writes M] --> B[Save .pq file]
-    B --> C[PQTest run-test]
-    C --> D{Status?}
-    D -- Passed --> E[Inspect Output]
-    D -- Failed --> F[Read Error.Details]
-    F --> A
-    E --> G{Looks right?}
-    G -- No --> A
-    G -- Yes --> H[Ship it]
-```
-
-A typical inner loop is a few seconds. For the user-group consolidation work, the LLM landed the final transformation in about 20 iterations over ten minutes. The source PBIX was never touched.
+For the user-group consolidation work, the LLM landed the final transformation in about 20 iterations over ten minutes. Each loop was a few seconds, and the source PBIX was never touched.
 
 ## Wrapping Up
 
 Code samples are in the [resources folder for this post on GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/agentic-power-query-development): the `.pq` files (including the failing examples above), a wrapper that pretty-prints results, and a bootstrap script that installs the SDK extension and drops an `AGENTS.md` so any agent that follows the convention picks up the loop on its own.
 
-The friction of "I need to refresh the model to see what my Power Query produces" has been baked into how we work with Power Query for so long that it took an LLM use case to push me to look for something better. PQTest had been sitting inside the SDK extension this whole time.
-
-If your team is doing anything serious with Power Query, definitely check out PQTest. Even without an LLM in the loop, being able to evaluate an M expression and see real rows back without a model/dataflow is awesome.
+If your team is doing anything serious with Power Query, definitely check out PQTest. Even without an LLM, being able to evaluate an M expression and see real rows back without a model/dataflow is awesome.
 
 Like always, if you have any questions or feedback, please reach out. I'd love to hear from you!
