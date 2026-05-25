@@ -14,8 +14,8 @@ tags:
   - Copilot
 authors:
   - justinmartin
-slug: iterating-on-power-query-with-an-llm
-image: assets/images/posts/iterating-on-power-query-with-an-llm/hero.png
+slug: agentic-power-query-development
+image: assets/images/posts/agentic-power-query-development/hero.png
 ---
 
 <!-- TODO: hero image — diagram of M file -> PQTest -> JSON -> LLM loop, or terminal screenshot of a passing PQTest run -->
@@ -173,10 +173,10 @@ A typical inner loop is a few seconds. For the user-group consolidation work, th
 
 ## Wrapping Up
 
-Code samples are in the [resources folder for this post on GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/iterating-on-power-query-with-an-llm): the `.pq` files (including the failing examples above), a wrapper that pretty-prints results, and a bootstrap script that installs the SDK extension and drops an `AGENTS.md` so any agent that follows the convention picks up the loop on its own.
+Code samples are in the [resources folder for this post on GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/agentic-power-query-development): the `.pq` files (including the failing examples above), a wrapper that pretty-prints results, and a bootstrap script that installs the SDK extension and drops an `AGENTS.md` so any agent that follows the convention picks up the loop on its own.
 
 The friction of "I need to refresh the model to see what my Power Query produces" has been baked into how we work with Power Query for so long that it took an LLM use case to push me to look for something better. PQTest had been sitting inside the SDK extension this whole time.
 
-If your team is doing anything serious with Power Query, give it a try. Even without an LLM in the loop, being able to evaluate an M expression and see real rows back without a model attached is a nice upgrade.
+If your team is doing anything serious with Power Query, definitely check out PQTest. Even without an LLM in the loop, being able to evaluate an M expression and see real rows back without a model/dataflow is awesome.
 
 Like always, if you have any questions or feedback, please reach out. I'd love to hear from you!

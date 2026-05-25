@@ -21,13 +21,14 @@ if (-not $pqtest) {
     exit 1
 }
 
-$raw = & $pqtest run-test -q $QueryFile -p 2>&1 | Out-String
-if ($Raw) { $raw; return }
+$pqArgs = @('run-test', '-q', $QueryFile, '--prettyPrint')
+$json = (& $pqtest @pqArgs) -join "`n"
+if ($Raw) { $json; return }
 
-try { $result = $raw | ConvertFrom-Json }
+try { $result = $json | ConvertFrom-Json }
 catch {
     Write-Host "Could not parse PQTest output as JSON:" -ForegroundColor Red
-    Write-Host $raw
+    Write-Host $json
     exit 1
 }
 

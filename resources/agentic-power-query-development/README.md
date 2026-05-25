@@ -1,6 +1,6 @@
 # Iterating on Power Query with an LLM
 
-Supporting code and examples for the [blog post of the same name](https://daxnoob.blog/iterating-on-power-query-with-an-llm/).
+Supporting code and examples for the [blog post of the same name](https://daxnoob.blog/agentic-power-query-development/).
 
 ## Files
 
