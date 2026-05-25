@@ -6,6 +6,7 @@ Supporting code and examples for the [blog post of the same name](https://daxnoo
 
 | File | What it is |
 |---|---|
+| `Initialize-PQTestWorkspace.ps1` | One-time setup. Installs the SDK extension if needed, resolves the PQTest binary, and drops an `AGENTS.md` so any agent picks up the loop instructions automatically. |
 | `hello.pq` | Trivial M expression that needs no data source. Use this to confirm PQTest works. |
 | `warehouse-query.pq` | Template for a query against a Fabric warehouse. Fill in your server/database/schema/table. |
 | `bad-syntax.pq` | Intentional syntax error. Use to see PQTest's exact line/column reporting. |
@@ -13,13 +14,12 @@ Supporting code and examples for the [blog post of the same name](https://daxnoo
 | `bad-types.pq` | Intentional type error (text + number). PQTest returns the operator, both types, and values. |
 | `set-credential.ps1` | Helper that registers an OAuth2 credential with PQTest using your Az PowerShell session token. |
 | `Invoke-PQTest.ps1` | Wrapper that finds PQTest, runs a query, and pretty-prints the result. |
-| `prompt-template.md` | The prompt I use to drive an LLM through the iteration loop. |
 
 ## Quick start
 
 ```powershell
-# 1. Install the Power Query SDK extension (one time)
-code --install-extension PowerQuery.vscode-powerquery-sdk
+# 1. One-time setup: installs the SDK extension, writes AGENTS.md
+.\Initialize-PQTestWorkspace.ps1
 
 # 2. Trivial test, no auth needed
 .\Invoke-PQTest.ps1 -QueryFile .\hello.pq
@@ -28,3 +28,5 @@ code --install-extension PowerQuery.vscode-powerquery-sdk
 .\set-credential.ps1 -QueryFile .\warehouse-query.pq
 .\Invoke-PQTest.ps1 -QueryFile .\warehouse-query.pq
 ```
+
+Once `AGENTS.md` is in the folder, point Copilot CLI, Claude Code, Cursor, or any agent that follows the AGENTS.md convention at this directory and ask it to write or change an M expression. It will pick up the loop automatically.

@@ -30,15 +30,15 @@ I hadn't used Power Query in a while, and I have been leaning on GitHub Copilot 
 
 I knew I could use the [Power BI modeling MCP](https://github.com/microsoft/fabric-pbi-modeling-mcp) since it can read and write a model's partitions and named expressions, but it requires you to apply the change and refresh the model, possibly breaking the report sitting on top.
 
-So I spun up a sandbox Fabric Dataflow Gen2 and let the LLM use the [public APIs](https://learn.microsoft.com/fabric/data-factory/dataflow-gen2-public-apis) to push new M definitions and trigger refreshes. This worked well. The LLM did the full build of the consolidated queries inside the dataflow, and once everything looked right I copied the final M back into the PBIX. For that project it was the right call anyway, since the transformations were going to live in a dataflow long term.
+So I spun up a sandbox Fabric Dataflow Gen2 and let the LLM use the [public APIs](https://learn.microsoft.com/fabric/data-factory/dataflow-gen2-public-apis) to push new M definitions and trigger refreshes. It worked really well - the LLM did the full build of the consolidated queries inside the dataflow, and once everything looked right I copied the final M back into the PBIX.
 
-But the loop is slow (30 to 60 seconds per refresh), and there is no dry-run mode. `updateDefinition` always commits, so you need a sandbox workspace if you don't want to nuke a real artifact mid-iteration. After shipping the dataflow I went looking for something lighter weight that didn't require a service round-trip at all.
+I asked Copilot if there was something lighter weight that I could use in the future for similar projects that didn't require me to spin up a dataflow and this is what it found.
 
 ## PQTest
 
 The [Power Query SDK extension](https://marketplace.visualstudio.com/items?itemName=PowerQuery.vscode-powerquery-sdk) for VS Code ships with a CLI called `PQTest.exe`. Point it at a `.pq` file and it evaluates the M against your real data sources and prints the result as JSON. No PBIX, no Desktop, no dataflow, no model.
 
-The [official docs](https://learn.microsoft.com/power-query/sdk-tools/pqtest-overview) are mostly written for custom-connector authors, but the CLI doesn't care where the M ends up. PBIX, semantic model, dataflow, notebook, custom connector. It just evaluates the expression and gives you back the rows.
+The [official docs](https://learn.microsoft.com/power-query/sdk-tools/pqtest-overview) are mostly written for custom-connector authors, but we can repurpose `PQTest.exe` to enable Copilot to test all PQ changes before we even need to write it back to the target artifact. It can iterate over changes and have the exe evaluate the expression and give you back the rows.
 
 Install the extension:
 
@@ -85,11 +85,11 @@ Returns:
 }]
 ```
 
-The important part is that `Output` is the actual evaluated result. PQTest ran the query and materialized the rows. About a second on this example, with nothing downstream touched.
+The important part is that `Output` is the materialized result of evaluating the query. PQTest ran it against the source and returned the rows. About a second on this example.
 
-## Talking to real data
+## Connecting to real data
 
-For anything that hits a remote source, you have to register a credential first. For a Fabric warehouse with Entra auth, I grab a token from Az PowerShell and inject it as an `OAuth2` credential:
+For anything that hits a remote source, you have to register a credential first. For a Fabric warehouse with Entra auth, I grab a token with Az PowerShell and pass it in as an `OAuth2` credential:
 
 <!-- TODO: screenshot — terminal output of PQTest running against a warehouse, showing real rows in the Output array -->
 
@@ -111,13 +111,13 @@ $cred = @{
 $cred | & $pqtest set-credential -q .\warehouse-query.pq
 ```
 
-PQTest stores the credential in `%LOCALAPPDATA%\Microsoft\PQTest\credentials.bin`, encrypted with Windows DPAPI tied to your user account. Same security model as Windows Credential Manager, fine to leave on disk between runs, only readable by you.
+PQTest stores the credential in `%LOCALAPPDATA%\Microsoft\PQTest\credentials.bin`, encrypted with Windows DPAPI tied to your user account. Same security model as Windows Credential Manager.
 
-After that, `run-test` hits the warehouse and returns rows. Same JSON shape as the hello-world example, just with real data inside `Output`. About four seconds end-to-end for a small query.
+After that, `run-test` hits the warehouse and returns rows. Same JSON shape as the hello-world example, just with real data inside `Output`.
 
 ## What makes this useful for an LLM
 
-When the query fails, PQTest gives back a structured error the LLM can parse and self-correct on.
+When the query fails, PQTest returns a structured error the LLM can parse and self-correct against.
 
 **Syntax error**, with exact line and column:
 
@@ -152,7 +152,7 @@ When the query fails, PQTest gives back a structured error the LLM can parse and
 }
 ```
 
-The LLM can fix and retry without another round trip to ask you what went wrong. That is what makes the loop work.
+The LLM can fix and retry without another round trip to ask you what went wrong.
 
 ## The loop
 
@@ -169,14 +169,14 @@ flowchart LR
     G -- Yes --> H[Ship it]
 ```
 
-A typical inner loop is a few seconds. For the user-group consolidation work, the LLM landed the final transformation in about 20 iterations over ten minutes of wall time. The source PBIX was never touched.
+A typical inner loop is a few seconds. For the user-group consolidation work, the LLM landed the final transformation in about 20 iterations over ten minutes. The source PBIX was never touched.
 
 ## Wrapping Up
 
-Code samples are in the [resources folder for this post on GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/iterating-on-power-query-with-an-llm): the `.pq` files (including the failing examples above), a credential bootstrap script, a wrapper that pretty-prints results, and the prompt I use to drive the loop with an agent. The same CLI runs in build pipelines if you want pre-deploy validation or regression tests on your M.
+Code samples are in the [resources folder for this post on GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/iterating-on-power-query-with-an-llm): the `.pq` files (including the failing examples above), a wrapper that pretty-prints results, and a bootstrap script that installs the SDK extension and drops an `AGENTS.md` so any agent that follows the convention picks up the loop on its own.
 
-The friction of "I need to refresh the model to see what my Power Query produces" has been baked into how we work with Power Query for so long that it took an LLM use case to push me to look for something better. PQTest was the answer the whole time, bundled in a VS Code extension most of us only crack open when writing a custom connector.
+The friction of "I need to refresh the model to see what my Power Query produces" has been baked into how we work with Power Query for so long that it took an LLM use case to push me to look for something better. PQTest had been sitting inside the SDK extension this whole time.
 
-If your team is doing anything serious with Power Query, give it a try. Even without an LLM in the loop, being able to evaluate an M expression and see real rows back without a model attached is a nice quality-of-life upgrade.
+If your team is doing anything serious with Power Query, give it a try. Even without an LLM in the loop, being able to evaluate an M expression and see real rows back without a model attached is a nice upgrade.
 
 Like always, if you have any questions or feedback, please reach out. I'd love to hear from you!
