@@ -1,7 +1,7 @@
 ---
 title: "Agentic Power Query Development"
 description: "Let an LLM write, run, and self-correct Power Query M on its own using PQTest, without ever touching your PBIX, dataflow, or semantic model."
-draft: false
+draft: true
 date:
   created: 2026-05-26
 categories:
