@@ -1,7 +1,7 @@
 ---
 title: "Agentic Power Query Development"
 description: "Let an LLM write, run, and self-correct Power Query M on its own using PQTest, without ever touching your PBIX, dataflow, or semantic model."
-draft: true
+draft: false
 date:
   created: 2026-05-26
 categories:
@@ -93,29 +93,48 @@ The important part is that `Output` is the materialized result of evaluating the
 
 ## Connecting to real data
 
-For anything that hits a remote source, you have to register a credential first. For a Fabric warehouse with Entra auth, I grab a token with Az PowerShell and pass it in as an `OAuth2` credential:
+For anything that hits a remote source, you have to register a credential first.
+
+Which command depends on the source kind:
+
+| Source | `-ak` | Extra flags |
+|---|---|---|
+| Excel from disk, public web data | `Anonymous` | — |
+| On-prem SQL, file shares | `Windows` | — |
+| Snowflake password, REST API keys, many SaaS connectors | `Key` | `-cp Key=<secret>` |
+| Excel-with-password, legacy DBs | `UsernamePassword` | `-cp Username=... -cp Password=...` |
+| Anything OAuth — Power BI XMLA, Fabric warehouse, Dataverse, Graph, SharePoint | `OAuth2` | `--interactive --useMsal --useSystemBrowser` |
+
+For OAuth sources the `--interactive` flow pops a system browser, you sign in, PQTest caches the token.
+
+One gotcha worth knowing about: `set-credential` does static analysis on your `.pq` to find the data source, so if your query builds the source path or SQL dynamically it can't see it. The fix is a stub `.pq` with a literal connector call - creds are keyed by host + database, so the real query picks it up:
 
 ```powershell
-Import-Module Az.Accounts
-$token = (Get-AzAccessToken -ResourceUrl "https://database.windows.net").Token
+'Sql.Database("yourhost.datawarehouse.fabric.microsoft.com", "yourdb")' |
+    Set-Content .\_stub-warehouse.pq
 
-$cred = @{
-  AuthenticationKind = "OAuth2"
-  AuthenticationProperties = @{
-    AccessToken = $token
-    Expires     = (Get-Date).AddHours(1).ToString("r")
-    RefreshToken = ""
-  }
-  PrivacySetting = "None"
-  Permissions    = @()
-} | ConvertTo-Json -Depth 5
-
-$cred | & $pqtest set-credential -q .\warehouse-query.pq
+& $pqtest set-credential -q .\_stub-warehouse.pq -ak OAuth2 `
+    --interactive --useMsal --useSystemBrowser
 ```
 
-PQTest stores the credential in `%LOCALAPPDATA%\Microsoft\PQTest\credentials.bin`, encrypted with Windows DPAPI tied to your user account. Same security model as Windows Credential Manager.
+## Composing a real project
 
-After that, `run-test` queries the warehouse and returns data in the same JSON shape as the hello-world example.
+PQTest evaluates one M expression per file, but real projects often have parameters, functions, and a bunch of queries that reference each other.
+
+`Invoke-PQTest.ps1` in the resources folder handles this with three input modes (raw pq files, pbip, and dataflow) that all produce the same thing: read every named expression out of the source, wrap them in one `let` block, run the target you asked for. The source of truth stays in the original artifact until you are ready to write the changes back.
+
+```powershell
+# PBIP: parses expressions.tmdl + tables/*.tmdl
+.\Invoke-PQTest.ps1 -PbipPath '.\Model.SemanticModel' -Target Users
+
+# Dataflow Gen2: parses mashup.pq (a section doc)
+.\Invoke-PQTest.ps1 -DataflowPath '.\Dataflow1.Dataflow' -Target DimUserGroup
+
+# Folder of .pq files: each file is one named binding, filename = name
+.\Invoke-PQTest.ps1 -PqFolder .\example-project -Target Issues
+```
+
+If you pass `-ShowComposed`, the wrapper will write the unfolded `let` block next to the source so you can see exactly what PQTest received. This can help with debugging.
 
 ## What makes this useful for an LLM
 
