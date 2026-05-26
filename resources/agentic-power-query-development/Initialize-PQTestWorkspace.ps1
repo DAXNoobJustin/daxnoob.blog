@@ -64,6 +64,15 @@ When the user asks you to write or change a Power Query M expression:
    ```
 
    If `$env:PQTEST_PATH` is not set, re-run `.\Initialize-PQTestWorkspace.ps1`.
+
+   If the file uses `// #include <other.pq>` to share parameters, UDFs, or
+   queries across files, run it through the composing wrapper instead so the
+   includes are resolved first:
+
+   ```powershell
+   .\Invoke-PQTestComposed.ps1 -QueryFile .\test.pq
+   ```
+
 3. Parse the JSON output.
    - If `Status == "Passed"`, inspect the first rows of `Output` and the column
      names and types. Confirm the shape matches the user's intent.
@@ -83,10 +92,23 @@ When the user asks you to write or change a Power Query M expression:
 
 ## Credentials
 
-If the query hits a remote source (SQL, Fabric warehouse, etc.) the user needs
-to register a credential first. The included `set-credential.ps1` will pull an
-OAuth2 token from the current Az PowerShell session and register it for a given
-query file. Do not try to register credentials silently on the user's behalf.
+If the query hits a remote source the user needs to register a credential first.
+Do not try to register credentials silently on the user's behalf - ask the user
+to do it, and tell them the right `-ak` flag for their source kind. For OAuth
+sources (Power BI XMLA, Fabric warehouse, Dataverse, Graph, SharePoint, etc.)
+the working flow is:
+
+```powershell
+& $env:PQTEST_PATH set-credential -q .\stub.pq -ak OAuth2 `
+    --interactive --useMsal --useSystemBrowser
+```
+
+If the real query builds its data source dynamically (e.g. parameterised SQL),
+`set-credential` will not be able to find the source statically. Have the user
+create a tiny stub `.pq` containing just the literal connector call
+(`Sql.Database("host", "db")`, `AnalysisServices.Database(...)`, etc.) and
+register the credential against that. Credentials are keyed by host+database
+so the real query will pick them up.
 '@ | Set-Content -Path $agentsPath -Encoding UTF8
     Write-Host "Wrote AGENTS.md" -ForegroundColor Green
 }

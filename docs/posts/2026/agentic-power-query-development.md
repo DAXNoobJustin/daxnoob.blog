@@ -93,29 +93,66 @@ The important part is that `Output` is the materialized result of evaluating the
 
 ## Connecting to real data
 
-For anything that hits a remote source, you have to register a credential first. For a Fabric warehouse with Entra auth, I grab a token with Az PowerShell and pass it in as an `OAuth2` credential:
+For anything that hits a remote source, you have to register a credential first. PQTest stores creds per data source kind + path in `%LOCALAPPDATA%\Microsoft\PQTest\credentials.bin`, encrypted with Windows DPAPI tied to your user account. Same security model as Windows Credential Manager. You only register once per machine.
+
+Which command depends on the source. `-ak` (authentication kind) is the switch:
+
+| Source | `-ak` | Extra flags |
+|---|---|---|
+| Excel from disk, public web data | `Anonymous` | — |
+| On-prem SQL, file shares | `Windows` | — |
+| Snowflake password, REST API keys, many SaaS connectors | `Key` | `-cp Key=<secret>` |
+| Excel-with-password, legacy DBs | `UsernamePassword` | `-cp Username=... -cp Password=...` |
+| Anything OAuth — Power BI XMLA, Fabric warehouse, Dataverse, Graph, SharePoint | `OAuth2` | `--interactive --useMsal --useSystemBrowser` |
+
+For OAuth-based sources the `--interactive` flow pops a system browser, you sign in for real, PQTest caches the token (including a refresh token). For Power BI XMLA in particular this is the only flow that works — pre-fetched bearer tokens get rejected by the XMLA endpoint.
+
+One gotcha: `set-credential` does static analysis on your `.pq` file to find the data source. If your query builds the source path or SQL dynamically (very common — parameterised queries, dynamic schemas), it can't see it and you get `Unable to determine data source from expression`. Workaround is to write a tiny stub `.pq` that just calls the connector with literal arguments and register the credential against that. Credentials are keyed by host + database, so all your real queries pick them up.
 
 ```powershell
-Import-Module Az.Accounts
-$token = (Get-AzAccessToken -ResourceUrl "https://database.windows.net").Token
+# Stub: just enough M for set-credential to identify the source
+'Sql.Database("yourhost.datawarehouse.fabric.microsoft.com", "yourdb")' |
+    Set-Content .\_stub-warehouse.pq
 
-$cred = @{
-  AuthenticationKind = "OAuth2"
-  AuthenticationProperties = @{
-    AccessToken = $token
-    Expires     = (Get-Date).AddHours(1).ToString("r")
-    RefreshToken = ""
-  }
-  PrivacySetting = "None"
-  Permissions    = @()
-} | ConvertTo-Json -Depth 5
-
-$cred | & $pqtest set-credential -q .\warehouse-query.pq
+& $pqtest set-credential -q .\_stub-warehouse.pq -ak OAuth2 `
+    --interactive --useMsal --useSystemBrowser
 ```
 
-PQTest stores the credential in `%LOCALAPPDATA%\Microsoft\PQTest\credentials.bin`, encrypted with Windows DPAPI tied to your user account. Same security model as Windows Credential Manager.
+After that, `run-test` against any query that hits the same warehouse returns data in the same JSON shape as the hello-world example.
 
-After that, `run-test` queries the warehouse and returns data in the same JSON shape as the hello-world example.
+## Composing a real project
+
+PQTest evaluates one M expression per file. Real Power Query projects are bigger than one expression — they have parameters, functions, and many queries that reference each other by bare name. You need a way to take that whole graph and present it to PQTest as a single `let` block.
+
+The `Invoke-PQTestComposed.ps1` wrapper in the resources folder does exactly this. It treats `// #include <file>` comments as a preprocessor instruction — before PQTest runs, every include line is replaced with the contents of the referenced file. Includes nest, so you can layer them.
+
+Mapping a real PBIX or dataflow into this layout is mechanical:
+
+1. **Open Advanced Editor** for each parameter, function, and query in your project. Copy the M.
+2. **Drop each one into `_project.pq`** as a `name = expression,` binding. Order does not matter — `let` is lexically scoped, so a query can call a UDF defined below it, a UDF can call a query defined above it, anything goes. This file is a *fragment* — it ends in a comma and is not valid standalone M. Don't try to run it directly.
+3. **Per query you want to test**, create a small `.pq` file like this:
+
+```text title="query-most-recent.pq"
+let
+    // #include _project.pq
+
+    MostRecent5 = Table.FirstN(
+        Table.Sort(IssuesTyped, {{"CreatedAt", Order.Descending}}),
+        5
+    )
+in
+    MostRecent5
+```
+
+Run it with:
+
+```powershell
+.\Invoke-PQTestComposed.ps1 -QueryFile .\query-most-recent.pq
+```
+
+Pass `-ShowComposed` and the wrapper also writes a `query-most-recent.composed.pq` next to the source — that's the fully unfolded file PQTest actually evaluated, useful when something behaves unexpectedly and you want to see exactly what the engine saw.
+
+For larger projects you can split `_project.pq` further (`_params.pq`, `_udfs.pq`, `_queries.pq`, ...) and include them all from a parent fragment. The wrapper resolves recursively and detects cycles.
 
 ## What makes this useful for an LLM
 
