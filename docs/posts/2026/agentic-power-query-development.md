@@ -1,9 +1,9 @@
 ---
 title: "Agentic Power Query Development"
 description: "Let an LLM write, run, and self-correct Power Query M on its own using PQTest, without ever touching your PBIX, dataflow, or semantic model."
-draft: true
+draft: false
 date:
-  created: 2026-05-22
+  created: 2026-05-26
 categories:
   - Power Query
 tags:
@@ -28,13 +28,13 @@ I hadn't used Power Query in a while, and I have been leaning on GitHub Copilot 
 
 I knew I could use the [Power BI modeling MCP](https://github.com/microsoft/fabric-pbi-modeling-mcp) since it can read and write a model's partitions and M expressions, but it requires you to apply the change and refresh the model, possibly breaking the report sitting on top.
 
-So I spun up a sandbox Fabric Dataflow Gen2 and let the LLM use the [public APIs](https://learn.microsoft.com/fabric/data-factory/dataflow-gen2-public-apis) to push new M definitions and trigger refreshes. It worked really well - the LLM did the full build of the consolidated queries inside the dataflow, and once everything looked right I copied the final M back into the PBIX.
+So I spun up a sandbox Fabric Dataflow Gen2 and let the LLM use the [public APIs](https://learn.microsoft.com/fabric/data-factory/dataflow-gen2-public-apis) to push new M definitions and trigger refreshes. It worked really well - the LLM did the full build of the queries inside the dataflow, and once everything looked right I copied the final M back into the PBIX.
 
 I asked Copilot if there was something lighter weight that I could use in the future for similar projects that didn't require me to spin up a dataflow and this is what it found.
 
 ## PQTest
 
-The [Power Query SDK extension](https://marketplace.visualstudio.com/items?itemName=PowerQuery.vscode-powerquery-sdk) for VS Code ships with a CLI called `PQTest.exe`. Point it at a `.pq` file and it evaluates the M against your real data sources and prints the result as JSON. No PBIX, no Desktop, no dataflow, no model.
+The [Power Query SDK extension](https://marketplace.visualstudio.com/items?itemName=PowerQuery.vscode-powerquery-sdk) for VS Code ships with a CLI called `PQTest.exe`. Point it at a `.pq` file and it evaluates the M against your real data sources and prints the result as JSON.
 
 The [official docs](https://learn.microsoft.com/power-query/sdk-tools/pqtest-overview) are mostly written for custom-connector authors, but we can repurpose `PQTest.exe` to enable Copilot to test all PQ changes before we even need to write it back to the target artifact. It can iterate over changes and have the exe evaluate the expression and give you back the rows.
 
@@ -49,8 +49,6 @@ The binary lands at a path like:
 ```text
 %USERPROFILE%\.vscode\extensions\powerquery.vscode-powerquery-sdk-0.7.1-win32-x64\.nuget\Microsoft.PowerQuery.SdkTools.2.154.1\tools\PQTest.exe
 ```
-
-(Versions change; the pattern is stable.)
 
 Grab it into a variable so the rest of the snippets in this post work as-is:
 
@@ -91,7 +89,7 @@ Returns:
 }]
 ```
 
-The important part is that `Output` is the materialized result of evaluating the query. PQTest ran it against the source and returned the rows. About a second on this example.
+The important part is that `Output` is the materialized result of evaluating the query. PQTest ran it against the source and returned the rows.
 
 ## Connecting to real data
 
@@ -117,11 +115,13 @@ $cred | & $pqtest set-credential -q .\warehouse-query.pq
 
 PQTest stores the credential in `%LOCALAPPDATA%\Microsoft\PQTest\credentials.bin`, encrypted with Windows DPAPI tied to your user account. Same security model as Windows Credential Manager.
 
-After that, `run-test` hits the warehouse and returns rows. Same JSON shape as the hello-world example, just with real data inside `Output`.
+After that, `run-test` queries the warehouse and returns data in the same JSON shape as the hello-world example.
 
 ## What makes this useful for an LLM
 
-When the query fails, PQTest returns a structured error the LLM can parse and self-correct against.
+The main benefit: the LLM can keep editing and testing M without touching your target artifact and without a human in the loop. Once the M looks right, it can write the changes back to the target dataflow, PBIX, or model using the modeling MCP or dataflow APIs.
+
+The other main benefit is error handling. When a query fails, PQTest returns a structured error the LLM can parse and self-correct against.
 
 **Syntax error**, with exact line and column:
 
@@ -156,14 +156,12 @@ When the query fails, PQTest returns a structured error the LLM can parse and se
 }
 ```
 
-The LLM can fix and retry without another round trip to ask you what went wrong.
-
-For the user-group consolidation work, the LLM landed the final transformation in about 20 iterations over ten minutes. Each loop was a few seconds, and the source PBIX was never touched.
+The LLM can fix and retry without another round trip to ask you what went wrong after you published the changes.
 
 ## Wrapping Up
 
-Code samples are in the [resources folder for this post on GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/agentic-power-query-development): the `.pq` files (including the failing examples above), a wrapper that pretty-prints results, and a bootstrap script that installs the SDK extension and drops an `AGENTS.md` so any agent that follows the convention picks up the loop on its own.
+Code samples are in the [resources folder for this post on GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/agentic-power-query-development): the `.pq` files (including the failing examples above), a wrapper that pretty-prints results, and a bootstrap script that installs the SDK extension and creates an `AGENTS.md`.
 
-If your team is doing anything serious with Power Query, definitely check out PQTest. Even without an LLM, being able to evaluate an M expression and see real rows back without a model/dataflow is awesome.
+If your team is using Power Query as any part of your data architecture, definitely check out PQTest. Even without an LLM, being able to evaluate an M expression and see real rows back without needing to go through a model/dataflow is pretty cool. I'm sure there are many other creative use cases for PQTest. 
 
 Like always, if you have any questions or feedback, please reach out. I'd love to hear from you!
