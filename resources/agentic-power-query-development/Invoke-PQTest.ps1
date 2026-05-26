@@ -89,7 +89,8 @@ function Read-DataflowBindings([string] $root) {
     $parts = [regex]::Split($text, '(?m)^shared\s+')
     foreach ($p in $parts) {
         if ($p -match '^\s*$') { continue }
-        if ($p -match '^(?s)(\S+)\s*=\s*(.*?);\s*$') {
+        # Name is either #"quoted with spaces" or a bare identifier
+        if ($p -match '^(?s)(#"[^"]+"|\S+?)\s*=\s*(.*?);\s*$') {
             $bindings[$matches[1]] = $matches[2]
         }
     }
