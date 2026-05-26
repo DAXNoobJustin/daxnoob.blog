@@ -93,7 +93,7 @@ The important part is that `Output` is the materialized result of evaluating the
 
 ## Connecting to real data
 
-For anything that hits a remote source, you have to register a credential first. PQTest caches it (DPAPI-encrypted) so you only do this once per machine.
+For anything that hits a remote source, you have to register a credential first.
 
 Which command depends on the source kind:
 
@@ -105,7 +105,7 @@ Which command depends on the source kind:
 | Excel-with-password, legacy DBs | `UsernamePassword` | `-cp Username=... -cp Password=...` |
 | Anything OAuth — Power BI XMLA, Fabric warehouse, Dataverse, Graph, SharePoint | `OAuth2` | `--interactive --useMsal --useSystemBrowser` |
 
-For OAuth sources the `--interactive` flow pops a system browser, you sign in, PQTest caches the token. For Power BI XMLA in particular this is the only flow I've gotten to work - pre-fetched bearer tokens get rejected.
+For OAuth sources the `--interactive` flow pops a system browser, you sign in, PQTest caches the token.
 
 One gotcha worth knowing about: `set-credential` does static analysis on your `.pq` to find the data source, so if your query builds the source path or SQL dynamically it can't see it. The fix is a stub `.pq` with a literal connector call - creds are keyed by host + database, so the real query picks it up:
 
@@ -119,31 +119,22 @@ One gotcha worth knowing about: `set-credential` does static analysis on your `.
 
 ## Composing a real project
 
-PQTest evaluates one M expression per file, but real Power Query projects are bigger than one expression - they have parameters, functions, and a bunch of queries that reference each other by bare name. You need a way to hand that whole graph to PQTest as a single `let` block.
+PQTest evaluates one M expression per file, but real projects often have parameters, functions, and a bunch of queries that reference each other.
 
-The `Invoke-PQTestComposed.ps1` wrapper in the resources folder does this with a `// #include <file>` comment that gets replaced with the file's contents before PQTest runs. Includes nest, so you can layer them however you want.
-
-The pattern I landed on is to drop every parameter, UDF, and query from the PBIX or dataflow into one `_project.pq` as `name = expression,` bindings. Order doesn't matter - `let` is lexically scoped, so anything can reference anything else. The file isn't valid standalone M (it ends in a comma), and that's fine - it's a fragment meant to be spliced in.
-
-Then each query you want to test is a small file that includes the project and does its thing:
-
-```text title="query-most-recent.pq"
-let
-    // #include _project.pq
-
-    MostRecent5 = Table.FirstN(
-        Table.Sort(IssuesTyped, {{"CreatedAt", Order.Descending}}),
-        5
-    )
-in
-    MostRecent5
-```
+`Invoke-PQTest.ps1` in the resources folder handles this with three input modes (raw pq files, pbip, and dataflow) that all produce the same thing: read every named expression out of the source, wrap them in one `let` block, run the target you asked for. The source of truth stays in the original artifact until you are ready to write the changes back.
 
 ```powershell
-.\Invoke-PQTestComposed.ps1 -QueryFile .\query-most-recent.pq
+# PBIP: parses expressions.tmdl + tables/*.tmdl
+.\Invoke-PQTest.ps1 -PbipPath '.\Model.SemanticModel' -Target Users
+
+# Dataflow Gen2: parses mashup.pq (a section doc)
+.\Invoke-PQTest.ps1 -DataflowPath '.\Dataflow1.Dataflow' -Target DimUserGroup
+
+# Folder of .pq files: each file is one named binding, filename = name
+.\Invoke-PQTest.ps1 -PqFolder .\example-project -Target Issues
 ```
 
-Pass `-ShowComposed` and the wrapper also writes the unfolded file next to the source, which is handy when something behaves unexpectedly and you want to see exactly what PQTest saw.
+If you pass `-ShowComposed`, the wrapper will write the unfolded `let` block next to the source so you can see exactly what PQTest received. This can help with debugging.
 
 ## What makes this useful for an LLM
 

@@ -56,29 +56,25 @@ can be tested without touching a PBIX, dataflow, or semantic model.
 
 When the user asks you to write or change a Power Query M expression:
 
-1. Write the proposed M to a `.pq` file in this folder (default: `./test.pq`).
-2. Run PQTest against it:
+1. Decide which input mode applies:
+   - Single ad-hoc expression: write it to `./test.pq`, run with
+     `.\Invoke-PQTest.ps1 -QueryFile .\test.pq`.
+   - User has a PBIP / dataflow / folder of `.pq` files: edit the source artifact
+     directly and run:
+     - `.\Invoke-PQTest.ps1 -PbipPath <path> -Target <name>`
+     - `.\Invoke-PQTest.ps1 -DataflowPath <path> -Target <name>`
+     - `.\Invoke-PQTest.ps1 -PqFolder <path> -Target <name>`
+   The composed modes parse every named expression out of the source, wrap them
+   all in a single `let` block, and evaluate the named target. Edit the real
+   source, not a copy.
 
-   ```powershell
-   & $env:PQTEST_PATH run-test -q .\test.pq -p
-   ```
-
-   If `$env:PQTEST_PATH` is not set, re-run `.\Initialize-PQTestWorkspace.ps1`.
-
-   If the file uses `// #include <other.pq>` to share parameters, UDFs, or
-   queries across files, run it through the composing wrapper instead so the
-   includes are resolved first:
-
-   ```powershell
-   .\Invoke-PQTestComposed.ps1 -QueryFile .\test.pq
-   ```
-
-3. Parse the JSON output.
+2. Parse the JSON output.
    - If `Status == "Passed"`, inspect the first rows of `Output` and the column
      names and types. Confirm the shape matches the user's intent.
    - If `Status == "Failed"`, read `Error.Message` and `Error.Details`, propose
      a fix, explain what the previous attempt got wrong, and re-run.
-4. Show a diff of what changed between iterations.
+
+3. Show a diff of what changed between iterations.
 
 ## Things to watch for
 
@@ -89,26 +85,25 @@ When the user asks you to write or change a Power Query M expression:
   for guidance.
 - When the error includes the available alternatives (e.g. for a missing
   table or key), use those to inform the next attempt rather than guessing.
+- Pass `-ShowComposed` if you need to see the unfolded `let` block PQTest
+  actually evaluated.
 
 ## Credentials
 
 If the query hits a remote source the user needs to register a credential first.
 Do not try to register credentials silently on the user's behalf - ask the user
 to do it, and tell them the right `-ak` flag for their source kind. For OAuth
-sources (Power BI XMLA, Fabric warehouse, Dataverse, Graph, SharePoint, etc.)
-the working flow is:
+sources the working flow is:
 
 ```powershell
 & $env:PQTEST_PATH set-credential -q .\stub.pq -ak OAuth2 `
     --interactive --useMsal --useSystemBrowser
 ```
 
-If the real query builds its data source dynamically (e.g. parameterised SQL),
-`set-credential` will not be able to find the source statically. Have the user
-create a tiny stub `.pq` containing just the literal connector call
-(`Sql.Database("host", "db")`, `AnalysisServices.Database(...)`, etc.) and
-register the credential against that. Credentials are keyed by host+database
-so the real query will pick them up.
+If the real query builds its data source dynamically, `set-credential` will not
+be able to find the source statically. Have the user create a tiny stub `.pq`
+containing just the literal connector call and register against that.
+Credentials are keyed by host+database so the real query will pick them up.
 '@ | Set-Content -Path $agentsPath -Encoding UTF8
     Write-Host "Wrote AGENTS.md" -ForegroundColor Green
 }
