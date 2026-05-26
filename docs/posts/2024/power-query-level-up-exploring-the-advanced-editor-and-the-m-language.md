@@ -11,6 +11,7 @@ tags:
   - M Functions
   - Video
 slug: power-query-level-up-exploring-the-advanced-editor-and-the-m-language
+image: assets/images/posts/power-query-level-up-exploring-the-advanced-editor-and-the-m-language/hero.jpg
 ---
 
 **Recently, I had the privilege of delivering my first public training session at the 2024 Global Power Platform Bootcamp where I gave an introduction to the Power Query Advanced Editor and the M Language. I've included a recording of the training below.**

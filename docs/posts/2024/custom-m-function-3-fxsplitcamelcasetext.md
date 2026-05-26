@@ -10,7 +10,7 @@ authors:
 tags:
   - M Functions
 slug: custom-m-function-3-fxsplitcamelcasetext
-image: assets/images/posts/custom-m-function-3-fxsplitcamelcasetext/image.png
+image: assets/images/posts/custom-m-function-3-fxsplitcamelcasetext/hero.png
 ---
 
 ## Introduction

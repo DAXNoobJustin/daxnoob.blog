@@ -12,6 +12,7 @@ tags:
 authors:
   - justinmartin
 slug: semantic-model-optimization-theory-tips-and-tools
+image: assets/images/posts/semantic-model-optimization-theory-tips-and-tools/hero.jpg
 ---
 
 **Here is a talk I gave at the Vancouver Fabric & Power BI User Group on Semantic Model Optimization**:

@@ -11,7 +11,7 @@ tags:
   - M Functions
   - Data Modeling
 slug: custom-m-function-5-fxcumulativetoincremental
-image: assets/images/posts/custom-m-function-5-fxcumulativetoincremental/image.png
+image: assets/images/posts/custom-m-function-5-fxcumulativetoincremental/hero.jpg
 ---
 
 ## Introduction

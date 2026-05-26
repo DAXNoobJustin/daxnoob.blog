@@ -10,7 +10,7 @@ authors:
 tags:
   - Power BI
 slug: underrated-power-bi-feature-measures-as-visual-filters
-image: assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/image-13.png
+image: assets/images/posts/underrated-power-bi-feature-measures-as-visual-filters/hero.png
 ---
 
 ## Introduction

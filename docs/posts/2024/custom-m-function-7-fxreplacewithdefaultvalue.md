@@ -11,7 +11,7 @@ tags:
   - M Functions
   - Data Quality
 slug: custom-m-function-7-fxreplacewithdefaultvalue
-image: assets/images/posts/custom-m-function-7-fxreplacewithdefaultvalue/image-4.png
+image: assets/images/posts/custom-m-function-7-fxreplacewithdefaultvalue/hero.jpg
 ---
 
 ## Introduction

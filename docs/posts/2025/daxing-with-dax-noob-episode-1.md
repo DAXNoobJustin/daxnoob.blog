@@ -10,6 +10,7 @@ tags:
 authors:
   - justinmartin
 slug: daxing-with-dax-noob-episode-1
+image: assets/images/posts/daxing-with-dax-noob-episode-1/hero.jpg
 ---
 
 On this first episode of DAXing with DAX Noob, I walk through solving a question on the Fabric Community forum about a broken YTD Forecast measure.

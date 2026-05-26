@@ -12,7 +12,7 @@ tags:
 authors:
   - justinmartin
 slug: identifying-semantic-model-capacity-spikes-using-workspace-monitoring
-image: assets/images/posts/identifying-semantic-model-capacity-spikes-using-workspace-monitoring/image.png
+image: assets/images/posts/identifying-semantic-model-capacity-spikes-using-workspace-monitoring/hero.png
 ---
 
 ## Introduction

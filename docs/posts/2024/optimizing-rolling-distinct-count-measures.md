@@ -12,7 +12,7 @@ tags:
   - Optimization
   - Semantic Model
 slug: optimizing-rolling-distinct-count-measures
-image: assets/images/posts/optimizing-rolling-distinct-count-measures/image.png
+image: assets/images/posts/optimizing-rolling-distinct-count-measures/hero.png
 ---
 
 ## Introduction

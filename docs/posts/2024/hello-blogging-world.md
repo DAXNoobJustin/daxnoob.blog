@@ -8,6 +8,7 @@ categories:
 authors:
   - justinmartin
 slug: hello-blogging-world
+image: assets/images/posts/hello-blogging-world/hero.png
 ---
 
 I've been wanting to start a blog for some time now, and I decided if I don't start now, I probably never will.

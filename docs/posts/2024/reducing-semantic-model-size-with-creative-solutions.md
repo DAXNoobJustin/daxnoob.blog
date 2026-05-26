@@ -12,7 +12,7 @@ tags:
   - Semantic Model
   - Optimization
 slug: reducing-semantic-model-size-with-creative-solutions
-image: assets/images/posts/reducing-semantic-model-size-with-creative-solutions/image.png
+image: assets/images/posts/reducing-semantic-model-size-with-creative-solutions/hero.png
 ---
 
 ## Introduction

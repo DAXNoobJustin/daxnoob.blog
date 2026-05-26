@@ -10,7 +10,7 @@ authors:
 tags:
   - M Functions
 slug: custom-m-function-4-fxsetcolumntypesfromexample
-image: assets/images/posts/custom-m-function-4-fxsetcolumntypesfromexample/image-6.png
+image: assets/images/posts/custom-m-function-4-fxsetcolumntypesfromexample/hero.png
 ---
 
 ## Introduction

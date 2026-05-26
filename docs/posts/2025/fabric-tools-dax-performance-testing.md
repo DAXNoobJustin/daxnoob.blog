@@ -14,7 +14,7 @@ tags:
 authors:
   - justinmartin
 slug: fabric-tools-dax-performance-testing
-image: assets/images/posts/fabric-tools-dax-performance-testing/image-1.png
+image: assets/images/posts/fabric-tools-dax-performance-testing/hero.png
 ---
 
 ## Introduction

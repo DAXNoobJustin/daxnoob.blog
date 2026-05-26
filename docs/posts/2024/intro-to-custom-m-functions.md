@@ -10,7 +10,7 @@ authors:
 tags:
   - M Functions
 slug: intro-to-custom-m-functions
-image: assets/images/posts/intro-to-custom-m-functions/image.png
+image: assets/images/posts/intro-to-custom-m-functions/hero.png
 ---
 
 I have been spending a lot of time in Power Query lately, and one thing that I have been trying to do is to compile a custom M function library that I can use to speed up my development instead of writing the same transformations over and over again (see [What is DRY? Hint: It makes for great code](https://docs.getdbt.com/terms/dry)).

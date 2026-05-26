@@ -13,7 +13,7 @@ tags:
 authors:
   - justinmartin
 slug: extracting-semantic-model-source-tables-with-fabric-notebooks
-image: assets/images/posts/extracting-semantic-model-source-tables-with-fabric-notebooks/image.png
+image: assets/images/posts/extracting-semantic-model-source-tables-with-fabric-notebooks/hero.png
 ---
 
 ## Introduction

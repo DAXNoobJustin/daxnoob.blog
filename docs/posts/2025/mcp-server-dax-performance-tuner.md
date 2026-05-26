@@ -13,6 +13,7 @@ tags:
 authors:
   - justinmartin
 slug: mcp-server-dax-performance-tuner
+image: assets/images/posts/mcp-server-dax-performance-tuner/hero.jpg
 ---
 
 **With all of the buzz around MCP servers, I wanted to see if one could be created that would help you optimize DAX. Introducing - DAX Performance Tuner**!

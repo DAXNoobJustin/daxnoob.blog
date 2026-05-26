@@ -12,7 +12,7 @@ tags:
   - Semantic Model
   - Power BI
 slug: enhancing-your-golden-semantic-model-with-user-input-tables
-image: assets/images/posts/enhancing-your-golden-semantic-model-with-user-input-tables/zoomit.png
+image: assets/images/posts/enhancing-your-golden-semantic-model-with-user-input-tables/hero.png
 ---
 
 ## Introduction

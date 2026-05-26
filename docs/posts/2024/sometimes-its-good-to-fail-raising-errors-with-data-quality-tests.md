@@ -11,7 +11,7 @@ tags:
   - Data Quality
   - M Functions
 slug: sometimes-its-good-to-fail-raising-errors-with-data-quality-tests
-image: assets/images/posts/sometimes-its-good-to-fail-raising-errors-with-data-quality-tests/image-1.png
+image: assets/images/posts/sometimes-its-good-to-fail-raising-errors-with-data-quality-tests/hero.jpg
 ---
 
 ## Introduction

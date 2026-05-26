@@ -11,7 +11,7 @@ tags:
   - Performance
   - Optimization
 slug: you-dont-know-until-you-test-it-dax-optimization
-image: assets/images/posts/you-dont-know-until-you-test-it-dax-optimization/image-26.png
+image: assets/images/posts/you-dont-know-until-you-test-it-dax-optimization/hero.png
 ---
 
 ## Introduction

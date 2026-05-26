@@ -12,7 +12,7 @@ tags:
   - Power BI
   - Data Modeling
 slug: creating-user-driven-default-slicer-selections
-image: assets/images/posts/creating-user-driven-default-slicer-selections/image-6.png
+image: assets/images/posts/creating-user-driven-default-slicer-selections/hero.png
 ---
 
 ## Introduction

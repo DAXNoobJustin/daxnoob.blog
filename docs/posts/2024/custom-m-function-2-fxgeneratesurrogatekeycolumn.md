@@ -11,7 +11,7 @@ tags:
   - M Functions
   - Data Modeling
 slug: custom-m-function-2-fxgeneratesurrogatekeycolumn
-image: assets/images/posts/custom-m-function-2-fxgeneratesurrogatekeycolumn/image-7.png
+image: assets/images/posts/custom-m-function-2-fxgeneratesurrogatekeycolumn/hero.png
 ---
 
 ## Introduction

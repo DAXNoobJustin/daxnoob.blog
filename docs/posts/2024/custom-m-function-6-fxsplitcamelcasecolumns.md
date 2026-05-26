@@ -10,7 +10,7 @@ authors:
 tags:
   - M Functions
 slug: custom-m-function-6-fxsplitcamelcasecolumns
-image: assets/images/posts/custom-m-function-6-fxsplitcamelcasecolumns/image-27.png
+image: assets/images/posts/custom-m-function-6-fxsplitcamelcasecolumns/hero.png
 ---
 
 ## Introduction

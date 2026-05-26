@@ -11,6 +11,7 @@ tags:
 authors:
   - justinmartin
 slug: daxing-with-dax-noob-episode-3
+image: assets/images/posts/daxing-with-dax-noob-episode-3/hero.jpg
 ---
 
 On this episode of DAXing with DAX Noob, we walk through two DAX problems posted on the Power BI Reddit channel and LinkedIn that involve some set functions and optimizing a Days of Supply measure.

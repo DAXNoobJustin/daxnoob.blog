@@ -10,6 +10,7 @@ tags:
 authors:
   - justinmartin
 slug: daxing-with-dax-noob-episode-2
+image: assets/images/posts/daxing-with-dax-noob-episode-2/hero.jpg
 ---
 
 On this episode of DAXing with DAX Noob, we walk through two DAX problems posted on the Power BI Reddit channel that involve some tricky evaluation context.

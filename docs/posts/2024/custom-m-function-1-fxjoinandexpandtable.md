@@ -10,7 +10,7 @@ authors:
 tags:
   - M Functions
 slug: custom-m-function-1-fxjoinandexpandtable
-image: assets/images/posts/custom-m-function-1-fxjoinandexpandtable/image-2.png
+image: assets/images/posts/custom-m-function-1-fxjoinandexpandtable/hero.png
 ---
 
 ## Introduction

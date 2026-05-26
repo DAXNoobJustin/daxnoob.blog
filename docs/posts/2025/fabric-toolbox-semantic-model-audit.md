@@ -14,7 +14,7 @@ tags:
 authors:
   - justinmartin
 slug: fabric-toolbox-semantic-model-audit
-image: assets/images/posts/fabric-toolbox-semantic-model-audit/image-11.png
+image: assets/images/posts/fabric-toolbox-semantic-model-audit/hero.png
 ---
 
 ## Introduction
