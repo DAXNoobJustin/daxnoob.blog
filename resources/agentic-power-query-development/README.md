@@ -2,6 +2,8 @@
 
 Supporting code and examples for the [blog post of the same name](https://daxnoob.blog/agentic-power-query-development/).
 
+> **⚠️ UPDATE - read first (licensing).** These scripts use `PQTest.exe` from the Power Query SDK Tools. The license that ships with the `Microsoft.PowerQuery.SdkTools` package scopes that tool to **developing custom connectors** (and build/test automation for connectors). Using it as a general-purpose M evaluator - what this repo demonstrates - appears to fall outside that licensed purpose. I'm not a lawyer; read the license and decide for yourself. Treat this as an experiment, not a production pattern. For a supported path, use a Fabric Dataflow Gen2 and its [public APIs](https://learn.microsoft.com/fabric/data-factory/dataflow-gen2-public-apis) to edit M programmatically - though refreshing against real sources will likely require you to authorize the connections in the service.
+
 ## Files
 
 | File | What it is |

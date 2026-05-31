@@ -1,6 +1,6 @@
 ---
 title: "Agentic Power Query Development"
-description: "Let an LLM write, run, and self-correct Power Query M on its own using PQTest, without ever touching your PBIX, dataflow, or semantic model."
+description: "An experiment in letting an LLM write, run, and self-correct Power Query M on its own with PQTest - including the licensing caveats and the supported alternative."
 draft: false
 date:
   created: 2026-05-26
@@ -17,6 +17,16 @@ authors:
 slug: agentic-power-query-development
 image: assets/images/posts/agentic-power-query-development/hero.png
 ---
+
+!!! danger "UPDATE: read this before you try it"
+
+    **Update (May 2026):** after I first published this, I went back and dug into the licensing and the supported alternatives.
+
+    This post uses `PQTest.exe` from the **Power Query SDK Tools** to evaluate arbitrary Power Query M. The license that ships with that tool (the `Microsoft.PowerQuery.SdkTools` package) scopes it to **developing custom connectors** with the Power Query SDK, and to build or automated-test processes *for developing connectors*. Using it as a general-purpose M evaluator - which is exactly what I do in this post - appears to fall outside that licensed purpose (though using it to test custom connectors, as intended, would be fine).
+
+    I'm not a lawyer so you should read the license yourself and make your own call. Treat everything here as a **fun experiment** and not something to lean on for production.
+
+    If you want a path that's actually supported: spin up a Fabric **Dataflow Gen2** and use its [public APIs](https://learn.microsoft.com/fabric/data-factory/dataflow-gen2-public-apis) to push and edit your M programmatically. Two caveats from my own testing - to refresh against real sources you'll likely need to go into the service and **authorize the connections yourself**, and API-triggered refresh of CI/CD dataflows is documented as unreliable - the API accepts the request and starts a job, but the job doesn't actually refresh your data. If someone figures out how to use dataflows to fully work end to end, please let me know!
 
 ## The problem
 
