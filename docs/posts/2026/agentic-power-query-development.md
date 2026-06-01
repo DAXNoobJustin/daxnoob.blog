@@ -191,6 +191,6 @@ The LLM can fix and retry without another round trip to ask you what went wrong 
 
 Code samples are in the [resources folder for this post on GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/agentic-power-query-development): the `.pq` files (including the failing examples above), a wrapper that pretty-prints results, and a bootstrap script that installs the SDK extension and creates an `AGENTS.md`.
 
-If your team is using Power Query as any part of your data architecture, definitely check out PQTest. Even without an LLM, being able to evaluate an M expression and see real rows back without needing to go through a model/dataflow is pretty cool. I'm sure there are many other creative use cases for PQTest. 
+This was still a really useful experiment. PQTest let me see M evaluate in a tight loop and gave the LLM enough feedback to fix its own mistakes. But given the license language, I would not frame PQTest as a general-purpose Power Query runner. I would treat this workflow as an experiment unless you're using it in the supported custom connector development or connector test scenario.
 
 Like always, if you have any questions or feedback, please reach out. I'd love to hear from you!
