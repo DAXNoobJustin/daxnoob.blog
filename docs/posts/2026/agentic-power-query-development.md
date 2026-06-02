@@ -1,7 +1,7 @@
 ---
 title: "Agentic Power Query Development"
 description: "An experiment in letting an LLM write, run, and self-correct Power Query M on its own with PQTest - including the licensing caveats and the supported alternative."
-draft: false
+draft: true
 date:
   created: 2026-05-26
 categories:
