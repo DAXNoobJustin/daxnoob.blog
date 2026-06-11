@@ -1,0 +1,28 @@
+find_replace:
+  # OneLake domain replacement
+  - find_value: "onelake.dfs.fabric.microsoft.com"
+    replace_value:
+      dev: "onelake.dfs.fabric.microsoft.com"
+      test: "onelake.dfs.fabric.microsoft.com"
+      prod: "onelake.dfs.fabric.microsoft.com"
+
+  # DirectLake Workspace ID - dev baseline
+  - find_value: "aaaaaaaa-aaaa-aaaa-aaaa-000000000043"
+    replace_value:
+      dev: "aaaaaaaa-aaaa-aaaa-aaaa-000000000043" # HelixFabric-Dev-Insights
+      test: "aaaaaaaa-aaaa-aaaa-aaaa-000000000041" # HelixFabric-Test-Insights
+      prod: "aaaaaaaa-aaaa-aaaa-aaaa-000000000018" # HelixFabric-Insights (prod)
+
+  # DirectLake Lakehouse ID
+  - find_value: "aaaaaaaa-aaaa-aaaa-aaaa-000000000007"
+    replace_value:
+      dev: "aaaaaaaa-aaaa-aaaa-aaaa-000000000007" # dev Unified lakehouse
+      test: "aaaaaaaa-aaaa-aaaa-aaaa-000000000080" # test Unified lakehouse
+      prod: "aaaaaaaa-aaaa-aaaa-aaaa-000000000020" # prod Unified lakehouse
+      
+  # DirectLake Restricted Lakehouse ID
+  - find_value: "aaaaaaaa-aaaa-aaaa-aaaa-000000000037"
+    replace_value:
+      dev: "aaaaaaaa-aaaa-aaaa-aaaa-000000000037" # dev Unified_Restricted lakehouse
+      test: "aaaaaaaa-aaaa-aaaa-aaaa-000000000027" # test Unified_Restricted lakehouse (Azure Data Insights)
+      prod: "aaaaaaaa-aaaa-aaaa-aaaa-000000000103" # prod Unified_Restricted lakehouse (Azure Data Insights)

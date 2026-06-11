@@ -1,0 +1,533 @@
+/// Returns the maximum date with a minimum threshold
+/// @param dateExpr - The date expression to evaluate
+/// @returns The maximum date or minimum threshold
+function 'Local.TimeIntelligence.MaxDate' =
+		(
+		    // The date expression to evaluate
+		    dateExpr: ANYREF EXPR
+		) =>
+		VAR _MaxDate = CALCULATE ( dateExpr )
+		VAR _MinDate =
+		    IF ( NOT ISFILTERED ( Calendar ), TODAY ( ) - 45, _MaxDate )
+		VAR _Result = MAX ( _MaxDate, _MinDate )
+		RETURN
+		    _Result
+
+/// Calculates a rolling N-day window for the given expression
+/// @param baseExpr - The base expression to evaluate
+/// @param dateExpr - The reference date for the window
+/// @param windowSize - Number of days in the rolling window
+/// @returns The calculated value over the rolling window
+function 'Local.TimeIntelligence.RollingN.Standard' =
+		(
+		    // The base expression to evaluate
+		    baseExpr: ANYREF EXPR,
+		    // The reference date for the window
+		    dateExpr: ANYREF EXPR,
+		    // Number of days in the rolling window
+		    windowSize: SCALAR NUMERIC VAL
+		) =>
+		VAR _DateReference = dateExpr
+		VAR _Result =
+		    CALCULATE (
+		        baseExpr,
+		        DATESINPERIOD (
+		            Calendar[Calendar Date],
+		            _DateReference,
+		            -windowSize,
+		            DAY
+		        )
+		    )
+		RETURN
+		    _Result
+
+function 'Local.FabricCapacityUnits.MaxDate.CU' =
+		( ) =>
+		Local.TimeIntelligence.MaxDate (
+		    CALCULATE (
+		        MAX ( 'Fabric Capacity Units'[DIM_CalendarKey] ),
+		        ALLEXCEPT ( 'Fabric Capacity Units', Calendar ),
+		        'Fabric Capacity Units'[DataSource] = "Fabric Capacity Units"
+		    )
+		)
+
+/// Shifts a measure by a specified number of months
+/// @param baseExpr - The base expression to evaluate
+/// @param monthExpr - The reference month ID
+/// @param monthShiftNumber - Number of months to shift
+/// @returns The calculated value at the shifted month
+function 'Local.TimeIntelligence.MonthShift' =
+		(
+		    // The base expression to evaluate
+		    baseExpr: ANYREF EXPR,
+		    // The reference month ID
+		    monthExpr: ANYREF EXPR,
+		    // Number of months to shift
+		    monthShiftNumber: SCALAR NUMERIC VAL
+		) =>
+		VAR _DateReference =
+		    monthExpr + monthShiftNumber
+		VAR _Result =
+		    CALCULATE (
+		        baseExpr,
+		        Calendar[FiscalMonthId] = _DateReference,
+		        REMOVEFILTERS ( Calendar )
+		    )
+		RETURN
+		    _Result
+
+/// Shifts a measure by a specified number of days
+/// @param baseExpr - The base expression to evaluate
+/// @param dateExpr - The reference date
+/// @param dayShiftNumber - Number of days to shift
+/// @returns The calculated value at the shifted date
+function 'Local.TimeIntelligence.DayShift' =
+		(
+		    // The base expression to evaluate
+		    baseExpr: ANYREF EXPR,
+		    // The reference date
+		    dateExpr: ANYREF EXPR,
+		    // Number of days to shift
+		    dayShiftNumber: SCALAR NUMERIC VAL
+		) =>
+		VAR _DateReference =
+		    dateExpr + dayShiftNumber
+		VAR _Result =
+		    CALCULATE (
+		        baseExpr,
+		        Calendar[Calendar Date] = _DateReference,
+		        REMOVEFILTERS ( Calendar )
+		    )
+		RETURN
+		    _Result
+
+/// Calculates the period-over-period change
+/// @param currentPeriodExpr - The current period expression
+/// @param priorPeriodExpr - The prior period expression
+/// @returns The difference between current and prior period
+function 'Local.TimeIntelligence.PeriodOverPeriod' =
+		(
+		    // The current period expression
+		    currentPeriodExpr: ANYREF EXPR,
+		    // The prior period expression
+		    priorPeriodExpr: ANYREF EXPR
+		) =>
+		CALCULATE ( currentPeriodExpr )
+		    - CALCULATE ( priorPeriodExpr )
+
+/// Calculates the period-over-period percentage change
+/// @param currentPeriodExpr - The current period expression
+/// @param priorPeriodExpr - The prior period expression
+/// @returns The percentage change between current and prior period
+function 'Local.TimeIntelligence.PeriodOverPeriodPercent' =
+		(
+		    // The current period expression
+		    currentPeriodExpr: ANYREF EXPR,
+		    // The prior period expression
+		    priorPeriodExpr: ANYREF EXPR
+		) =>
+		VAR _Current =
+		    CALCULATE ( currentPeriodExpr )
+		VAR _Prior = CALCULATE ( priorPeriodExpr )
+		VAR _Result = DIVIDE ( _Current - _Prior, _Prior )
+		RETURN
+		    _Result
+
+function 'Local.Revenue.MaxMonthId' =
+		( ) =>
+		IF (
+		    ISCROSSFILTERED ( Calendar ),
+		    CALCULATE (
+		        MAX ( Calendar[FiscalMonthId] ),
+		        Calendar[Closed Month Flag] = "True"
+		    ),
+		    CALCULATE (
+		        MAX ( Calendar[FiscalMonthId] ),
+		        Calendar[Azure Closed Month Flag] = "True"
+		    )
+		)
+
+/// Calculates month-to-date for the given expression
+/// @param baseExpr - The base expression to evaluate
+/// @param dateExpr - The reference date
+/// @param dateFilterColumn - The date column to filter
+/// @returns The month-to-date calculation
+function 'Local.TimeIntelligence.MonthToDate' =
+		(
+		    // The base expression to evaluate
+		    baseExpr: ANYREF EXPR,
+		    // The reference date
+		    dateExpr: ANYREF EXPR,
+		    // The date column to filter
+		    dateFilterColumn: ANYREF EXPR
+		) =>
+		VAR _DateReference = dateExpr
+		VAR _Result =
+		    CALCULATE (
+		        CALCULATE (
+		            baseExpr,
+		            DATESMTD ( Calendar[Calendar Date] )
+		        ),
+		        dateFilterColumn = _DateReference
+		    )
+		RETURN
+		    _Result
+
+/// Calculates quarter-to-date for the given expression
+/// @param baseExpr - The base expression to evaluate
+/// @param dateExpr - The reference date
+/// @param dateFilterColumn - The date column to filter
+/// @returns The quarter-to-date calculation
+function 'Local.TimeIntelligence.QuarterToDate' =
+		(
+		    // The base expression to evaluate
+		    baseExpr: ANYREF EXPR,
+		    // The reference date
+		    dateExpr: ANYREF EXPR,
+		    // The date column to filter
+		    dateFilterColumn: ANYREF EXPR
+		) =>
+		VAR _DateReference = dateExpr
+		VAR _Result =
+		    CALCULATE (
+		        CALCULATE (
+		            baseExpr,
+		            DATESQTD ( Calendar[Calendar Date] )
+		        ),
+		        dateFilterColumn = _DateReference
+		    )
+		RETURN
+		    _Result
+
+/// Calculates year-to-date for the given expression (fiscal year ending June 30)
+/// @param baseExpr - The base expression to evaluate
+/// @param dateExpr - The reference date
+/// @param dateFilterColumn - The date column to filter
+/// @returns The year-to-date calculation
+function 'Local.TimeIntelligence.YearToDate' =
+		(
+		    // The base expression to evaluate
+		    baseExpr: ANYREF EXPR,
+		    // The reference date
+		    dateExpr: ANYREF EXPR,
+		    // The date column to filter
+		    dateFilterColumn: ANYREF EXPR
+		) =>
+		VAR _DateReference = dateExpr
+		VAR _Result =
+		    CALCULATE (
+		        CALCULATE (
+		            baseExpr,
+		            DATESYTD ( Calendar[Calendar Date], "06-30" )
+		        ),
+		        dateFilterColumn = _DateReference
+		    )
+		RETURN
+		    _Result
+
+/// Calculates revenue metric month-to-date
+/// @param metricColumn - The metric column reference to sum
+/// @returns The month-to-date metric value
+function 'Local.Revenue.Metric.MonthToDate' =
+		(
+		    // The metric column reference to sum
+		    metricColumn: ANYREF EXPR
+		) =>
+		Local.TimeIntelligence.MonthToDate (
+		    CALCULATE (
+		        SUM ( metricColumn ),
+		        metricColumn <> 0
+		    ),
+		    Local.Revenue.MaxMonthId ( ),
+		    Calendar[FiscalMonthId]
+		)
+
+/// Calculates revenue metric year-to-date
+/// @param metricColumn - The metric column reference to sum
+/// @returns The year-to-date metric value
+function 'Local.Revenue.Metric.YearToDate' =
+		(
+		    // The metric column reference to sum
+		    metricColumn: ANYREF EXPR
+		) =>
+		Local.TimeIntelligence.YearToDate (
+		    CALCULATE (
+		        SUM ( metricColumn ),
+		        metricColumn <> 0
+		    ),
+		    Local.Revenue.MaxMonthId ( ),
+		    Calendar[FiscalMonthId]
+		)
+
+/// Returns the latest Usage Fabric activity date for a given metric column,
+/// considering only the rows where that metric is non-zero. Shared core for the
+/// per-metric Local.UsageFabric.MaxDate.* wrappers.
+/// @param metricCol - Usage Fabric metric column required to be non-zero (defaults to FabricMAU, the DWM metric)
+/// @returns The maximum date with the standard minimum-threshold guard
+function 'Local.UsageFabric.MaxDate' =
+		(
+		    // Usage Fabric metric column required to be non-zero
+		    metricCol: ANYREF EXPR = 'Usage Fabric'[FabricMAU]
+		) =>
+		Local.TimeIntelligence.MaxDate (
+		    CALCULATE (
+		        MAX ( 'Usage Fabric'[DIM_CalendarKey] ),
+		        ALLEXCEPT ( 'Usage Fabric', Calendar ),
+		        metricCol <> 0
+		    )
+		)
+
+function 'Local.UsageFabric.MaxDate.DWM' =
+		( ) =>
+		Local.UsageFabric.MaxDate ( )
+
+/// Calculates Fabric period active users metric
+/// @param metricColumn - The metric column reference to sum
+/// @param dateExpr - The reference date expression
+/// @returns Period active users count
+function 'Local.UsageFabric.PeriodActiveUsers' =
+		(
+		    // The metric column reference to sum
+		    metricColumn: ANYREF EXPR,
+		    // The reference date expression
+		    dateExpr: ANYREF EXPR
+		) =>
+		Local.TimeIntelligence.SetDateAnchor (
+		    CALCULATE (
+		        SUM ( metricColumn ),
+		        TREATAS (
+		            SELECTCOLUMNS (
+		                FILTER (
+		                    'Usage Fabric Product',
+		                    IF (
+		                        NOT ISFILTERED ( 'Usage Fabric Product'[Fabric Activity] ),
+		                        'Usage Fabric Product'[Fabric Activity] = "All",
+		                        TRUE ( )
+		                    )
+		                        && IF (
+		                            NOT ISFILTERED ( 'Usage Fabric Product'[Fabric Feature] ),
+		                            'Usage Fabric Product'[Fabric Feature] = "All",
+		                            TRUE ( )
+		                        )
+		                        && IF (
+		                            NOT ( ISFILTERED ( 'Usage Fabric Product'[Fabric Product] )
+		                                || ISFILTERED ( 'Product Master' ) ),
+		                            'Usage Fabric Product'[Fabric Product] = "All",
+		                            TRUE ( )
+		                        )
+		                ),
+		                'Usage Fabric Product'[DIM_Usage_FabricProductId]
+		            ),
+		            'Usage Fabric Product'[DIM_Usage_FabricProductId]
+		        ),
+		        metricColumn <> 0
+		    ),
+		    dateExpr
+		)
+
+/// Anchors an expression to a specific date
+/// @param baseExpr - The base expression to evaluate
+/// @param dateExpr - The date to anchor to
+/// @returns The calculated value at the anchored date
+function 'Local.TimeIntelligence.SetDateAnchor' =
+		(
+		    // The base expression to evaluate
+		    baseExpr: ANYREF EXPR,
+		    // The date to anchor to
+		    dateExpr: ANYREF EXPR
+		) =>
+		VAR _DateReference = dateExpr
+		VAR _Result =
+		    CALCULATE (
+		        baseExpr,
+		        Calendar[Calendar Date] = _DateReference
+		    )
+		RETURN
+		    _Result
+
+/// Allocates Power BI Premium revenue across workload types based on capacity units usage
+/// @returns Power BI Premium revenue attributed to each workload type
+function 'Local.Revenue.WorkloadAllocation.PSKU' =
+		( ) =>
+		VAR _RevenueWorkloads = ALL ( Revenue[Workload Type] )
+		VAR _Result =
+		    SUMX (
+		        SUMMARIZECOLUMNS (
+		            Calendar[FM End Date],
+		            Revenue[Workload Type],
+		            "@AttributedRevenue",
+		                VAR _RevenueToAllocate =
+		                    CALCULATE (
+		                        [Adjusted Revenue],
+		                        'Product Master'[Product] = "Power BI Premium",
+		                        REMOVEFILTERS ( Revenue[Workload Type] )
+		                    )
+		                VAR _AllocationPercent =
+		                    CALCULATE (
+		                        DIVIDE (
+		                            [CU Hours],
+		                            CALCULATE (
+		                                [CU Hours],
+		                                'Fabric Capacity Units'[Workload Type] IN _RevenueWorkloads
+		                            )
+		                        ),
+		                        TREATAS (
+		                            VALUES ( Revenue[Workload Type] ),
+		                            'Fabric Capacity Units'[Workload Type]
+		                        ),
+		                        Capacity[Capacity Grouping] = "Power BI Premium"
+		                    )
+		                VAR _Result = _RevenueToAllocate * _AllocationPercent
+		                RETURN
+		                    _Result
+		        ),
+		        [@AttributedRevenue]
+		    )
+		RETURN
+		    _Result
+
+/// Allocates Fabric SKU revenue across workload types, distributing Compute Pool revenue proportionally
+/// @returns Fabric Capacity revenue attributed to each workload type excluding autoscale and compute pool
+function 'Local.Revenue.WorkloadAllocation.FSKU' =
+		( ) =>
+		CALCULATE (
+		    SUMX (
+		        SUMMARIZECOLUMNS (
+		            Calendar[FM End Date],
+		            Revenue[Workload Type],
+		            "@AttributedRevenue",
+		                VAR _AllocatedWorkloads = { "Compute Pool", "Capacity Overage" }
+		                VAR _RevenueToAllocate =
+		                    CALCULATE (
+		                        [Consumed Revenue],
+		                        Revenue[Workload Type] IN _AllocatedWorkloads
+		                    )
+		                VAR _WorkloadRevenue =
+		                    CALCULATE (
+		                        [Consumed Revenue],
+		                        KEEPFILTERS (
+		                            NOT Revenue[Workload Type] IN _AllocatedWorkloads
+		                        )
+		                    )
+		                VAR _AllocationPercent =
+		                    CALCULATE (
+		                        DIVIDE (
+		                            [Consumed Revenue],
+		                            CALCULATE (
+		                                [Consumed Revenue],
+		                                REMOVEFILTERS ( Revenue[Workload Type] )
+		                            )
+		                        ),
+		                        KEEPFILTERS (
+		                            Revenue[Service Level 4] <> "OneLake"
+		                                || Revenue[Service Level 5] = "OneLake Cache"
+		                        ),
+		                        KEEPFILTERS (
+		                            NOT Revenue[Service Level 5] IN
+		                                {
+		                                    "autoscale for Spark",
+		                                    "autoscale for Data Warehouse",
+		                                    "Compute Pool",
+		                                    "Capacity Overage"
+		                                }
+		                        )
+		                    )
+		                VAR _Result =
+		                    _WorkloadRevenue + ( _RevenueToAllocate * _AllocationPercent )
+		                RETURN
+		                    _Result
+		        ),
+		        [@AttributedRevenue]
+		    ),
+		    Revenue[Service Level 4] IN { "Fabric Capacity", "OneLake" }
+		)
+
+/// Generic scope guard: returns measure value only when the specified column
+/// has a single value in the current context (via visual groupBy or slicer filter).
+/// @param measureExpr - The measure expression to evaluate
+/// @param scopeExpr - The column reference to check for single-value scope (defaults to 'Product Master'[Product Mid Group])
+/// @returns The measure value if in scope or single-valued, otherwise measure * 0
+function 'Local.Utility.ScopeGuard' =
+		(
+		    // The measure expression to evaluate
+		    measureExpr: ANYREF EXPR,
+		    // The column to check for single-value scope
+		    scopeExpr: ANYREF EXPR = 'Product Master'[Product Mid Group]
+		) =>
+		IF (
+		    ISINSCOPE ( scopeExpr ),
+		    measureExpr,
+		    measureExpr * INT ( HASONEVALUE ( scopeExpr ) )
+		)
+
+/// Annualized run rate from consumed and adjusted revenue expressions.
+/// Adapts to filter context — works for single-month (base/MTD) and multi-month (YTD) contexts.
+/// @param consumedExpr - The consumed revenue expression
+/// @param adjustedExpr - The adjusted revenue expression
+/// @returns The annualized run rate
+function 'Local.Revenue.ARR' =
+		(
+		    // The consumed revenue expression
+		    consumedExpr: ANYREF EXPR,
+		    // The adjusted revenue expression
+		    adjustedExpr: ANYREF EXPR
+		) =>
+		VAR _TotalDays =
+		    SUMX (
+		        VALUES ( Calendar[FiscalMonthId] ),
+		        CALCULATE ( MAX ( Calendar[Day Of Month] ) )
+		    )
+		VAR _MonthCount = DISTINCTCOUNT ( Calendar[FiscalMonthId] )
+		VAR _ConsumedARR = DIVIDE ( consumedExpr, _TotalDays ) * 365
+		VAR _AdjustedARR = DIVIDE ( adjustedExpr, _MonthCount ) * 12
+		RETURN
+		    _ConsumedARR + _AdjustedARR
+
+/// Net revenue retention rate for the existing-customer cohort (account keys with prior-period value > 0).
+/// Generalises the NRR cohort pattern across MoM/YoY and Workload variants.
+/// @param priorExpr - Prior-period revenue/ARR measure (e.g., [ARR (MTD) PM] or [ARR (MTD) PY])
+/// @param currentExpr - Current-period revenue/ARR measure (e.g., [ARR (MTD)])
+/// @returns Retention rate (current cohort sum / prior cohort sum)
+function 'Local.Revenue.Cohort.RetentionRate' =
+		(
+		    // Prior-period revenue/ARR measure
+		    priorExpr: ANYREF EXPR,
+		    // Current-period revenue/ARR measure
+		    currentExpr: ANYREF EXPR
+		) =>
+		Local.Utility.ScopeGuard (
+		    VAR _PriorByAccountKey =
+		        SUMMARIZECOLUMNS ( Account[DIM_AccountKey], "@Prior", priorExpr )
+		    VAR _Qualified = FILTER ( _PriorByAccountKey, [@Prior] > 0 )
+		    VAR _PriorARR = SUMX ( _Qualified, [@Prior] )
+		    VAR _CurrARR = CALCULATE ( currentExpr, _Qualified )
+		    RETURN
+		        DIVIDE ( _CurrARR, _PriorARR ),
+		    'Product Master'[Product Mid Group]
+		)
+
+function 'Local.UsageSummary.MaxDate' =
+		( ) =>
+		Local.TimeIntelligence.MaxDate (
+		    CALCULATE (
+		        MAX ( 'Usage Summary'[DIM_CalendarKey] ),
+		        ALLEXCEPT ( 'Usage Summary', 'Product Master', Calendar ),
+		        'Usage Summary'[MonthlyActiveUsage] <> 0
+		    )
+		)
+
+/// Calculates usage summary period active users with product filter
+/// @param metricColumn - The metric column reference to sum
+/// @returns Period active users count (only when single product selected)
+function 'Local.UsageSummary.PeriodActiveUsers' =
+		(
+		    // The metric column reference to sum
+		    metricColumn: ANYREF EXPR
+		) =>
+		Local.TimeIntelligence.SetDateAnchor (
+		    CALCULATE (
+		        SUM ( metricColumn )
+		    ),
+		    Local.UsageSummary.MaxDate ( )
+		)
+		    * INT ( HASONEVALUE ( 'Product Master'[Product] ) )

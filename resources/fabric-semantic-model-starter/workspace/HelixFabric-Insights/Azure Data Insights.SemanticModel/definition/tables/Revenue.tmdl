@@ -1,0 +1,288 @@
+/// Revenue fact table containing monthly billed, consumed, and adjusted revenue data across all Azure Data & AI products.
+table Revenue
+
+	/// Month-to-date adjusted revenue in constant dollars, reflecting corrections and true-ups applied to billed amounts.
+	measure 'Adjusted Revenue (MTD)' = Local.Revenue.Metric.MonthToDate ( Revenue[AdjustedRevenueCD] )
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+		annotation TimeIntel_Anchor = Local.Revenue.MaxMonthId
+
+	/// Fiscal year-to-date adjusted revenue in constant dollars, reflecting corrections and true-ups applied to billed amounts.
+	measure 'Adjusted Revenue (YTD)' = Local.Revenue.Metric.YearToDate ( Revenue[AdjustedRevenueCD] )
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+	/// Total adjusted revenue in constant dollars, summing all corrections and true-ups across the current filter context.
+	measure 'Adjusted Revenue' = SUM( 'Revenue'[AdjustedRevenueCD] )
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+	/// Month-to-date combined consumed (usage-based) and adjusted revenue in constant dollars.
+	measure 'Consumed + Adjusted Revenue (MTD)' = [Adjusted Revenue (MTD)] + [Consumed Revenue (MTD)]
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Consumption, Revenue MTD, Monthly Revenue
+
+		annotation Copilot_Alias = Total Revenue (MTD)
+
+		annotation Copilot_DefaultFilter = 'Calendar'[Azure Closed Month Flag]=True
+
+		annotation TimeIntel_Anchor = Local.Revenue.MaxMonthId
+
+	/// Fiscal year-to-date combined consumed (usage-based) and adjusted revenue in constant dollars.
+	measure 'Consumed + Adjusted Revenue (YTD)' = [Adjusted Revenue (YTD)] + [Consumed Revenue (YTD)]
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Consumption, Revenue YTD, Annual Revenue
+
+		annotation Copilot_Alias = Total Revenue (YTD)
+
+		annotation Copilot_DefaultFilter = 'Calendar'[Azure Closed Month Flag]=True
+
+		annotation TimeIntel_Anchor = Local.Revenue.MaxMonthId
+
+	/// Total combined consumed (usage-based) and adjusted revenue in constant dollars.
+	measure 'Consumed + Adjusted Revenue' = [Adjusted Revenue] + [Consumed Revenue]
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+	/// Month-to-date Azure consumed (usage-based) revenue in constant dollars.
+	measure 'Consumed Revenue (MTD)' = Local.Revenue.Metric.MonthToDate ( Revenue[RevenueAmount] )
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+		annotation TimeIntel_Anchor = Local.Revenue.MaxMonthId
+
+	/// Fiscal year-to-date Azure consumed (usage-based) revenue in constant dollars.
+	measure 'Consumed Revenue (YTD)' = Local.Revenue.Metric.YearToDate ( Revenue[RevenueAmount] )
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+		annotation TimeIntel_Anchor = Local.Revenue.MaxMonthId
+
+	/// Total Azure consumed (usage-based) revenue in constant dollars across the current filter context.
+	measure 'Consumed Revenue' = SUM ( 'Revenue'[RevenueAmount] )
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+	/// Annualized run rate from consumed and adjusted revenue. All-up Azure scope (all SKUs, all workloads, no allocation). Non-additive — represents a rate, not a sum; do not aggregate across products or periods. For Fabric-workload ARR with proper Compute Pool / Capacity Overage allocation, use [Allocated ARR].
+	measure ARR =
+			Local.Revenue.ARR (
+			    [Consumed Revenue],
+			    [Adjusted Revenue]
+			)
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+	/// Month-to-date all-up Azure annualized run rate from consumed and adjusted revenue. Non-additive — do not sum across products or periods. For Fabric-workload ARR, use [Allocated ARR (MTD)].
+	measure 'ARR (MTD)' =
+			Local.TimeIntelligence.MonthToDate (
+			    [ARR],
+			    Local.Revenue.MaxMonthId ( ),
+			    Calendar[FiscalMonthId]
+			)
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Annualized Run Rate MTD, Annualized Revenue MTD, ARR Monthly, Monthly ARR
+
+		annotation Copilot_Alias = ARR (MTD)
+
+		annotation TimeIntel_Anchor = Local.Revenue.MaxMonthId
+
+	/// Fabric workload-attributable annualized run rate.Equivalent to [ARR] filtered to Fabric, but with Compute Pool and Capacity Overage revenue redistributed proportionally into the actual workloads. This is the "Fabric ARR" number used in executive briefings. Non-additive — represents a rate, not a sum. Slice by 'Revenue'[Workload Type] for workload-level breakdowns.
+	measure 'Allocated ARR' =
+			Local.Revenue.ARR (
+			    Local.Revenue.WorkloadAllocation.FSKU ( ),
+			    Local.Revenue.WorkloadAllocation.PSKU ( )
+			)
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+	/// Month-to-date Fabric workload-attributable annualized run rate. Compute Pool and Capacity Overage revenue redistributed proportionally across workloads. This is the "Fabric ARR" number used in executive briefings. Slice by 'Revenue'[Workload Type] for workload-level breakdowns. Non-additive — do not sum across workloads.
+	measure 'Allocated ARR (MTD)' =
+			Local.TimeIntelligence.MonthToDate (
+			    [Allocated ARR],
+			    Local.Revenue.MaxMonthId ( ),
+			    Calendar[FiscalMonthId]
+			)
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Allocated Annualized Run Rate MTD, Workload ARR MTD, SKU-Allocated ARR MTD, ARR by Workload MTD
+
+		annotation Copilot_Alias = Allocated ARR (MTD)
+
+		annotation TimeIntel_Anchor = Local.Revenue.MaxMonthId
+
+	/// 12-month all-up Azure (unallocated) net revenue retention rate. Filters to cohort customers with prior-year ARR > 0. Non-additive — represents a rate.
+	measure 'NRR (YoY)' = Local.Revenue.Cohort.RetentionRate ( [ARR (MTD) PY], [ARR (MTD)] )
+		formatString: #,0.0%;-#,0.0%;#,0.0%
+		displayFolder: Revenue
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Net Revenue Retention YoY, Customer Retention YoY, Annual Retention, YoY Retention
+
+		annotation Copilot_Alias = NRR (YoY)
+
+		annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["UNNECESSARY_MEASURES"]}
+
+	/// Fiscal year-to-date all-up Azure annualized run rate from consumed and adjusted revenue. Non-additive — do not sum across products or periods. For Fabric-workload ARR, use [Allocated ARR (YTD)].
+	measure 'ARR (YTD)' =
+			Local.TimeIntelligence.YearToDate (
+			    [ARR],
+			    Local.Revenue.MaxMonthId ( ),
+			    Calendar[FiscalMonthId]
+			)
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Annualized Run Rate YTD, Annualized Revenue YTD, ARR Annual, Year-to-date ARR
+
+		annotation Copilot_Alias = ARR (YTD)
+
+		annotation TimeIntel_Anchor = Local.Revenue.MaxMonthId
+
+	/// Fiscal year-to-date Fabric workload-attributable annualized run rate. Compute Pool and Capacity Overage revenue redistributed proportionally across workloads. This is the "Fabric ARR" number used in executive briefings. Slice by 'Revenue'[Workload Type] for workload-level breakdowns. Non-additive — do not sum across workloads.
+	measure 'Allocated ARR (YTD)' =
+			Local.TimeIntelligence.YearToDate (
+			    [Allocated ARR],
+			    Local.Revenue.MaxMonthId ( ),
+			    Calendar[FiscalMonthId]
+			)
+		formatString: $ #,##0
+		displayFolder: Revenue
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Allocated Annualized Run Rate YTD, Workload ARR YTD, SKU-Allocated ARR YTD, ARR by Workload YTD
+
+		annotation Copilot_Alias = Allocated ARR (YTD)
+
+		annotation TimeIntel_Anchor = Local.Revenue.MaxMonthId
+
+	/// 1-month all-up Azure (unallocated) net revenue retention rate. Filters to cohort customers with prior-month ARR > 0. Non-additive — represents a rate.
+	measure 'NRR (MoM)' = Local.Revenue.Cohort.RetentionRate ( [ARR (MTD) PM], [ARR (MTD)] )
+		formatString: #,0.0%;-#,0.0%;#,0.0%
+		displayFolder: Revenue
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Net Revenue Retention MoM, Customer Retention MoM, Monthly Retention, MoM Retention
+
+		annotation Copilot_Alias = NRR (MoM)
+
+		annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["UNNECESSARY_MEASURES"]}
+
+	/// Adjusted revenue amount in constant dollars, reflecting post-billing corrections and true-ups.
+	column AdjustedRevenueCD
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		sourceColumn: AdjustedRevenueCD
+
+	/// Azure consumed (usage-based) revenue amount in constant dollars.
+	column RevenueAmount
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		sourceColumn: RevenueAmount
+
+	/// Foreign key to the Calendar dimension. Each row represents one fiscal month.
+	column DIM_CalendarKey
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_CalendarKey
+
+	/// Foreign key to the Product Master dimension.
+	column DIM_ProductMasterId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_ProductMasterId
+
+	/// Foreign key to the Segment dimension.
+	column DIM_SubSegmentId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubSegmentId
+
+	/// Foreign key to the Geography dimension.
+	column DIM_SubsidiarySubDistrictId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubsidiarySubDistrictId
+
+	/// Foreign key to the Account dimension (AccountKey).
+	column DIM_AccountKey
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_AccountKey
+
+	/// Fourth level of the Azure service taxonomy hierarchy. Blank for non-Azure-consumption revenue rows; N/A for Azure rows without service-level detail.
+	column 'Service Level 4'
+		dataType: string
+		displayFolder: -> Attributes\Service
+		sourceColumn: ServiceLevel4
+
+	/// Fifth (most granular) level of the Azure service taxonomy hierarchy. Classifies revenue by individual Azure service.
+	column 'Service Level 5'
+		dataType: string
+		displayFolder: -> Attributes\Service
+		sourceColumn: ServiceLevel5
+
+	/// Fabric workload type for the revenue row (e.g., OneLake, Data Integration, Compute Pool, Real Time Intelligence, Power BI, Data Warehousing Core, Copilot, DE and DS, SQLDb). Populated only for Fabric F SKU revenue rows (Strategic Pillar = 'Fabric F SKU'); blank for all other rows.
+	column 'Workload Type'
+		dataType: string
+		displayFolder: -> Attributes\Fabric
+		sourceColumn: WorkloadType
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms = Fabric Workload Type, Workload
+
+	partition Revenue = entity
+		mode: directLake
+		source
+			entityName: FACT_Revenue
+			schemaName: Tabular_AzureDataInsights
+			expressionSource: exp_directlake_restricted
+
+	extendedProperty SourceColumn = Upstream Finance Source
+
+	extendedProperty SourceColumn2 = Azure Data Insights and Analytics
+
+	annotation TabularEditor_TableGroup = Fact
+
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["STAR_SCHEMA"]}
+
+	annotation Copilot_Topic = revenue
+

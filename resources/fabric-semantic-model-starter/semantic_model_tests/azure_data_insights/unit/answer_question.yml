@@ -1,0 +1,17 @@
+source_model: Azure Data Insights
+cases:
+  - id: answer_question_revenue_default
+    description: AnswerQuestion for revenue — measure-level DefaultFilters (Azure Closed Month Flag) auto-apply.
+    category: snapshot
+    dax: "EVALUATE\nLocal.AskADIA.AnswerQuestion(\n  \"revenue\",\n  BLANK(),\n  BLANK(),\n  BLANK(),\n  BLANK(),\n  BLANK()\n)\n"
+  - id: answer_question_revenue_with_filter
+    description: AnswerQuestion for revenue with an explicit user filter.
+    category: snapshot
+    dax: "EVALUATE\nLocal.AskADIA.AnswerQuestion(\n  \"revenue\",\n  BLANK(),\n  \"'Product Master'[Product Mid Group]=Fabric\",\n  BLANK(),\n  BLANK(),\n  BLANK()\n)\n"
+  - id: answer_question_autoapplied_user_wins_over_default
+    description: "Precedence: when a user filter on the same column as a question-level DefaultFilter is passed, the default is tagged (suppressed by user) in [AutoApplied] (and the user filter is rendered into the SUMMARIZECOLUMNS instead). Covers _TagSuppressedDefaults user-precedence branch. Uses the 'revenue' question (measure-level DefaultFilter on 'Calendar'[Azure Closed Month Flag]) with an explicit user filter on that same column."
+    category: snapshot
+    dax:
+      'EVALUATE { MAXX(Local.AskADIA.AnswerQuestion("revenue", BLANK(), "''Calendar''[Azure Closed Month Flag]=False", 0, BLANK(), BLANK()), [AutoApplied]) }
+
+      '

@@ -1,0 +1,131 @@
+/// Fabric product usage fact table tracking active user counts (DAU/WAU/MAU), active tenants (MAT), active accounts (MAA), trial usage, trial sign-ups, visitor metrics, external user metrics, and total user metrics at the Fabric Product/Feature/Activity grain.
+table 'Usage Fabric'
+
+	/// Measures the unique number of users who have used Fabric on capacity on a given day.
+	measure 'Fabric DAU' = Local.UsageFabric.PeriodActiveUsers ( 'Usage Fabric'[FabricDAU], Local.UsageFabric.MaxDate.DWM ( ) )
+		formatString: #,0
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Alias = Fabric_DAU
+
+		annotation Copilot_Synonyms = Fabric Daily Active Users
+
+		annotation TimeIntel_Anchor = Local.UsageFabric.MaxDate.DWM
+
+	/// Measures the unique number of users who have used the fabric product in the last 28 days.
+	measure 'Fabric MAU' = Local.UsageFabric.PeriodActiveUsers ( 'Usage Fabric'[FabricMAU], Local.UsageFabric.MaxDate.DWM ( ) )
+		formatString: #,0
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Fabric Active Users, Workload MAU
+
+		annotation Copilot_Alias = MAU
+
+		annotation TimeIntel_Anchor = Local.UsageFabric.MaxDate.DWM
+
+	/// Measures the unique number of users who have used the fabric product in the last 7 days.
+	measure 'Fabric WAU' = Local.UsageFabric.PeriodActiveUsers ( 'Usage Fabric'[FabricWAU], Local.UsageFabric.MaxDate.DWM ( ) )
+		formatString: #,0
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Alias = Fabric_WAU
+
+		annotation Copilot_Synonyms = Fabric Weekly Active Users
+
+		annotation TimeIntel_Anchor = Local.UsageFabric.MaxDate.DWM
+
+	/// Foreign key to the Calendar dimension.
+	column DIM_CalendarKey
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_CalendarKey
+
+	/// Foreign key to the Environment dimension.
+	column DIM_EnvironmentId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_EnvironmentId
+
+	/// Foreign key to the Product Master dimension.
+	column DIM_ProductMasterId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_ProductMasterId
+
+	/// Foreign key to the Segment dimension.
+	column DIM_SubSegmentId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubSegmentId
+
+	/// Foreign key to the Geography dimension.
+	column DIM_SubsidiarySubDistrictId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubsidiarySubDistrictId
+
+	/// Foreign key to the Account dimension (AccountKey).
+	column DIM_AccountKey
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_AccountKey
+
+	/// Foreign key to the Usage Fabric Product dimension.
+	column DIM_Usage_FabricProductId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_Usage_FabricProductId
+
+	/// Count of distinct Fabric developer users active on the given calendar day on Fabric capacity.
+	column FabricDAU
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		sourceColumn: FabricDAU
+
+	/// Count of distinct Fabric developer users active in the rolling 28-day window on Fabric capacity.
+	column FabricMAU
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		sourceColumn: FabricMAU
+
+	/// Count of distinct Fabric developer users active in the rolling 7-day window on Fabric capacity.
+	column FabricWAU
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		sourceColumn: FabricWAU
+
+	partition 'Usage Fabric' = entity
+		mode: directLake
+		source
+			entityName: FACT_Usage_Fabric
+			schemaName: Tabular_AzureDataInsights
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn
+		type: string
+
+	annotation TabularEditor_TableGroup = Fact
+
+	annotation Copilot_Topic = usage
+

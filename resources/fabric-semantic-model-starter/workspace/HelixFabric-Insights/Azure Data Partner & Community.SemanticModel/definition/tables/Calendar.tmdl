@@ -1,0 +1,321 @@
+/// Shared date dimension for all time-based analysis. Contains calendar and Microsoft fiscal (Jul-Jun) hierarchies, relative period offsets, and time reference flags for filtering to complete periods.
+table Calendar
+	dataCategory: Time
+
+	measure 'Is Calendar In Scope' =
+			ISINSCOPE ( Calendar[Azure Closed Month Flag] )
+			    || ISINSCOPE ( Calendar[Calendar Date (mmm-yy)] )
+			    || ISINSCOPE ( Calendar[Calendar Date] )
+			    || ISINSCOPE ( Calendar[Calendar Month] )
+			    || ISINSCOPE ( Calendar[Closed Month Flag] )
+			    || ISINSCOPE ( Calendar[Community Idea Closed Month Flag] )
+			    || ISINSCOPE ( Calendar[Current Day Flag] )
+			    || ISINSCOPE ( Calendar[Current Month Flag] )
+			    || ISINSCOPE ( Calendar[Current Quarter Flag] )
+			    || ISINSCOPE ( Calendar[Current Year Flag] )
+			    || ISINSCOPE ( Calendar[Day Of Month] )
+			    || ISINSCOPE ( Calendar[DIM_CalendarKey] )
+			    || ISINSCOPE ( Calendar[DIM_DateId] )
+			    || ISINSCOPE ( Calendar[First Day Of Week] )
+			    || ISINSCOPE ( Calendar[Fiscal Month] )
+			    || ISINSCOPE ( Calendar[Fiscal Quarter] )
+			    || ISINSCOPE ( Calendar[Fiscal Semester] )
+			    || ISINSCOPE ( Calendar[Fiscal Year] )
+			    || ISINSCOPE ( Calendar[FiscalMonthId] )
+			    || ISINSCOPE ( Calendar[FM Begin Date] )
+			    || ISINSCOPE ( Calendar[FM End Date] )
+			    || ISINSCOPE ( Calendar[MonthSort] )
+			    || ISINSCOPE ( Calendar[Quarter] )
+			    || ISINSCOPE ( Calendar[Relative Month] )
+			    || ISINSCOPE ( Calendar[Relative Quarter] )
+			    || ISINSCOPE ( Calendar[Relative Year] )
+			    || ISINSCOPE ( Calendar[Reverse Fiscal Month] )
+			    || ISINSCOPE ( Calendar[ReverseFiscalMonthId] )
+			    || ISINSCOPE ( Calendar[Time Reference Daily Flag] )
+			    || ISINSCOPE ( Calendar[Time Reference Flag] )
+			    || ISINSCOPE ( Calendar[Weekday] )
+			    || ISINSCOPE ( Calendar[RelativeYearNumber] )
+			    || ISINSCOPE ( Calendar[RelativeQuarterNumber] )
+			    || ISINSCOPE ( Calendar[RelativeMonthNumber] )
+		isHidden
+
+		annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["NUMERIC_FORMATTING","UNNECESSARY_MEASURES"]}
+
+	/// Indicates whether the fiscal month is closed for Azure revenue reporting. 'True' means the month's Azure revenue data is finalized.
+	column 'Azure Closed Month Flag'
+		dataType: string
+		sourceColumn: AzureClosedMonthFlag
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = false
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Calendar Date
+	column 'Calendar Date (mmm-yy)'
+		dataType: dateTime
+		isUnique
+		formatString: mmm-yy
+		sourceColumn: CalendarDate
+
+		annotation TabularEditor_MarkAsDateKey = 1
+
+	/// Full calendar date (yyyy-mm-dd). Primary date key for the Calendar dimension and the model's mark-as-date-table column.
+	column 'Calendar Date'
+		dataType: dateTime
+		isUnique
+		isKey
+		formatString: yyyy-mm-dd
+		sourceColumn: CalendarDate
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = false
+
+		annotation Copilot_Synonyms
+
+		annotation TabularEditor_MarkAsDateKey = 1
+
+	/// Calendar Month
+	column 'Calendar Month'
+		dataType: string
+		sourceColumn: CalendarMonth
+		sortByColumn: MonthSort
+
+	/// Closed Month Flag
+	column 'Closed Month Flag'
+		dataType: string
+		sourceColumn: ClosedMonthFlag
+
+	column 'Community Idea Closed Month Flag'
+		dataType: string
+		sourceColumn: CommunityIdeaClosedMonthFlag
+
+	/// Current Day Flag
+	column 'Current Day Flag'
+		dataType: string
+		sourceColumn: CurrentDayFlag
+
+	/// Current Month Flag
+	column 'Current Month Flag'
+		dataType: string
+		sourceColumn: CurrentMonthFlag
+
+	/// Current Quarter Flag
+	column 'Current Quarter Flag'
+		dataType: string
+		sourceColumn: CurrentQuarterFlag
+
+	/// Current Year Flag
+	column 'Current Year Flag'
+		dataType: string
+		sourceColumn: CurrentYearFlag
+
+	/// Day Of Month
+	column 'Day Of Month'
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: DayOfMonth
+
+	/// DIM_CalendarKey
+	column DIM_CalendarKey
+		dataType: dateTime
+		isHidden
+		isUnique
+		formatString: yyyy-mm-dd
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_CalendarKey
+
+	/// DIM_DateId
+	column DIM_DateId
+		dataType: int64
+		isHidden
+		isUnique
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_DateId
+
+		annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["UNNECESSARY_COLUMNS"]}
+
+	column 'First Day Of Week'
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		sourceColumn: FirstDayOfWeek
+
+	/// Calendar month and year label (e.g., 'July, 2017'), spanning the Microsoft fiscal year (July through June). Sorted by FiscalMonthId.
+	column 'Fiscal Month'
+		dataType: string
+		sourceColumn: FiscalMonth
+		sortByColumn: FiscalMonthId
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Microsoft fiscal quarter label (e.g., 'FY25-Q4'). Fiscal quarters: Q1=Jul-Sep, Q2=Oct-Dec, Q3=Jan-Mar, Q4=Apr-Jun.
+	column 'Fiscal Quarter'
+		dataType: string
+		sourceColumn: FiscalQuarter
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Fiscal Semester
+	column 'Fiscal Semester'
+		dataType: string
+		sourceColumn: FiscalSemester
+
+	/// Microsoft fiscal year label (e.g., 'FY26'). Fiscal year runs from July 1 through June 30.
+	column 'Fiscal Year'
+		dataType: string
+		sourceColumn: FiscalYear
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms = FY25=FY2025, FY26=FY2026
+
+		annotation Copilot_ValueSynonyms = FY25=FY2025|FY26=FY2026
+
+	/// FiscalMonthId
+	column FiscalMonthId
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: FiscalMonthId
+
+	/// Fiscal Month Begin Date
+	column 'FM Begin Date'
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		sourceColumn: FMBeginDate
+
+	/// Fiscal Month End Date
+	column 'FM End Date'
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		sourceColumn: FMEndDate
+
+	/// MonthSort
+	column MonthSort
+		dataType: int64
+		isHidden
+		sourceColumn: MonthSort
+
+	/// Quarter
+	column Quarter
+		dataType: string
+		sourceColumn: Quarter
+
+	/// Relative Month
+	column 'Relative Month'
+		dataType: string
+		sourceColumn: RelativeMonth
+		sortByColumn: MonthSort
+
+	/// Relative Quarter
+	column 'Relative Quarter'
+		dataType: string
+		sourceColumn: RelativeQuarter
+
+	/// Relative Year
+	column 'Relative Year'
+		dataType: string
+		sourceColumn: RelativeYear
+
+	/// Fiscal Year Offset (0 = Current)
+	column RelativeYearNumber
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: RelativeYearNumber
+
+	/// Fiscal Quarter Offset (0 = Current)
+	column RelativeQuarterNumber
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: RelativeQuarterNumber
+
+	/// Fiscal Month Offset (0 = Current)
+	column RelativeMonthNumber
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: RelativeMonthNumber
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = false
+
+		annotation Copilot_Enumerable = false
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_AutoFilterWhenSliced = trigger:'Calendar'[Fiscal Month],'Calendar'[Calendar Date]|TREATAS({-12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0}, 'Calendar'[RelativeMonthNumber])
+
+	/// Reverse Fiscal Month
+	column 'Reverse Fiscal Month'
+		dataType: string
+		sourceColumn: ReverseFiscalMonth
+		sortByColumn: ReverseFiscalMonthId
+
+	/// ReverseFiscalMonthId
+	column ReverseFiscalMonthId
+		dataType: int64
+		isHidden
+		sourceColumn: ReverseFiscalMonthId
+
+	/// Time Reference Daily Flag (Use this filter in your report to only show historical data up to current date.)
+	column 'Time Reference Daily Flag'
+		dataType: string
+		sourceColumn: TimeReferenceDailyFlag
+
+	/// Time Reference Flag
+	column 'Time Reference Flag'
+		dataType: string
+		sourceColumn: TimeReferenceFlag
+
+	/// Weekday Number
+	column 'Weekday Number'
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: WeekdayNumber
+
+	/// Weekday
+	column Weekday
+		dataType: string
+		sourceColumn: Weekday
+
+	partition Calendar = entity
+		mode: directLake
+		source
+			entityName: DIM_Calendar
+			schemaName: Tabular_PartnerCommunity
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn = Upstream Finance Source
+
+	annotation TabularEditor_TableGroup = Dim
+

@@ -1,0 +1,79 @@
+source_model: Azure Data Partner & Community
+# Tests for the Search* UDF annotation/codegen wiring on the P&C model.
+#
+# CONSTRAINT — directLakeBehavior=directLakeOnly: the validate pipeline runs
+# `refresh_type: calculate`, which populates calc tables but does NOT load base
+# table column dictionaries. ANY query that calls VALUES / DISTINCT / etc. on a
+# base column will fail with a "we cannot process the request because table ..."
+# error — including dictionary-only paths inside _SearchAllValues /
+# _SearchAllLadderColumns. So tests in this file MUST stay on metadata-only
+# surfaces:
+#   - Calc tables (_INFO_*, _COPILOT_*)
+#   - String-returning UDFs (DiscoverColumns/Measures/Questions, AnswerQuestion,
+#     BuildQuery, GenerateQuery — these return DAX strings, not data)
+# DO NOT add tests that call SearchValues / SearchHierarchy / _SearchAllValues
+# directly — they look "dictionary-only" but still trigger base-column dictionary
+# loads. End-to-end execution is validated via the smoke catalog (rank_*.yml)
+# which runs Main-PR-only with a Full refresh.
+cases:
+  # --- Copilot_SearchRanker annotation discovery ------------------------------
+  - id: ranker_annotations_picked_up
+    description: >
+      generateInfoAnnotations.csx must surface Copilot_SearchRanker on
+      'Partner'[Partner Name] (Local.AskADIA._RankPartners) — the P&C
+      per-model ranker for partner ranking by Influenced Revenue MTD. If the
+      annotation reverts or the value drifts, the codegen will stop generating
+      the ranker block in _SearchAllValues for that surface.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+          _INFO_ANNOTATIONS,
+          _INFO_ANNOTATIONS[AnnotationName] = "Copilot_SearchRanker"
+              && _INFO_ANNOTATIONS[ObjectType] = "Column"
+      )
+    expected_row_count: { exact: 1 }
+    contains_all:
+      - "Partner"
+      - "Local.AskADIA._RankPartners"
+
+  # --- Copilot_PairWith back-references ---------------------------------------
+  - id: pair_with_annotations_picked_up
+    description: >
+      Each ranker target column has a Copilot_PairWith annotation pointing back
+      to its key column ('Account'[Account] -> 'Account'[AccountKey]; 'Partner'[Partner Name]
+      -> 'Partner'[Partner Id]). The reverse pairing on the key columns
+      (AccountKey, Partner Id) lets the ranker dispatch consume either side.
+      Asserts at least 2 PairWith annotations on Column objects (could be more
+      if other dim columns add their own pairings later).
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+          _INFO_ANNOTATIONS,
+          _INFO_ANNOTATIONS[AnnotationName] = "Copilot_PairWith"
+              && _INFO_ANNOTATIONS[ObjectType] = "Column"
+      )
+    expected_row_count: { min: 2 }
+    contains_all:
+      - "Account"
+      - "Partner"
+
+  # --- Copilot_Sliceable annotation discovery ---------------------------------
+  - id: sliceable_columns_picked_up
+    description: >
+      Sliceable columns surface in _COPILOT_MEASURE_COLUMNS via _INFO_ANNOTATIONS.
+      P&C marks ~24 columns sliceable across Account, Partner, Geography,
+      Product Master, Calendar, and Segment.
+      Assert at least 15 to catch a regression where the annotation pass
+      drops most columns (exact count tolerates incremental additions).
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+          _INFO_ANNOTATIONS,
+          _INFO_ANNOTATIONS[AnnotationName] = "Copilot_Sliceable"
+              && _INFO_ANNOTATIONS[AnnotationValue] = "true"
+              && _INFO_ANNOTATIONS[ObjectType] = "Column"
+      )
+    expected_row_count: { min: 15 }

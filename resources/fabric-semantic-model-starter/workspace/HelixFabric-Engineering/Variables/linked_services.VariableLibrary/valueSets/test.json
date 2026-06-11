@@ -1,0 +1,14 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/valueSet/1.0.0/schema.json",
+  "name": "test",
+  "variableOverrides": [
+    {
+      "name": "example_sql_source",
+      "value": "your-sql-server-test.database.windows.net;ExampleDatabase"
+    },
+    {
+      "name": "example_kusto_source",
+      "value": "https://your-cluster-test.kusto.windows.net;ExampleKustoDb"
+    }
+  ]
+}

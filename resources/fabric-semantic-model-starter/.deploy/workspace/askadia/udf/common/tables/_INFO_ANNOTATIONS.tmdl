@@ -1,0 +1,41 @@
+/// Hidden calculated table exposing Copilot_* annotations. Generated at deploy time by generateInfoAnnotations.csx.
+table _INFO_ANNOTATIONS
+	isHidden
+
+	column TableName
+		isNameInferred
+		sourceColumn: [TableName]
+
+	column ObjectName
+		isNameInferred
+		sourceColumn: [ObjectName]
+
+	column ObjectType
+		isNameInferred
+		sourceColumn: [ObjectType]
+
+	column AnnotationName
+		isNameInferred
+		sourceColumn: [AnnotationName]
+
+	column AnnotationValue
+		isNameInferred
+		sourceColumn: [AnnotationValue]
+
+	partition _INFO_ANNOTATIONS = calculated
+		mode: import
+		source =
+				DATATABLE(
+				    "TableName", STRING,
+				    "ObjectName", STRING,
+				    "ObjectType", STRING,
+				    "AnnotationName", STRING,
+				    "AnnotationValue", STRING,
+				    {
+				        {"_PLACEHOLDER", "_PLACEHOLDER", "Table", "Copilot_Visibility", "Hidden"}
+				    }
+				)
+
+	annotation TabularEditor_TableGroup = Other
+
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}

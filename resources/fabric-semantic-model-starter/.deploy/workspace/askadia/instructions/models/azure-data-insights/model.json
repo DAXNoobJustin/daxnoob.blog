@@ -1,0 +1,105 @@
+{
+  "slug": "azure-data-insights",
+  "source": "Azure Data Insights.SemanticModel",
+  "title": "Azure Data Insights",
+  "rows": [
+    {
+      "anchor": "model-reference",
+      "route": null,
+      "topic": "Azure Data Insights Model Reference",
+      "whenToUse": "Triggers: model context, account, AccountKey, calendar, product disambiguation, geography, hierarchies, model gotchas. Examples: which product column should I use, how do I filter a country. Intent: preserve the ADI model reference source file.",
+      "routerHint": "Account/AccountKey, calendar, product disambiguation, geography, hierarchy, model-wide gotchas."
+    },
+    {
+      "anchor": "usage",
+      "topic": "Usage Topic",
+      "route": {
+        "name": "Usage",
+        "triggers": "MAU, WAU, DAU, active users, adoption, Fabric workload/feature/activity usage"
+      },
+      "whenToUse": "Triggers: usage, MAU, WAU, DAU, active users, Fabric MAU, Power BI MAU, workload, feature, activity, adoption. Intent: preserve the ADI usage topic source file.",
+      "routerHint": "MAU, WAU, DAU, active users, adoption, Fabric workload/feature/activity usage."
+    },
+    {
+      "anchor": "revenue",
+      "topic": "Revenue Topic",
+      "route": {
+        "name": "Revenue",
+        "triggers": "revenue, Consumption, ARR, allocated ARR, NRR, P SKU vs F SKU"
+      },
+      "whenToUse": "Triggers: revenue, Consumption, consumed revenue, adjusted revenue, ARR, allocated ARR, NRR, MTD, YTD, P SKU, F SKU. Intent: preserve the ADI revenue topic source file.",
+      "routerHint": "Revenue, Consumption, MTD/YTD, ARR, allocated ARR, NRR, P SKU vs F SKU."
+    },
+    {
+      "anchor": "consumption",
+      "topic": "Consumption Topic",
+      "route": {
+        "name": "Consumption",
+        "triggers": "CU hours, capacity units, Fabric vs Power BI consumption, SKU type, workload ladder"
+      },
+      "whenToUse": "Triggers: consumption, CU, CU hours, capacity units, workload type, workload kind, artifact kind, operation name, F SKU, P SKU, Fabric Trial. Intent: preserve the ADI consumption topic source file.",
+      "routerHint": "CU hours, capacity units, Fabric vs Power BI consumption, SKU type, workload ladder."
+    },
+    {
+      "anchor": "customer-360",
+      "topic": "Customer 360",
+      "route": {
+        "name": "Customer 360",
+        "triggers": "account review, customer health, customer profile, named-account prep"
+      },
+      "whenToUse": "Triggers: tell me about customer, account review, customer health, customer profile, customer 360, account analysis, customer meeting prep, prep me for my customer meetings today, what customer meetings do I have today. Intent: preserve the Azure Data Insights customer_360_overview flow.",
+      "routerHint": "Account review, customer health, customer profile, named-account prep, `customer_360_overview`."
+    },
+    {
+      "anchor": "out-of-scope",
+      "route": null,
+      "topic": "Out-of-scope Routing",
+      "whenToUse": "Triggers: out of scope, not supported, deny, raw fact-table exploration, scan table for keyword, list distinct values, ad-hoc DAX, untrained topic, cost, margin, pricing, win rate, budget, headcount. Intent: deny questions outside the trained Azure Data Insights topics and route sibling-model topics to the right model.",
+      "routerHint": "Sibling-model routing, raw fact-table exploration, untrained topics (cost, margin, pricing, win rate)."
+    }
+  ],
+  "workedExamples": [
+    {
+      "ask": "What is Fabric MAU by workload?",
+      "rows": [
+        "workflow",
+        "udf-reference",
+        "output-formatting",
+        "model-reference",
+        "usage"
+      ]
+    },
+    {
+      "ask": "Revenue for Contoso by product in FY25",
+      "rows": [
+        "workflow",
+        "udf-reference",
+        "output-formatting",
+        "model-reference",
+        "revenue"
+      ]
+    },
+    {
+      "ask": "How much CU is Copilot using?",
+      "rows": [
+        "workflow",
+        "udf-reference",
+        "output-formatting",
+        "model-reference",
+        "consumption",
+        "examples-part-1"
+      ]
+    },
+    {
+      "ask": "Tell me about Contoso",
+      "rows": [
+        "customer-360",
+        "output-formatting"
+      ]
+    }
+  ],
+  "golden": {
+    "definition/tables/_COPILOT_INSTRUCTIONS.tmdl": "6fb5d1a9a5eec13191aec5abb09f2d9d89cb1cd9c90ce488bd24bc3f6b8f4291",
+    "Copilot/Instructions/instructions.md": "a98a850f999dafa074e182f989f193ba946cffeb70b86bf684a8d81e527b722c"
+  }
+}

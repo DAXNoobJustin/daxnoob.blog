@@ -1,0 +1,86 @@
+/// Microsoft sales channel and customer segment dimension containing the segment hierarchy (Segment Group > Segment > Sub Segment). Includes alternative segment classifications for CE (Commercial Enterprise), STB (Sales Territories & Business), Standard Reporting, and summary-level rollups.
+table Segment
+
+	/// Commercial Enterprise Segment Sort
+	column 'CE Segment Sort'
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: CESegmentSort
+
+	/// Commercial Enterprise Segment (i.e. Strategic, SM&C SMB, Enterprise (Non-Strategic))
+	column 'CE Segment'
+		dataType: string
+		sourceColumn: CESegment
+		sortByColumn: 'CE Segment Sort'
+
+	/// DIM_SubSegmentId
+	column DIM_SubSegmentId
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubSegmentId
+
+	/// Top-level grouping in the segment hierarchy (e.g., Enterprise, SME&C Corporate, Consumer).
+	column 'Segment Group'
+		dataType: string
+		sourceColumn: SegmentGroup
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Smaller, more manageable subsections of the total market for a product of service. Market segments possess relatively distinct and homogeneous demographic, psychographic and/or consumption characteristics. (i.e. Retail, Services, Small, Medium and Corporate Commercial, etc.)
+	column Segment
+		dataType: string
+		sourceColumn: Segment
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+	/// STB Mid Segment
+	column 'STB Mid Segment'
+		dataType: string
+		sourceColumn: STBMidSegment
+
+	/// Std Rptg Reported Subsegment
+	column 'Std Rptg Reported Subsegment'
+		dataType: string
+		sourceColumn: StdRptgReportedSubsegment
+
+	/// Std Rptg Super Reported Subsegment
+	column 'Std Rptg Super Reported Subsegment'
+		dataType: string
+		sourceColumn: StdRptgSuperReportedSubsegment
+
+	/// Sub Segment
+	column 'Sub Segment'
+		dataType: string
+		sourceColumn: SubSegment
+
+	/// Summary Segment
+	column 'Summary Segment'
+		dataType: string
+		sourceColumn: SummarySegment
+
+	partition Segment = entity
+		mode: directLake
+		source
+			entityName: DIM_Segment
+			schemaName: Tabular_PartnerCommunity
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn = Upstream Finance Source
+
+	annotation TabularEditor_TableGroup = Dim
+

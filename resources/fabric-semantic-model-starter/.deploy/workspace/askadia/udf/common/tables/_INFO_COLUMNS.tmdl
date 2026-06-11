@@ -1,0 +1,107 @@
+/// Hidden calculated table exposing model column metadata via INFO.VIEW.COLUMNS(). Used by ADIA skills for runtime registry loading.
+table _INFO_COLUMNS
+	isHidden
+
+	column ID
+		isNameInferred
+		sourceColumn: [ID]
+
+	column Name
+		isNameInferred
+		sourceColumn: [Name]
+
+	column Table
+		isNameInferred
+		sourceColumn: [Table]
+
+	column DataType
+		isNameInferred
+		sourceColumn: [DataType]
+
+	column DataCategory
+		isNameInferred
+		sourceColumn: [DataCategory]
+
+	column Description
+		isNameInferred
+		sourceColumn: [Description]
+
+	column IsHidden
+		isNameInferred
+		sourceColumn: [IsHidden]
+
+	column IsUnique
+		isNameInferred
+		sourceColumn: [IsUnique]
+
+	column IsKey
+		isNameInferred
+		sourceColumn: [IsKey]
+
+	column IsNullable
+		isNameInferred
+		sourceColumn: [IsNullable]
+
+	column Alignment
+		isNameInferred
+		sourceColumn: [Alignment]
+
+	column SummarizeBy
+		isNameInferred
+		sourceColumn: [SummarizeBy]
+
+	column ColumnStorage
+		isNameInferred
+		sourceColumn: [ColumnStorage]
+
+	column Type
+		isNameInferred
+		sourceColumn: [Type]
+
+	column SourceColumn
+		isNameInferred
+		sourceColumn: [SourceColumn]
+
+	column Expression
+		isNameInferred
+		sourceColumn: [Expression]
+
+	column FormatString
+		isNameInferred
+		sourceColumn: [FormatString]
+
+	column IsAvailableInMDX
+		isNameInferred
+		sourceColumn: [IsAvailableInMDX]
+
+	column SortByColumn
+		isNameInferred
+		sourceColumn: [SortByColumn]
+
+	column GroupingBehavior
+		isNameInferred
+		sourceColumn: [GroupingBehavior]
+
+	column SourceProviderType
+		isNameInferred
+		sourceColumn: [SourceProviderType]
+
+	column DisplayFolder
+		isNameInferred
+		sourceColumn: [DisplayFolder]
+
+	column AlternateOf
+		isNameInferred
+		sourceColumn: [AlternateOf]
+
+	column LineageTag
+		isNameInferred
+		sourceColumn: [LineageTag]
+
+	partition _INFO_COLUMNS = calculated
+		mode: import
+		source = INFO.VIEW.COLUMNS()
+
+	annotation TabularEditor_TableGroup = Other
+
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}

@@ -84,6 +84,9 @@ plugins:
         "2025/06/18/identifying-semantic-model-capacity-spikes-using-workspace-monitoring/index.md": "posts/2025/identifying-semantic-model-capacity-spikes-using-workspace-monitoring.md"
         "2025/10/21/mcp-server-dax-performance-tuner/index.md": "posts/2025/mcp-server-dax-performance-tuner.md"
         "2025/11/04/semantic-model-optimization-theory-tips-and-tools/index.md": "posts/2025/semantic-model-optimization-theory-tips-and-tools.md"
+        # Short link to the open-source starter repo. External target, and not a
+        # post, so it is excluded from the RSS/JSON feeds by the rss match_path.
+        "starter.md": "https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/fabric-semantic-model-starter"
   - blog:
       post_url_format: "{slug}"
       blog_dir: .

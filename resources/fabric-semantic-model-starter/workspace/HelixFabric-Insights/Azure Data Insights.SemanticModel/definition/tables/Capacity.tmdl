@@ -1,0 +1,86 @@
+/// Capacity dimension covering Fabric, Fabric Trial, Power BI Premium, and Power BI Embedded SKU types. Contains SKU details, lifecycle dates, regional deployment info, and reporting-exclusion flags. One row per Capacity Id and SKU combination.
+table Capacity
+
+	/// Internal helper that counts Capacity dimension rows in the current filter context (COUNTROWS over the dim). Exists purely as an aggregation anchor so Copilot can roll a count up over Capacity attributes — e.g. capacities by SKU, grouping, or region. Not a precise distinct-entity count. Hidden from report authors; surfaced only to Copilot.
+	measure _RecordCountCapacity = COUNTROWS ( 'Capacity' )
+		formatString: #,0
+		isHidden
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Number of Capacities, Capacity Count
+
+		annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["UNNECESSARY_MEASURES"]}
+
+	/// High-level grouping of the capacity type (e.g., Fabric, Fabric Trial, Power BI Premium, Power BI Embedded - A SKUs, Power BI Embedded - EM SKUs).
+	column 'Capacity Grouping'
+		dataType: string
+		sourceColumn: CapacityGrouping
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms = F SKU=Fabric, Fabric Capacity=Fabric, Fabric Trial SKU=Fabric Trial, FT SKU=Fabric Trial, P SKU=Power BI Premium, Premium SKU=Power BI Premium, Trial=Fabric Trial
+
+		annotation Copilot_ValueSynonyms = Fabric=F SKU;Fabric Capacity|Fabric Trial=Fabric Trial SKU;FT SKU;Trial|Power BI Premium=P SKU;Premium SKU
+
+	/// Specific SKU identifier for the capacity (e.g., F2, F4, F64, P1, P2, FT1).
+	column 'Capacity SKU'
+		dataType: string
+		sourceColumn: CapacitySKU
+		sortByColumn: CapacitySKUOrder
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Numeric sort order for Capacity SKU display.
+	column CapacitySKUOrder
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: CapacitySKUOrder
+
+	/// Surrogate key for the Capacity dimension. Unique per Capacity Id and SKU combination — the dimension grain.
+	column DIM_CapacityId
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_CapacityId_Alt
+
+	/// Indicates whether the capacity is excluded from consumption reporting (sourced from an upstream exclusion list). Despite the column name, this is a reporting-exclusion flag, not a deletion indicator.
+	column 'Fabric Capacity Deleted Flag'
+		dataType: string
+		displayFolder: -> Custom Attributes
+		sourceColumn: CUSTOM_FabricCapacityDeletedFlag
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	partition Capacity = entity
+		mode: directLake
+		source
+			entityName: DIM_Capacity
+			schemaName: Tabular_AzureDataInsights
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn
+		type: string
+
+	annotation TabularEditor_TableGroup = Dim
+

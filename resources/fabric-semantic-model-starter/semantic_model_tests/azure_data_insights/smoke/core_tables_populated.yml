@@ -1,0 +1,28 @@
+source_model: Azure Data Insights
+# Refresh sanity — assert that key dim and fact tables are non-empty after a
+# Full refresh. Pattern: build a one-row-per-table table of (name, count),
+# then FILTER to rows where count = 0 or BLANK. Healthy refresh => 0 rows.
+# Failure surfaces the specific empty table(s) in the case output.
+#
+# Tables chosen: the core DirectLake dims (Account, Capacity)
+# plus the largest joinable dims (Calendar, Product Master)
+# and two high-volume facts (Revenue, Usage Summary).
+cases:
+  - id: smoke_core_tables_populated
+    description: All critical dims and facts have at least one row after refresh.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+        UNION(
+          ROW("Table", "Account",        "Count", COUNTROWS('Account')),
+          ROW("Table", "Calendar",       "Count", COUNTROWS('Calendar')),
+          ROW("Table", "Capacity",       "Count", COUNTROWS('Capacity')),
+          ROW("Table", "Product Master", "Count", COUNTROWS('Product Master')),
+          ROW("Table", "Revenue",        "Count", COUNTROWS('Revenue')),
+          ROW("Table", "Usage Summary",  "Count", COUNTROWS('Usage Summary'))
+        ),
+        [Count] = 0 || ISBLANK([Count])
+      )
+    expected_row_count:
+      exact: 0

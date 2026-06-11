@@ -1,0 +1,81 @@
+# ============================================================================
+# reliability/config.example.yml
+# ----------------------------------------------------------------------------
+# Reference map of every placeholder used across this folder and what to
+# replace it with in YOUR environment. This file is documentation only --
+# nothing reads it at runtime. The real values live in the artifacts:
+#   * KQL `let` variables (kql/*.kql)
+#   * pipeline parameter defaults (pipeline/DataActivatorAlertHandler.json)
+#   * notebook constants (notebooks/*.ipynb)
+# Copy this to config.yml, fill it in, and use it as your wiring checklist.
+# ============================================================================
+
+# --- Models you are monitoring -------------------------------------------
+# DirectLake semantic model dataset GUIDs. Used by the OneLake KQL detector
+# (kql/OneLakeSecurityError.kql `_modelIds`) and the refresh notebook
+# (notebooks/RefreshSemanticModel.ipynb `OneLakeModelIds`).
+# All models that share ONE OneLake lakehouse should be listed together --
+# a OneLake security drift affects all of them, so they are refreshed as a group.
+monitored_models:
+  - name: "Azure Data Insights"
+    dataset_guid: "aaaaaaaa-aaaa-aaaa-aaaa-0000000000a1"
+  - name: "Azure Data Partner & Community"
+    dataset_guid: "aaaaaaaa-aaaa-aaaa-aaaa-0000000000a2"
+
+# --- Workspace Monitoring (the telemetry backbone) -----------------------
+# Enable Workspace Monitoring on the workspace hosting your models. It stands
+# up a Fabric-managed Eventhouse (KQL DB) with the SemanticModelLogs table.
+# The KQL detectors run against this database from the Activator rule.
+workspace_monitoring:
+  models_workspace: "HelixFabric-Insights"
+  kql_database: "Monitoring Eventhouse"     # default name; has a space -- quote it
+  key_table: "SemanticModelLogs"
+
+# --- Alert-handler pipeline host -----------------------------------------
+# The reliability system deploys into its own host workspace, separate from
+# the two sample workspaces (Engineering + Insights). Point this at yours.
+pipeline:
+  name: "Semantic Model Alerting System"
+  workspace: "HelixFabric-Operations"
+
+# --- Cooldown / dedup SQL database (sql/CreateAlertingSchema.sql) ---------
+# A Fabric SQL Database holding the AlertLog table + ClaimAlertSlot procs.
+# The pipeline reads/writes it to suppress duplicate alerts (the Activator
+# fires every minute; the SQL slot-claim is what stops alert spam).
+alerting_db:
+  workspace_id: "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0"   # -> pipeline param AlertingDbWorkspaceId
+  artifact_id:  "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d1"   # -> pipeline param AlertingDbArtifactId
+  server:       "<your-fabric-sql-server>.database.fabric.microsoft.com,1433"
+
+# --- Refresh notebook (notebooks/RefreshSemanticModel.ipynb) --------------
+refresh_notebook:
+  workspace_id: "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0"
+  notebook_id:  "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d2"
+
+# --- Connections the pipeline binds (replace with your own connection GUIDs)
+connections:
+  sql_lookup:        "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c4"   # Fabric SQL DB (cooldown lookups)
+  sql_storedproc:    "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c5"   # Fabric SQL DB (log stored procs)
+  teams:             "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c3"   # Microsoft Teams (group chat)
+  incident_keyvault: "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c1"   # Key Vault (incident-function key)
+  incident_function: "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c2"   # incident webhook / function app
+
+# --- Notifications -------------------------------------------------------
+# We use an incident system internally via an Azure Function. Swap these for YOUR incident
+# system (ServiceNow, PagerDuty, etc.) or drop the incident branch entirely and
+# keep Teams + auto-refresh. See README "Swapping the incident system".
+incident:
+  owning_team:       "YourTeam/Operations"               # -> pipeline param IncidentOwningTeam
+  default_severity:  4                                      # -> pipeline param IncidentSeverity
+  portal_base_url:   "https://<your-incident-portal>/incident/"
+  function_path:     "create-incident"
+  keyvault_secret:   "incident-function-key"
+teams:
+  group_chat_id:     "19:00000000000000000000000000000000@thread.v2"
+
+# --- Per-alert cooldown minutes (pipeline param CooldownConfig) -----------
+# Parsed inside ClaimAlertSlot by alert type; stops re-firing within the window.
+cooldown_minutes:
+  ErrorSpike: 30
+  PerformanceDegradation: 30
+  OneLakeSecurityError: 15

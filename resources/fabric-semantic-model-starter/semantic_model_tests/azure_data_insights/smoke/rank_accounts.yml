@@ -1,0 +1,45 @@
+source_model: Azure Data Insights
+# Refresh sanity — Insights per-model ranker UDF (Local.AskADIA._RankAccounts)
+# produces ranked Account rows for a search term. Validates two things on
+# Main PRs:
+#   1. The ranker UDF still resolves (would fail at deploy time anyway via
+#      generateSearchHelpers.csx, but cheap belt-and-suspenders).
+#   2. After a Full refresh of the DirectLake Account dim, the ranker returns
+#      at least one row for a known-populated search term — i.e. a core
+#      Account DirectLake binding actually has data (vs. silently empty after
+#      a partition refresh outage).
+#
+# "Microsoft" is a stable search term for the Account dim (always present in
+# the account dimension, returns at least one match). Not asserting on row content because
+# the ranker's Area/Segment/Industry expansion shipped recently —
+# brittle assertions would just regenerate snapshots every iteration.
+cases:
+  - id: smoke_rank_accounts_returns_rows
+    description: |
+      _RankAccounts("Microsoft") returns at least one ranked row after Full
+      refresh. Catches: ranker UDF removed, Account DirectLake binding empty,
+      Area/Segment/Industry expansion regression that drops all rows.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+        { COUNTROWS(Local.AskADIA._RankAccounts("Microsoft")) },
+        [Value] > 0
+      )
+    expected_row_count:
+      exact: 1
+
+  - id: smoke_rank_accounts_contoso_returns_rows
+    description: |
+      _RankAccounts("contoso") returns at least one ranked row. Catches
+      regressions where the ranker over-scopes the MAU signal to a current
+      month with blank usage and drops valid account-name matches.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+        { COUNTROWS(Local.AskADIA._RankAccounts("contoso")) },
+        [Value] > 0
+      )
+    expected_row_count:
+      exact: 1

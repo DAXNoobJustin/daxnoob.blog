@@ -1,0 +1,498 @@
+model 'Azure Data Partner & Community'
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	dataSourceDefaultMaxConnections: 100
+	maxParallelismPerRefresh: 20
+	directLakeBehavior: directLakeOnly
+
+annotation TabularEditor_SerializeOptions = {"SortArrays":true,"IgnoreInferredObjects":true,"IgnoreInferredProperties":true,"IgnoreTimestamps":true,"IgnoreLineageTags":true,"SplitMultilineStrings":true,"PrefixFilenames":false,"LocalTranslations":true,"LocalPerspectives":true,"LocalRelationships":true,"TmdlOptions":{"IncludeRefs":false},"Levels":["Data Sources","Perspectives","Relationships","Roles","Shared Expressions","Tables","Tables/CalculationItems","Tables/Columns","Tables/Hierarchies","Tables/Measures","Tables/Partitions","Translations"]}
+
+annotation __BNorm = 1
+
+annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":[]}
+
+annotation BestPracticeAnalyzer =
+		[
+		  {
+		    "ID": "AUTO_CREATED_MEASURE_PRESENT",
+		    "Name": "Auto Created Measure present",
+		    "Category": "Custom",
+		    "Description": "Auto created measures should not be present in the GIT repo.  Solve with executing this script.  // Remove all extended measures prior to deploying new\nforeach(var m in Model.AllMeasures.ToList()) {\n    if(m.GetAnnotation(\"Auto_ExtendedMeasure\") != null) {\n        m.Delete();\n    }\n}",
+		    "Severity": 3,
+		    "Scope": "Measure",
+		    "Expression": "GetAnnotation(\"Auto_ExtendedMeasure\") != null",
+		    "FixExpression": "Delete()",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "MEASURES_QUALIFIED",
+		    "Name": "Measure reference qualified",
+		    "Category": "DAX Expressions",
+		    "Description": "When referencing a measure using DAX, do not specify the table name. Use only the measure name in square brackets.",
+		    "Severity": 3,
+		    "Scope": "Measure, CalculationItem",
+		    "Expression": "DependsOn.Any(Key.ObjectType = \"Measure\" and Value.Any(FullyQualified))",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "DUPLICATE_MEASURES",
+		    "Name": "Duplicate measure definitions",
+		    "Category": "DAX Expressions",
+		    "Description": "Two measures with different names and defined by the same DAX expression",
+		    "Severity": 3,
+		    "Scope": "Measure",
+		    "Expression": "Model.AllMeasures.Any(Expression.Replace(\" \",\"\").Replace(\"\\n\",\"\").Replace(\"\\r\",\"\").Replace(\"\\t\",\"\") = outerIt.Expression.Replace(\" \",\"\").Replace(\"\\n\",\"\").Replace(\"\\r\",\"\").Replace(\"\\t\",\"\") and it <> outerIt)\r\nand not Name.StartsWith(\"_\")",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "INTERSECT",
+		    "Name": "INTERSECT function used",
+		    "Category": "DAX Expressions",
+		    "Description": "The TREATAS function is more efficient and provides better performance than the INTERSECT function when used in virutal relationships.\r\nReference:  https://www.sqlbi.com/articles/propagate-filters-using-treatas-in-dax/",
+		    "Severity": 3,
+		    "Scope": "Measure, CalculationItem",
+		    "Expression": "RegEx.IsMatch(Expression,\"(?i)INTERSECT\\s*\\(\")",
+		    "CompatibilityLevel": 1400
+		  },
+		  {
+		    "ID": "DIVIDE",
+		    "Name": "DIVIDE function not used",
+		    "Category": "DAX Expressions",
+		    "Description": "Use the DIVIDE  function instead of using \"/\". The DIVIDE function resolves divide-by-zero cases. As such, it is recommended to use to avoid errors.\r\n\r\nReference: https://docs.microsoft.com/power-bi/guidance/dax-divide-function-operator",
+		    "Severity": 3,
+		    "Scope": "Measure, CalculationItem",
+		    "Expression": "RegEx.IsMatch(Expression,\"\\]\\s*\\/(?!\\/)(?!\\*)\")\r\nor\r\nRegEx.IsMatch(Expression,\"\\)\\s*\\/(?!\\/)(?!\\*)\")",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "IFERROR",
+		    "Name": "IFERROR function used",
+		    "Category": "DAX Expressions",
+		    "Description": "Avoid using the IFERROR function as it may cause performance degradation",
+		    "Severity": 3,
+		    "Scope": "Measure",
+		    "Expression": "RegEx.IsMatch(Expression,\"(?i)IFERROR\\s*\\(\")",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "DIRECT_MEASURE_REFERENCE",
+		    "Name": "Direct measure reference",
+		    "Category": "DAX Expressions",
+		    "Description": "A measure should not directly referernce another measure. i.e. MeasureB:=[MeasureA]",
+		    "Severity": 3,
+		    "Scope": "Measure",
+		    "Expression": "Model.AllMeasures.Any(DaxObjectName == current.Expression)",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "FILTER",
+		    "Name": "FILTER function used improperly",
+		    "Category": "DAX Expressions",
+		    "Description": "Instead of using this pattern FILTER('Table','Table'[Column]=\"Value\") or FILTER('Table',[Measure]>Value).  https://docs.microsoft.com/power-bi/guidance/dax-avoid-avoid-filter-as-filter-argument",
+		    "Severity": 3,
+		    "Scope": "Measure, CalculationItem",
+		    "Expression": "RegEx.IsMatch(Expression,\"(?i)CALCULATE\\s*\\(\\s*[^,]+,\\s*(?i)FILTER\\s*\\(\\s*\\'*[A-Za-z0-9 _]+'*\\s*,\\s*\\'*[A-Za-z0-9 _]+\\'*\\[[A-Za-z0-9 _]+\\]\")\r\nor\r\nRegEx.IsMatch(Expression,\"(?i)CALCULATETABLE\\s*\\([^,]*,\\s*(?i)FILTER\\s*\\(\\s*\\'*[A-Za-z0-9 _]+\\'*,\\s*\\'*[A-Za-z0-9 _]+\\'*\\[[A-Za-z0-9 _]+\\]\")\r\nor\r\nRegEx.IsMatch(Expression,\"(?i)CALCULATE\\s*\\(\\s*[^,]+,\\s*(?i)FILTER\\s*\\(\\s*\\'*[A-Za-z0-9 _]+\\'*\\s*,\\s*\\[[^\\]]+\\]\")\r\nor\r\nRegEx.IsMatch(Expression,\"(?i)CALCULATETABLE\\s*\\([^,]*,\\s*(?i)FILTER\\s*\\(\\s*\\'*[A-Za-z0-9 _]+\\'*,\\s*\\[\")",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "INACTIVE_UNREFERENCED_RELATIONSHIP",
+		    "Name": "Inactive unreferenced relationship",
+		    "Category": "DAX Expressions",
+		    "Description": "Inactive relationships are activated using the USERELATIONSHIP function. An inactive unreferenced relationship should be removed.",
+		    "Severity": 3,
+		    "Scope": "Relationship",
+		    "Expression": "IsActive == false\r\nand not\r\n(\r\nModel.AllMeasures.Any(RegEx.IsMatch(Expression,\r\n\"(?i)USERELATIONSHIP\\s*\\(\\s*\\'*\" +\r\ncurrent.FromTable.Name + \"\\'*\\[\" + \r\ncurrent.FromColumn.Name + \"\\]\\s*,\\s*\\'*\" +\r\ncurrent.ToTable.Name + \"\\'*\\[\" +\r\ncurrent.ToColumn.Name + \"\\]\"))\r\nor\r\nModel.AllCalculationItems.Any(RegEx.IsMatch(Expression,\r\n\"(?i)USERELATIONSHIP\\s*\\(\\s*\\'*\" +\r\ncurrent.FromTable.Name + \"\\'*\\[\" + \r\ncurrent.FromColumn.Name + \"\\]\\s*,\\s*\\'*\" +\r\ncurrent.ToTable.Name + \"\\'*\\[\" +\r\ncurrent.ToColumn.Name + \"\\]\"))\r\n)",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "PERCENTAGE_MEASURE",
+		    "Name": "'1-(x/y)' syntax used",
+		    "Category": "DAX Expressions",
+		    "Description": "Instead of using the '1-(x/y)' or '1+(x/y)' syntax to achieve a percentage calculation, use the DIVIDE function DIVIDE(New-Old, Old).",
+		    "Severity": 3,
+		    "Scope": "Measure, CalculationItem",
+		    "Expression": "RegEx.IsMatch(Expression,\"[0-9]+\\s*[-+]\\s*[\\(]*\\s*(?i)SUM\\s*\\(\\s*\\'*[A-Za-z0-9 _]+\\'*\\s*\\[[A-Za-z0-9 _]+\\]\\s*\\)\\s*\\/\")\r\nor\r\nRegEx.IsMatch(Expression,\"[0-9]+\\s*[-+]\\s*(?i)DIVIDE\\s*\\(\")",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "COLUMN_MISSING_SOURCE_COLUMN",
+		    "Name": "Column missing source column",
+		    "Category": "Error Prevention",
+		    "Description": "Data columns must have a source column. A data column without a source column will cause an error when processing the model.",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "string.IsNullOrWhitespace(SourceColumn)",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "MISSING_EXPRESSION",
+		    "Name": "Expression reliant object missing expression",
+		    "Category": "Error Prevention",
+		    "Description": "Calculated columns, calculation items and measures must have an expression. Without an expression, these objects will not show any values.",
+		    "Severity": 3,
+		    "Scope": "Measure, CalculationItem",
+		    "Expression": "string.IsNullOrWhiteSpace(Expression)",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "USERELATIONSHIP_RLS",
+		    "Name": "USERELATIONSHIP function used on RLS table",
+		    "Category": "Error Prevention",
+		    "Description": "The USERELATIONSHIP function may not be used against a table which also leverages row-level security (RLS). https://blog.crossjoin.co.uk/2013/05/10/userelationship-and-tabular-row-security/",
+		    "Severity": 3,
+		    "Scope": "Table, CalculatedTable",
+		    "Expression": "Model.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)USERELATIONSHIP\\s*\\(\\s*.+?(?=])\\]\\s*,\\s*'*\" + current.Name + \"'*\\[\"))\r\nand\r\nRowLevelSecurity.Any(it <> null and it <> \"\")",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "RELATIONSHIP_DATA_TYPE",
+		    "Name": "Columns in relationship are different data types",
+		    "Category": "Error Prevention",
+		    "Description": "Columns used in a relationship should be of the same data type. Ideally, they will be of integer data type (see the related rule 'Relationship columns should be of integer data type'). Having columns within a relationship which are of different data types may lead to various issues.",
+		    "Severity": 3,
+		    "Scope": "Relationship",
+		    "Expression": "FromColumn.DataType != ToColumn.DataType",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "FORMAT_FLAG_YES/NO",
+		    "Name": "Flag column missing Yes/No format",
+		    "Category": "Formatting",
+		    "Description": "Flags must be properly formatted as Yes/No as this is easier to read than using 0/1 integer values.",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "\n(\nName.EndsWith(\" Flag\") and \nDataType <> \"String\" and \nnot (IsHidden or Table.IsHidden)\n) and not Table.Name.StartsWith(\"[Custom]\")",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "DATECOLUMN_FORMATSTRING",
+		    "Name": "Column missing DateTime format",
+		    "Category": "Formatting",
+		    "Description": "Columns of type \"DateTime\" should be formatted",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "DataType = \"DateTime\" \r\nand string.IsNullOrWhitespace(FormatString)",
+		    "FixExpression": "FormatString = \"mm/dd/yyyy\"",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "MEASURE_MISSING_FORMAT",
+		    "Name": "Measure missing format",
+		    "Category": "Formatting",
+		    "Description": "Visible measures should have their format string property assigned",
+		    "Severity": 3,
+		    "Scope": "Measure",
+		    "Expression": "not IsHidden \r\nand not Table.IsHidden \r\nand string.IsNullOrWhitespace(FormatString)\r\nand string.IsNullOrWhitespace(FormatStringExpression)",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "NUMERIC_COLUMN_SUMMARIZE",
+		    "Name": "Numeric column sumarized",
+		    "Category": "Formatting",
+		    "Description": "Numeric columns (integer, decimal, double) should have their SummarizeBy property set to \"None\" to avoid accidental summation in Power BI (create measures instead).",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "(\r\nDataType = \"Int64\"\r\nor \r\nDataType=\"Decimal\" \r\nor \r\nDataType=\"Double\"\r\n)\n\r\nand SummarizeBy <> \"None\"\r\n\nand not (IsHidden or Table.IsHidden)\r\nand Table.GetAnnotation(\"TabularEditor_TableGroup\") <> \"Custom\"",
+		    "FixExpression": "SummarizeBy = AggregateFunction.None",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "PERCENTAGE_FORMATTING",
+		    "Name": "Percentage measure missing format",
+		    "Category": "Formatting",
+		    "Description": "Should be formatted with thousands separators and 1 decimal",
+		    "Severity": 3,
+		    "Scope": "Measure",
+		    "Expression": "FormatString.Contains(\"%\") and FormatString <> \"#,0.0%;-#,0.0%;#,0.0%\"",
+		    "FixExpression": "FormatString = \"#,0.0%\\u003B-#,0.0%\\u003B#,0.0%\"",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "NUMERIC_FORMATTING",
+		    "Name": "Numeric measure missing format",
+		    "Category": "Formatting",
+		    "Severity": 3,
+		    "Scope": "Measure",
+		    "Expression": "string.IsNullOrWhitespace(FormatStringExpression) and (\r\nnot FormatString.Contains(\"$\") and\r\nnot FormatString.Contains(\"%\") and\r\nnot (FormatString = \"#,0\" or FormatString = \"#,0.0\" or FormatString = \"#,0.00\" or FormatString = \"#,0.000\" or FormatString = \"#,0.0000\") and\r\nnot ( FormatString = \"yyyy-mm-dd\" )\r\n) and (\r\nnot ( DataType = \"Boolean\" )\r\n)",
+		    "FixExpression": "FormatString = \"#,0\"",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "RELATIONSHIP_INTEGER_OR_DATETIME",
+		    "Name": "Columns in relationship are not integer or datetime",
+		    "Category": "Performance",
+		    "Description": "It is a best practice for relationship columns to be of integer or datetime data type",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "UsedInRelationships.Any()\n\n and DataType != DataType.Int64 and DataType != DataType.Datetime",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "FOREIGN_KEY_NOT_HIDDEN",
+		    "Name": "Foreign key not hidden",
+		    "Category": "Maintenance",
+		    "Description": "Foreign keys should always be hidden.",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "UsedInRelationships.Any(FromColumn.Name == current.Name and FromCardinality == \"Many\")\n\r\nand\r\n\nIsHidden == false",
+		    "FixExpression": "IsHidden = true",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "PRIMARY_KEY_NOT_MARKED",
+		    "Name": "Primary key not marked",
+		    "Category": "Maintenance",
+		    "Description": "Set the 'Key' property to 'True' for primary key columns within the column properties.",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "UsedInRelationships.Any(ToTable.Name == current.Table.Name and ToColumn.Name == current.Name and ToCardinality == \"One\")\r\n\nand\r\n\nIsKey == false\r\nand\r\ncurrent.Table.DataCategory != \"Time\"",
+		    "FixExpression": "IsKey = true",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "MEASURE_REFERENCED_COLUMN_NOT_HIDDEN",
+		    "Name": "Measure referenced column not hidden",
+		    "Category": "Maintenance",
+		    "Description": "It is a best practice to hide fact table columns that are used for aggregation in measures.",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "(\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)COUNT\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\n\nor\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)COUNTBLANK\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\n\nor\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)SUM\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\nor\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)AVERAGE\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\n\nor\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)VALUES\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\n\nor\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)DISTINCT\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\nor\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)DISTINCTCOUNT\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\n\nor\n\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)MIN\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\n\nor\n\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)MAX\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\n\nor\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)COUNTA\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\n\r\n\nor\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)AVERAGEA\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\n\nor\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)MAXA\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\n\nor\r\nReferencedBy.AllMeasures.Any(RegEx.IsMatch(Expression,\"(?i)MINA\\s*\\(\\s*\\'*\" + outerit.Table.Name + \"\\'*\\[\" + outerit.Name + \"\\]\\s*\\)\"))\r\n)\r\n\nand IsHidden == false\r\n\nand (DataType == \"Int64\" || DataType == \"Decimal\" || DataType == \"Double\")",
+		    "FixExpression": "IsHidden = true",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "FIRST_LETTER_OF_NAME_NOT_CAPITALIZED",
+		    "Name": "First letter of name not capitalized",
+		    "Category": "Naming",
+		    "Severity": 3,
+		    "Scope": "Table, Measure, Hierarchy, CalculatedTableColumn, CalculationGroup",
+		    "Expression": "Name.Substring(0,1).ToUpper() != Name.Substring(0,1)",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "MONTH_SORT",
+		    "Name": "Month not sorted",
+		    "Category": "Maintenance",
+		    "Description": "This rule highlights month columns which are strings and are not sorted. If left unsorted, they will sort alphabetically (i.e. April, August...). Make sure to sort such columns so that they sort properly (January, February, March...).",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "Name.ToUpper().Contains(\"MONTH\")\r\nand ! Name.ToUpper().Contains(\"MONTHS\") \r\nand DataType == DataType.String \r\nand SortByColumn == null\r\nand ! Name.ToUpper().EndsWith(\"FLAG\")",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "UNNECESSARY_COLUMNS",
+		    "Name": "Column not referenced",
+		    "Category": "Maintenance",
+		    "Description": "Hidden columns that are not referenced by any DAX expressions, relationships, hierarchy levels or Sort By-properties should be removed.",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "(IsHidden or Table.IsHidden)\n\n\r\nand Table.GetAnnotation(\"TabularEditor_TableGroup\") != \"Other\"\r\nand ReferencedBy.Count = 0\r\n\n\nand (not UsedInRelationships.Any())\n\n\r\nand (not UsedInSortBy.Any())\n\n\r\nand (not UsedInHierarchies.Any())\n\n\r\nand (not Table.RowLevelSecurity.Any(\nit <> null and it.IndexOf(\"[\" + current.Name + \"]\", \"OrdinalIgnoreCase\") >= 0\n))\n\n and (not Model.Roles.Any(RowLevelSecurity.Any(\nit <> null and \n(\nit.IndexOf(current.Table.Name + \"[\" + current.Name + \"]\", \"OrdinalIgnoreCase\") >= 0 or\n it.IndexOf(\"'\" + current.Table.Name + \"'[\" + current.Name + \"]\", \"OrdinalIgnoreCase\") >= 0\n )\n)))",
+		    "FixExpression": "Delete()",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "UNNECESSARY_MEASURES",
+		    "Name": "Measure not referenced",
+		    "Category": "Maintenance",
+		    "Description": "Hidden measures that are not referenced by any DAX expressions should be removed for maintainability",
+		    "Severity": 3,
+		    "Scope": "Measure",
+		    "Expression": "(Table.IsHidden or IsHidden) \r\nand ReferencedBy.Count = 0",
+		    "FixExpression": "Delete()",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "ROLES_HAS_NO_MEMBERS",
+		    "Name": "Roles has no members",
+		    "Category": "Maintenance",
+		    "Description": "May remove roles with no members.",
+		    "Severity": 3,
+		    "Scope": "ModelRole",
+		    "Expression": "Members.Count() == 0",
+		    "FixExpression": "Delete()",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "TABLE_MISSING_RELATIONSHIP",
+		    "Name": "Table missing relationship",
+		    "Category": "Custom",
+		    "Description": "This rule highlights tables which are not connected to any other table in the model with a relationship.",
+		    "Severity": 3,
+		    "Scope": "Table",
+		    "Expression": "UsedInRelationships.Count() == 0\r\nand GetAnnotation(\"TabularEditor_TableGroup\") != \"Other\"",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "CALCULATION_GROUP_HAS_NO_ITEMS",
+		    "Name": "Calculation group has no items",
+		    "Category": "Maintenance",
+		    "Description": "Calculation groups have no function unless they have calculation items.",
+		    "Severity": 3,
+		    "Scope": "CalculationGroup",
+		    "Expression": "CalculationItems.Count == 0",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "PARTITION_NAME_DOESN'T_MATCH_TABLE_NAME",
+		    "Name": "Partition name doesn't match table name",
+		    "Category": "Naming",
+		    "Description": "Tables with just one partition should match their table and partition names.Tables with more than one partition should have each partition name starting with the table name.",
+		    "Severity": 3,
+		    "Scope": "Table",
+		    "Expression": "(Partitions.Count = 1 and Partitions[0].Name <> Name)",
+		    "FixExpression": "Partitions[0].Name = it.Name",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "SPECIAL_CHARS_IN_OBJECT_NAMES",
+		    "Name": "Name contains special characters",
+		    "Category": "Naming",
+		    "Description": "Tabs, line breaks, etc.",
+		    "Severity": 3,
+		    "Scope": "Model, Table, Measure, Hierarchy, Perspective, Partition, DataColumn, CalculatedTableColumn, CalculationGroup, CalculationItem",
+		    "Expression": "Name.IndexOf(char(9)) > -1\r\nor\r\n\nName.IndexOf(char(10)) > -1 \r\nor\r\n\nName.IndexOf(char(13)) > -1",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "NAME_CONTAINS_LEADING_OR_TRAILING_SPACES",
+		    "Name": "Name contains leading or trailing spaces",
+		    "Category": "Naming",
+		    "Description": "Unintentionally leaving a trailing space in an object name is a common occurrence when copying/duplicating objects in Tabular Editor.",
+		    "Severity": 3,
+		    "Scope": "Model, Table, Measure, Hierarchy, Level, Perspective, Partition, ProviderDataSource, DataColumn, CalculatedTableColumn, StructuredDataSource, NamedExpression, ModelRole, CalculationGroup, CalculationItem",
+		    "Expression": "Name.StartsWith(\" \") or Name.EndsWith(\" \")",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "DOUBLE_DATATYPE",
+		    "Name": "Double data type used",
+		    "Category": "Performance",
+		    "Description": "The \"Double\" floating point data type should be avoided, as it can result in unpredictable roundoff errors and decreased performance in certain scenarios. Use \"Int64\" or \"Decimal\" where appropriate (but note that \"Decimal\" is limited to 4 digits after the decimal sign).",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "DataType = \"Double\" and not Table.Name.StartsWith(\"[Custom]\")",
+		    "FixExpression": "DataType = DataType.Decimal",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "ISAVAILABLEINMDX_FALSE_NONATTRIBUTE_COLUMNS",
+		    "Name": "IsAvailableInMdx True on non-attribute columns",
+		    "Category": "Performance",
+		    "Description": "To speed up processing time and conserve memory after processing, attribute hierarchies should not be built for columns that are never used for slicing by MDX clients. In other words, all hidden columns that are not used as a Sort By Column or referenced in user hierarchies should have their IsAvailableInMdx property set to false.\r\nReference: https://blog.crossjoin.co.uk/2018/07/02/isavailableinmdx-ssas-tabular/",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "IsAvailableInMDX\r\nand\r\n\n(IsHidden or Table.IsHidden)\r\nand\r\n\nnot UsedInSortBy.Any() \r\nand\r\n\nnot UsedInHierarchies.Any()\r\nand\r\nnot UsedInVariations.Any()\r\nand\r\nSortByColumn = null",
+		    "FixExpression": "IsAvailableInMDX = false",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "STAR_SCHEMA",
+		    "Name": "Star schema violated",
+		    "Category": "Performance",
+		    "Description": "Generally speaking, a star-schema is the optimal architecture for tabular models. That being the case, there are valid cases to use a snowflake approach. Please check your model and consider moving to a star-schema architecture.\r\nReference: https://docs.microsoft.com/power-bi/guidance/star-schema",
+		    "Severity": 3,
+		    "Scope": "Table, CalculatedTable",
+		    "Expression": "UsedInRelationships.Any(current.Name == FromTable.Name)\r\nand\r\nUsedInRelationships.Any(current.Name == ToTable.Name)",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "DATE_TABLE_AS_DATE_TABLE",
+		    "Name": "Date table not marked as a date table",
+		    "Category": "Performance",
+		    "Description": "This rule looks for tables that contain the words 'date' or 'calendar' as they should likely be marked as a date table.\r\nReference: https://docs.microsoft.com/power-bi/transform-model/desktop-date-tables",
+		    "Severity": 3,
+		    "Scope": "Table, CalculatedTable",
+		    "Expression": "(Name.ToUpper().Contains(\"DATE\") or Name.ToUpper().Contains(\"CALENDAR\"))\n\nand\n\n(\nDataCategory <> \"Time\"\n\nor\n\nColumns.Any(IsKey == true && DataType == \"DateTime\") == false\n)",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "INVALID_OBJECT",
+		    "Name": "Invalid Object",
+		    "Category": "Maintenance",
+		    "Description": "Culture, ProviderDataSource, Calculation Group, CalculatedColumn, CalculatedTable, CalculatedTableColumn, KPI, StructuredDataSource, and Variation should not be used",
+		    "Severity": 3,
+		    "Scope": "Culture, ProviderDataSource, CalculatedColumn, CalculatedTable, CalculatedTableColumn, KPI, StructuredDataSource, Variation, CalculationGroup",
+		    "Expression": "1=1",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "MANY-TO-MANY",
+		    "Name": "Many-to-many relationship used",
+		    "Category": "Performance",
+		    "Description": "Many to many should not be used",
+		    "Severity": 3,
+		    "Scope": "Relationship",
+		    "Expression": "FromCardinality == \"Many\"\n and \nToCardinality == \"Many\"",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "TABLE_MISSING_TABLE_GROUP",
+		    "Name": "Table missing table group",
+		    "Category": "Custom",
+		    "Description": "All tables should be assigned to Fact, Dim, or Other table group. ",
+		    "Severity": 3,
+		    "Scope": "Table",
+		    "Expression": "not GetAnnotation(\"TabularEditor_TableGroup\").StartsWith(\"Other\")\r\nand not GetAnnotation(\"TabularEditor_TableGroup\").StartsWith(\"Fact\")\r\nand not GetAnnotation(\"TabularEditor_TableGroup\").StartsWith(\"Dim\")\r\nand not GetAnnotation(\"TabularEditor_TableGroup\").StartsWith(\"Custom\")",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "DIM_COLUMN_MISSING_ISKEY",
+		    "Name": "Dim column missing IsKey",
+		    "Category": "Custom",
+		    "Description": "For DIM_ columns in a dimension, the column should be a Key",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "Table.GetAnnotation(\"TabularEditor_TableGroup\").StartsWith(\"Dim\")\r\nand Name.StartsWith(\"DIM_\")\r\nand Table.Name != \"Calendar\"\r\nand IsKey == false",
+		    "FixExpression": "IsKey = true",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "DIM_COLUMN_MISSING_ISHIDDEN",
+		    "Name": "Dim column missing IsHidden",
+		    "Category": "Custom",
+		    "Description": "DIM_ columns should be hidden",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "Name.StartsWith(\"DIM_\")\r\nand IsHidden == false",
+		    "FixExpression": "IsHidden = true",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "DIM_COLUMN_MISSING_SUMMARIZEBY_NONE",
+		    "Name": "Dim column missing SummarizeBy None",
+		    "Category": "Custom",
+		    "Description": "DIM_ columns should not be summarized",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "Name.StartsWith(\"DIM_\")\r\nand SummarizeBy <> \"None\"",
+		    "FixExpression": "SummarizeBy = AggregateFunction.None",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "DIM__AVAILABLEINMDX",
+		    "Name": "Dim column missing IsAvailableInMdx",
+		    "Category": "Custom",
+		    "Description": "DIM_ columns should be hidden, not summarized, and not available in MDX",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "Name.StartsWith(\"DIM_\")\r\nand IsAvailableInMdx == true",
+		    "FixExpression": "IsAvailableInMdx = false",
+		    "CompatibilityLevel": 1560
+		  },
+		  {
+		    "ID": "DIM_COLUMN_MISSING_ISUNIQUE",
+		    "Name": "Dim column missing IsUnique",
+		    "Category": "Custom",
+		    "Description": "For DIM_ columns in a dimension, the column should be Unique",
+		    "Severity": 3,
+		    "Scope": "DataColumn",
+		    "Expression": "Table.GetAnnotation(\"TabularEditor_TableGroup\").StartsWith(\"Dim\")\r\nand Name.StartsWith(\"DIM_\")\r\nand IsUnique == false",
+		    "FixExpression": "IsUnique = true",
+		    "CompatibilityLevel": 1560
+		  }
+		]
+
+annotation __TEdtr = 1
+
+annotation PBI_ProTooling = ["TMDL-Extension"]
+

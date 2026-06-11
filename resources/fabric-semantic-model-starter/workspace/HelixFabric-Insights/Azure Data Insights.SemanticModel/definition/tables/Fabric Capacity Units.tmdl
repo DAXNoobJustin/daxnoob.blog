@@ -1,0 +1,275 @@
+/// Daily Fabric capacity unit consumption metrics tracking CU (Capacity Unit) usage by workload, operation type, and billing category across tenants and capacities.
+table 'Fabric Capacity Units'
+
+	/// Rolling 28-day total capacity unit consumption in hours.
+	measure 'CU Hours (28d)' =
+			Local.TimeIntelligence.RollingN.Standard (
+			    [CU Hours],
+			    Local.FabricCapacityUnits.MaxDate.CU ( ),
+			    28
+			)
+		formatString: #,0
+		displayFolder: Capacity Units
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Capacity Units, CU, Consumption
+
+		annotation Copilot_Alias = CU_Hours_28d
+
+		annotation TimeIntel_Anchor = Local.FabricCapacityUnits.MaxDate.CU
+
+	/// Total capacity unit consumption in hours across all workloads and operation types.
+	measure 'CU Hours' = SUM ( 'Fabric Capacity Units'[CUTimeHrs] )
+		formatString: #,0.000
+		displayFolder: Capacity Units
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Alias = CU_Hours
+
+		annotation Copilot_Synonyms = Raw Capacity Units, CU Hours Raw
+
+	/// Total computed capacity utilization score, calculated as consumed CU seconds divided by provisioned CU seconds (normalized by SKU). Used to assess how heavily a capacity is being utilized.
+	measure 'CU Score' = SUM ( 'Fabric Capacity Units'[CUScore] )
+		formatString: #,0
+		displayFolder: Load Score
+
+	/// Rolling 28-day count of distinct customers (account keys) with Fabric capacity usage.
+	measure 'Fabric Customer Count (28d)' =
+			Local.TimeIntelligence.RollingN.Standard (
+			    CALCULATE (
+			        SUMX ( VALUES ( 'Fabric Capacity Units'[DIM_AccountKey] ), 1 ),
+			        'Fabric Capacity Units'[DataSource]
+			            = "Fabric Capacity Units"
+			    ),
+			    Local.FabricCapacityUnits.MaxDate.CU ( ),
+			    28
+			)
+		formatString: #,0
+		displayFolder: Capacity Units
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Fabric Customers
+
+		annotation TimeIntel_Anchor = Local.FabricCapacityUnits.MaxDate.CU
+
+	/// Distinct count of customers (account keys) with Fabric capacity consumption data.
+	measure 'Fabric Customer Count' =
+			CALCULATE (
+			    DISTINCTCOUNT ( 'Fabric Capacity Units'[DIM_AccountKey] ),
+			    KEEPFILTERS ( 'Fabric Capacity Units'[DataSource] = "Fabric Capacity Units" )
+			)
+		formatString: #,0
+		displayFolder: Capacity Units
+
+	/// The type of Fabric artifact (e.g., Dataset, Lakehouse, Warehouse, Report, SynapseNotebook).
+	column 'Artifact Kind'
+		dataType: string
+		displayFolder: -> Attributes
+		sourceColumn: ArtifactKind
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Capacity SKU size tier (e.g., F2, F4, F8, F16, F32, F64, F128, F256, F512, F1024, F2048, P1, P2, P3, P4, P5).
+	column Sku
+		dataType: string
+		displayFolder: -> Attributes
+		summarizeBy: none
+		sourceColumn: CapacitySku
+		sortByColumn: CapacitySKUOrder
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms = Capacity SKU, SKU, SKU Tier, Capacity Tier
+
+	/// Numeric sort order for capacity SKU sizes (blank=1, F2=2, F4=3, ..., P5=17).
+	column CapacitySKUOrder
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: CapacitySKUOrder
+
+	/// Total computed capacity utilization score, calculated as consumed CU seconds divided by provisioned CU seconds (normalized by SKU). Used to assess how heavily a capacity is being utilized.
+	column CUScore
+		dataType: int64
+		isHidden
+		formatString: #,0
+		isAvailableInMdx: false
+		displayFolder: Load Score
+		summarizeBy: none
+		sourceColumn: CPUScore
+
+	/// Capacity unit consumption measured in hours (CUTime / 3600).
+	column CUTimeHrs
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		displayFolder: Capacity Units
+		summarizeBy: none
+		sourceColumn: CPUTimeHrs
+
+	/// Source of the record: 'Fabric Capacity Units' for CU data, 'Score' for load score data, or 'Spark Auto Scale' for autoscale data.
+	column DataSource
+		dataType: string
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DataSource
+
+	/// Foreign key to the Calendar dimension.
+	column DIM_CalendarKey
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_CalendarKey
+
+	/// Foreign key to the Capacity dimension.
+	column DIM_CapacityId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_CapacityId_Alt
+
+	/// Foreign key to the Environment dimension.
+	column DIM_EnvironmentId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_EnvironmentId
+
+	/// Foreign key to the Segment dimension at the sub-segment level.
+	column DIM_SubSegmentId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubSegmentId
+
+	/// Foreign key to the Geography dimension.
+	column DIM_SubsidiarySubDistrictId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubsidiarySubDistrictId
+
+	/// Foreign key to the Account dimension (AccountKey).
+	column DIM_AccountKey
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_AccountKey
+
+	/// The name of the Fabric operation or workload activity (e.g., Query, Dataset Scheduled Refresh, OneLake Read via Proxy).
+	column 'Operation Name'
+		dataType: string
+		displayFolder: -> Attributes
+		sourceColumn: OperationName
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Product classification (e.g., Fabric, Power BI).
+	column 'Product Flag'
+		dataType: string
+		displayFolder: -> Attributes
+		summarizeBy: none
+		sourceColumn: ProductFlag
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms = Fabric Consumption=Fabric, Fabric CU=Fabric, PBI=Power BI, Power BI Consumption=Power BI, Power BI CU=Power BI
+
+		annotation Copilot_ValueSynonyms = Fabric=Fabric Consumption;Fabric CU|Power BI=PBI;Power BI Consumption;Power BI CU
+
+	/// Fabric workload category code (e.g., lake, AS, Reflex, DMS, SparkCore, ES).
+	column 'Workload Kind'
+		dataType: string
+		displayFolder: -> Attributes
+		sourceColumn: WorkloadKind
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_ValueSynonyms = SQLDb=SQL Database;SQL DB|CosmosDB=Cosmos DB|Kusto=KQL Database;KQL|ML=Machine Learning|Dataflows=Data Flows|Reflex=Activator;Data Activator
+
+	/// Higher-level workload classification (e.g., OneLake, Power BI, Real Time Intelligence, Data Integration, Data Warehousing Core).
+	column 'Workload Type'
+		dataType: string
+		displayFolder: -> Attributes
+		sourceColumn: WorkloadType
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_ValueSynonyms = DE and DS=Data Engineering;Data Science|Real Time Intelligence=RTI;real-time intelligence|SQLDb=SQL Database;SQL DB|Data Warehousing Core=Data Warehouse;Warehouse;DWH|Data Integration=Data Factory;ADF;Pipeline|AppDev=App Dev;Application Development;Apps|CosmosDB=Cosmos DB
+
+	/// Four-level workload consumption hierarchy: Workload Type > Workload Kind > Artifact Kind > Operation Name.
+	hierarchy 'Workload Hierarchy'
+
+		level 'Workload Type'
+			column: 'Workload Type'
+
+		level 'Workload Kind'
+			column: 'Workload Kind'
+
+		level 'Artifact Kind'
+			column: 'Artifact Kind'
+
+		level 'Operation Name'
+			column: 'Operation Name'
+
+		annotation Copilot_AutoIncludeParents = true
+
+		annotation Copilot_SearchLadder = true
+
+	partition 'Fabric Capacity Units' = entity
+		mode: directLake
+		source
+			entityName: FACT_FabricCapacityUnits
+			schemaName: Tabular_AzureDataInsights
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn
+		type: string
+
+	annotation TabularEditor_TableGroup = Fact
+
+	annotation Copilot_Topic = consumption
+

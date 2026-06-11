@@ -1,0 +1,33 @@
+source_model: Azure Data Insights
+cases:
+  - id: build_query_minimal
+    description: "GenerateQuery happy path: single measure, no slicing/filters."
+    category: snapshot
+    dax: "EVALUATE\n  Local.AskADIA.GenerateQuery(\n    \"MAU\",\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    BLANK()\n  )\n"
+  - id: build_query_with_slice
+    description: GenerateQuery with one slice column.
+    category: snapshot
+    dax: "EVALUATE\n  Local.AskADIA.GenerateQuery(\n    \"MAU\",\n    \"Account[Account]\",\n    BLANK(),\n    10,\n    BLANK(),\n    BLANK(),\n    BLANK()\n  )\n"
+  - id: build_query_with_sort
+    description: GenerateQuery with explicit sort measure + descending direction.
+    category: snapshot
+    dax: "EVALUATE\n  Local.AskADIA.GenerateQuery(\n    \"MAU\",\n    \"Account[Account]\",\n    BLANK(),\n    25,\n    \"MAU\",\n    \"DESC\",\n    BLANK()\n  )\n"
+  - id: build_query_with_filter
+    description: GenerateQuery with an explicit column filter.
+    category: snapshot
+    dax: "EVALUATE\n  Local.AskADIA.GenerateQuery(\n    \"MAU\",\n    BLANK(),\n    \"'Account'[Account]=Contoso\",\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    BLANK()\n  )\n"
+  - id: build_query_multiple_measures
+    description: GenerateQuery with a pipe-delimited multi-measure name (two measures in one query).
+    category: snapshot
+    dax: "EVALUATE\n  Local.AskADIA.GenerateQuery(\n    \"MAU|Fabric MAU\",\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    BLANK()\n  )\n"
+  - id: build_query_wrapper
+    description: GenerateQuery with a daxWrapper that applies custom TOPN.
+    category: snapshot
+    dax: "EVALUATE\n  Local.AskADIA.GenerateQuery(\n    \"MAU\",\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    \"EVALUATE TOPN(3, {query}, [MAU], ASC)\"\n  )\n"
+  - id: build_query_autoapplied_baseline
+    description: "AutoApplied column reports which measure/section default filters GenerateQuery folded into the generated query — here, with no user filter or slice on a default column, the operative default is listed untagged."
+    category: snapshot
+    dax:
+      'EVALUATE { MAXX(Local.AskADIA.GenerateQuery("MAU", BLANK(), BLANK(), 100, BLANK(), BLANK(), BLANK()), [AutoApplied]) }
+
+      '

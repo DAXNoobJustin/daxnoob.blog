@@ -1,0 +1,69 @@
+source_model: Azure Data Insights
+# Insights-specific DiscoverQuestions assertions. Scope + generic contract:
+# see semantic_model_tests/README.md → "Test catalog organization".
+cases:
+  - id: list_questions_no_filter
+    description: DiscoverQuestions('') returns the full curated set; assert known Insights questions are present.
+    category: structural
+    dax: EVALUATE { Local.AskADIA.DiscoverQuestions("") }
+    contains_all:
+      - usage_mau_by_workload
+      - revenue
+      - consumption_workload_breakout
+      - customer_360_overview
+  - id: list_questions_customer
+    description: DiscoverQuestions('customer') includes customer-related Insights questions.
+    category: structural
+    dax: EVALUATE { Local.AskADIA.DiscoverQuestions("customer") }
+    contains_all:
+      - customer
+  - id: discover_questions_all_snapshot
+    description: DiscoverQuestions("") full-body baseline. Vocab will change in a later revision; review diff.
+    category: structural
+    dax: 'EVALUATE { Local.AskADIA.DiscoverQuestions("") }
+
+      '
+    expected_row_count:
+      exact: 1
+    contains_all:
+      - "Total questions:"
+      - "Topics in scope:"
+      - "**Fact: Usage Fabric**"
+      - "**Fact: Usage Summary**"
+      - "**Fact: Revenue**"
+      - "**Fact: Fabric Capacity Units**"
+      - "usage_mau_by_workload"
+      - "revenue"
+      - "customer_360_overview"
+      - "consumption_workload_breakout"
+  - id: discover_questions_usage_snapshot
+    description: DiscoverQuestions("usage") full-body baseline. Diff-on-refactor.
+    category: structural
+    dax: 'EVALUATE { Local.AskADIA.DiscoverQuestions("usage") }
+
+      '
+    expected_row_count:
+      exact: 1
+    contains_all:
+      - "Total questions:"
+      - "**Fact: Usage Fabric**"
+      - "**Fact: Usage Summary**"
+      - "usage_mau_by_workload"
+  - id: discover_questions_revenue_snapshot
+    description: DiscoverQuestions("revenue") full-body baseline. Diff-on-refactor.
+    category: structural
+    dax: 'EVALUATE { Local.AskADIA.DiscoverQuestions("revenue") }
+
+      '
+    expected_row_count:
+      exact: 1
+    contains_all:
+      - "Total questions:"
+      - "**Fact: Revenue**"
+      - "revenue_pf_sku"
+  - id: discover_questions_no_match_snapshot
+    description: DiscoverQuestions with nonsense term — canonical "no questions matched" message.
+    category: snapshot
+    dax: 'EVALUATE { Local.AskADIA.DiscoverQuestions("__zzz_no_such_question__") }
+
+      '

@@ -1,0 +1,281 @@
+﻿[
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000030",
+    "payload": {
+      "name": "Semantic Model Alerting System",
+      "description": "Container Description",
+      "type": "kqlQueries"
+    },
+    "type": "container-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-00000000002a",
+    "payload": {
+      "name": "Semantic Model Alerting System",
+      "description": "Container Description",
+      "type": "kqlQueries"
+    },
+    "type": "container-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000021",
+    "payload": {
+      "name": "Semantic Model Alerting System",
+      "description": "Container Description",
+      "type": "kqlQueries"
+    },
+    "type": "container-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000024",
+    "payload": {
+      "name": "Semantic Model Alerting System",
+      "description": "Container Description",
+      "type": "kqlQueries"
+    },
+    "type": "container-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000036",
+    "payload": {
+      "name": "Fabric item action",
+      "fabricItem": {
+        "itemId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000f1",
+        "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0",
+        "itemType": "Pipeline"
+      },
+      "jobType": "Pipeline",
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000024"
+      }
+    },
+    "type": "fabricItemAction-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000039",
+    "payload": {
+      "name": "Monitoring Eventhouse event",
+      "runSettings": {
+        "executionIntervalInSeconds": 60
+      },
+      "query": {
+        "queryString": "let _nowRaw = now();\nlet _lookback = 30m;\nlet _now = bin(_nowRaw, 1m);\nlet _baselineWindow = 3h;              // 3h baseline: smooths spikes via bucketed median\nlet _baselineBucket = 20m;             // sub-bucket size within baseline window\nlet _degradationThreshold = 3.0;\nlet _minDegradedQueryRate = 0.20;\nlet _minDegradedUserRate = 0.30;\nlet _minDegradedUserCount = 4;        // minimum degraded users (absolute count to avoid false positives with small samples)\nlet _minSampleCount = 25;\nlet _minUserCount = 3;                 // minimum distinct users to evaluate (avoids noisy off-peak alerts)\nlet _minUserQueries = 3;              // minimum queries per user to compute a reliable per-user P90\nlet _minBaselineBuckets = 2;           // require at least 2 qualifying buckets for a reliable baseline\nlet _minDegradedP90Ms = 10000;         // minimum recent P90 (ms) to trigger — avoids alerts on fast queries\nlet _cooldownPeriod = 120s;\nlet _warmingCooldown = 60s;              // exclude queries within 60s before/after warming queries\nlet _minRefreshRows = 3;\nlet _percentile = 90;                  // P90: more stable than P95 on small samples\nlet _perfOperations = dynamic([\"QueryEnd\"]);\nlet _debug = false; // set to true to show all models regardless of trigger criteria\n//\n// Report-only OperationIds: QueryBegin events where XmlaProperties contains a non-empty ReportId\nlet reportOpIds = SemanticModelLogs\n    | where Timestamp between ((_now - _baselineWindow - _lookback) .. _now)\n    | where OperationName == \"QueryBegin\"\n    | where isnotempty(ItemId)\n    | where XmlaProperties has \"ReportId\"\n    | distinct OperationId;\n//\n// Bucketed baseline: compute P90 per 20-min bucket, then take the median across buckets\n// This smooths out individual spike windows (e.g. [5K, 6K, 140K, 8K] → median = 7K)\nlet baselineBuckets = SemanticModelLogs\n    | where Timestamp between ((_now - _baselineWindow - _lookback) .. (_now - _lookback))\n    | where OperationName in (_perfOperations)\n    | where isnotempty(ItemId)\n    | join kind=leftsemi reportOpIds on OperationId\n    | summarize\n        BucketPercentile = todouble(percentile(DurationMs, _percentile)),\n        BucketCount      = count()\n      by ItemName, ItemId, bin(Timestamp, _baselineBucket)\n    | where BucketCount >= 5;          // require minimum queries per bucket for reliable percentile\nlet baseline = baselineBuckets\n    | summarize\n        BaselineP90        = todouble(percentile(BucketPercentile, 50)), // median of bucket P90s\n        BaselineBucketCount = count()\n      by ItemName, ItemId\n    | where BaselineBucketCount >= _minBaselineBuckets;\n//\nlet refreshCooldowns = SemanticModelLogs\n    | where Timestamp between ((_now - _lookback - _cooldownPeriod) .. _now)\n    | where OperationName == \"CommandEnd\" and OperationDetailName == \"Batch\"\n    | where isnotempty(ItemId)\n    | where countof(EventText, \"<row xmlns=\") >= _minRefreshRows\n    | project ItemId, CooldownStart = Timestamp, CooldownEnd = Timestamp + _cooldownPeriod;\n//\n// Warming query cooldowns: notebook-driven warming queries (Util_RefreshSemanticModel)\n// Exclude any queries within ±60s of each warming query, since users hit a cold model\n// during this period and latency is not representative of steady-state performance.\n// Multiple warming queries often fire in quick succession, so we merge overlapping\n// windows to avoid a join explosion (N warming events × M queries per model).\nlet warmingRaw = SemanticModelLogs\n    | where Timestamp between ((_now - _lookback - _warmingCooldown) .. (_now + _warmingCooldown))\n    | where OperationName == \"QueryEnd\"\n    | where isnotempty(ItemId)\n    | where EventText has \"Util_RefreshSemanticModel\"\n    | project ItemId, CooldownStart = Timestamp - _warmingCooldown, CooldownEnd = Timestamp + _warmingCooldown;\nlet warmingCooldowns = warmingRaw\n    | order by ItemId asc, CooldownStart asc\n    | extend IsNewGroup = iff(ItemId != prev(ItemId) or CooldownStart > prev(CooldownEnd), 1, 0)\n    | extend GroupId = row_cumsum(IsNewGroup)\n    | summarize CooldownStart = min(CooldownStart), CooldownEnd = max(CooldownEnd) by ItemId, GroupId\n    | project ItemId, CooldownStart, CooldownEnd;\n//\nlet recentQueries = SemanticModelLogs\n    | where Timestamp between ((_now - _lookback) .. _now)\n    | where OperationName in (_perfOperations)\n    | where isnotempty(ItemId)\n    | join kind=leftsemi reportOpIds on OperationId;\n//\nlet queriesInRefreshCooldown = recentQueries\n    | join kind=inner refreshCooldowns on ItemId\n    | where Timestamp between (CooldownStart .. CooldownEnd)\n    | distinct OperationId, ItemId;\n//\nlet queriesInWarmingCooldown = recentQueries\n    | join kind=inner warmingCooldowns on ItemId\n    | where Timestamp between (CooldownStart .. CooldownEnd)\n    | distinct OperationId, ItemId;\n//\nlet queriesInCooldown = union queriesInRefreshCooldown, queriesInWarmingCooldown\n    | distinct OperationId, ItemId;\n//\nlet recentClean = recentQueries\n    | join kind=leftanti queriesInCooldown on OperationId, ItemId\n    | join kind=leftouter baseline on ItemName, ItemId\n    | extend BaselineP90 = coalesce(BaselineP90, 0.0);\n//\n// Per-user P90: compute each user's personal P90, then compare to model baseline\n// Only include users with enough queries for a meaningful percentile\nlet perUserP90 = recentClean\n    | summarize\n        UserP90    = todouble(percentile(DurationMs, _percentile)),\n        UserQueryCount = count()\n      by ItemName, ItemId, ExecutingUser, BaselineP90\n    | where UserQueryCount >= _minUserQueries\n    | extend IsUserDegraded = iff(BaselineP90 > 0 and UserP90 >= BaselineP90 * _degradationThreshold, 1, 0);\n//\n// Aggregate per-user results back to model level\nlet userMetrics = perUserP90\n    | summarize\n        QualifiedUserCount = count(),                     // users with enough queries to evaluate\n        DegradedUserCount  = countif(IsUserDegraded == 1) // users whose personal P90 is degraded\n      by ItemName, ItemId;\n//\n// Model-level query metrics (unchanged — still useful for overall signal)\nlet queryMetrics = recentClean\n    | extend IsDegradedQuery = iff(BaselineP90 > 0 and todouble(DurationMs) >= BaselineP90 * _degradationThreshold, 1, 0)\n    | summarize\n        RecentP90          = todouble(percentile(DurationMs, _percentile)),\n        TotalQueryCount    = count(),\n        DegradedQueryCount = countif(IsDegradedQuery == 1),\n        TotalDistinctUsers = dcount(ExecutingUser)\n      by ItemName, ItemId;\n//\n// Include both recent and baseline models so debug mode shows data even when recent window is sparse\nlet allModels = union\n    (recentQueries | project ItemName, ItemId),\n    (baseline | project ItemName, ItemId)\n    | distinct ItemName, ItemId;\n//\nlet result = allModels\n    | join kind=leftouter baseline on ItemName, ItemId\n    | join kind=leftouter queryMetrics on ItemName, ItemId\n    | join kind=leftouter userMetrics on ItemName, ItemId\n    | extend\n        RecentP90_ms       = round(coalesce(RecentP90, 0.0), 0),\n        BaselineP90_ms     = round(coalesce(BaselineP90, 0.0), 0),\n        TotalQueryCount    = coalesce(TotalQueryCount, tolong(0)),\n        DegradedQueryCount = coalesce(DegradedQueryCount, tolong(0)),\n        TotalDistinctUsers = coalesce(TotalDistinctUsers, tolong(0)),\n        QualifiedUserCount = coalesce(QualifiedUserCount, tolong(0)),\n        DegradedUserCount  = coalesce(DegradedUserCount, tolong(0))\n    | extend DegradedQueryRate = iff(TotalQueryCount > 0,\n                                     round(todouble(DegradedQueryCount) / todouble(TotalQueryCount), 4), 0.0)\n    | extend DegradedUserRate  = iff(QualifiedUserCount > 0,\n                                     round(todouble(DegradedUserCount) / todouble(QualifiedUserCount), 4), 0.0)\n    | extend DegradationRatio  = iff(RecentP90_ms > 0.0 and BaselineP90_ms > 0.0,\n                                     round(RecentP90_ms / BaselineP90_ms, 2), 0.0)\n    | extend Triggered = iff(TotalDistinctUsers >= _minUserCount\n                         and TotalQueryCount >= _minSampleCount\n                         and DegradedQueryRate >= _minDegradedQueryRate\n                         and DegradedUserRate >= _minDegradedUserRate\n                         and DegradedUserCount >= _minDegradedUserCount\n                         and DegradationRatio >= _degradationThreshold\n                         and RecentP90_ms >= _minDegradedP90Ms, 1, 0)\n    | where _debug or Triggered == 1\n    | project\n        Timestamp    = _now,\n        ItemName,\n        ItemId,\n        Triggered,\n        DegradationRatio,\n        AlertType    = \"PerformanceDegradation\",\n        IncidentMessage   = iff(Triggered == 1 or _debug,\n            strcat(\n                \"Semantic Model Performance Degradation Alert<br><br>\",\n                \"Model '\", ItemName, \"' is showing elevated query latency. \",\n                \"The recent P90 response time is \", tostring(DegradationRatio), \"x the 3-hour baseline, \",\n                \"and \", tostring(round(DegradedQueryRate * 100, 1)), \"% of queries (\",\n                tostring(DegradedQueryCount), \"/\", tostring(TotalQueryCount), \") exceeded the threshold, \",\n                \"affecting \", tostring(DegradedUserCount), \" of \", tostring(QualifiedUserCount), \" users (\",\n                tostring(round(DegradedUserRate * 100, 1)), \"%).<br><br>\",\n                \"<b>Metrics:</b><br>\",\n                \"Recent P90: \", tostring(RecentP90_ms), \" ms<br>\",\n                \"Baseline P90: \", tostring(BaselineP90_ms), \" ms<br>\",\n                \"Degradation: \", tostring(DegradationRatio), \"x<br>\",\n                \"Slow Queries: \", tostring(DegradedQueryCount), \" / \", tostring(TotalQueryCount),\n                \" (\", tostring(round(DegradedQueryRate * 100, 1)), \"%)<br>\",\n                \"Affected Users: \", tostring(DegradedUserCount), \" / \", tostring(QualifiedUserCount),\n                \" (\", tostring(round(DegradedUserRate * 100, 1)), \"%)<br>\",\n                \"Total Users: \", tostring(TotalDistinctUsers),\n                \" (\", tostring(QualifiedUserCount), \" with ≥\", tostring(_minUserQueries), \" queries evaluated)<br><br>\",\n                \"<b>Investigation Steps:</b><br>\",\n                \"1. Open your monitoring dashboard and validate whether the slowdown is ongoing.<br>\",\n                \"2. Check the Capacity Metrics App for throttling or overload on the capacity.<br>\",\n                \"3. In Workspace Monitoring, identify the specific Report ID (from XmlaProperties) or table/query (from EventText) causing the slowdown.<br>\",\n                \"4. If root cause is unclear, escalate to your platform / Analysis Services support contact.\"\n            ), \"\"),\n        TeamsMessage = iff(Triggered == 1 or _debug,\n            strcat(\n                \"⚠️ <b>Performance Degradation — \", ItemName, \"</b><br><br>\",\n                \"Query response times are \", tostring(DegradationRatio), \"x slower than normal.<br>\",\n                \"Recent P90: \", tostring(RecentP90_ms), \" ms (baseline: \", tostring(BaselineP90_ms), \" ms)<br><br>\",\n                tostring(DegradedUserCount), \" of \", tostring(QualifiedUserCount), \" users experiencing degraded P90<br>\",\n                tostring(DegradedQueryCount), \" of \", tostring(TotalQueryCount), \" queries impacted (\",\n                tostring(round(DegradedQueryRate * 100, 1)), \"%)\"\n            ), \"\")\n    | order by Triggered desc, DegradationRatio desc;\nresult\n"
+      },
+      "eventhouseItem": {
+        "itemId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000e2",
+        "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000e3",
+        "itemType": "KustoDatabase"
+      },
+      "queryParameters": [],
+      "metadata": {
+        "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0",
+        "querySetId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000e1",
+        "queryId": "aaaaaaaa-aaaa-aaaa-aaaa-000000000029"
+      },
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000024"
+      }
+    },
+    "type": "kqlSource-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-00000000003c",
+    "payload": {
+      "name": "Monitoring Eventhouse event",
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000024"
+      },
+      "definition": {
+        "type": "Event",
+        "instance": "{\"steps\":[{\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-00000000003b\",\"name\":\"SourceEventStep\",\"rows\":[{\"arguments\":[{\"name\":\"entityId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000039\"}],\"kind\":\"SourceReference\",\"name\":\"SourceSelector\"}]}],\"templateId\":\"SourceEvent\",\"templateVersion\":\"1.2.4\"}"
+      }
+    },
+    "type": "timeSeriesView-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000037",
+    "payload": {
+      "name": "PerformanceDegradation",
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000024"
+      },
+      "definition": {
+        "type": "Rule",
+        "instance": "{\"templateId\":\"EventTrigger\",\"templateVersion\":\"1.2.4\",\"steps\":[{\"name\":\"FieldsDefaultsStep\",\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000034\",\"rows\":[{\"name\":\"EventSelector\",\"kind\":\"Event\",\"arguments\":[{\"kind\":\"EventReference\",\"type\":\"complex\",\"arguments\":[{\"name\":\"entityId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-00000000003c\"}],\"name\":\"event\"}]}]},{\"name\":\"EventDetectStep\",\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000035\",\"rows\":[{\"name\":\"OnEveryValue\",\"kind\":\"OnEveryValue\",\"arguments\":[]}]},{\"name\":\"ActStep\",\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000022\",\"rows\":[{\"name\":\"FabricItemBinding\",\"kind\":\"FabricItemInvocation\",\"arguments\":[{\"name\":\"fabricJobConnectionDocumentId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000036\"},{\"name\":\"parameters\",\"type\":\"array\",\"values\":[{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"AlertType\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"AlertType\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"IncidentMessage\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"IncidentMessage\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"ItemId\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"ItemId\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"ItemName\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"ItemName\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"TeamsMessage\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"TeamsMessage\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]}]},{\"name\":\"additionalInformation\",\"type\":\"array\",\"values\":[]},{\"name\":\"workspaceId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0\"},{\"name\":\"itemId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-0000000000f1\"},{\"name\":\"itemType\",\"type\":\"string\",\"value\":\"Pipeline\"},{\"name\":\"jobType\",\"type\":\"string\",\"value\":\"Pipeline\"}]}]}]}",
+        "settings": {
+          "shouldRun": true,
+          "shouldApplyRuleOnUpdate": false
+        }
+      }
+    },
+    "type": "timeSeriesView-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000025",
+    "payload": {
+      "name": "Semantic Model Alerting System",
+      "description": "Container Description",
+      "type": "kqlQueries"
+    },
+    "type": "container-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000038",
+    "payload": {
+      "name": "Fabric item action",
+      "fabricItem": {
+        "itemId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000f1",
+        "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0",
+        "itemType": "Pipeline"
+      },
+      "jobType": "Pipeline",
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000025"
+      }
+    },
+    "type": "fabricItemAction-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000033",
+    "payload": {
+      "name": "Monitoring KQL database event",
+      "runSettings": {
+        "executionIntervalInSeconds": 60
+      },
+      "query": {
+        "queryString": "let _subWindow = 5m;                  // 5-min evaluation windows\nlet _now = bin(ago(0m), _subWindow);\nlet _subWindowCount = 6;              // 6 × 5m = 30 min lookback\nlet _recentLookback = _subWindow * _subWindowCount;\nlet _userErrorThreshold = 0.15;       // 15% per-user error rate within a window to be \"affected\"\nlet _minUserQueries = 3;              // min queries per user per window to be evaluated\nlet _minEvaluatedUsers = 5;           // window needs ≥5 users with enough queries to be assessed\nlet _minAffectedUserRate = 0.30;      // 30% of evaluated users must be affected for window to be \"bad\"\nlet _minTotalErrors = 5;              // minimum absolute error count across lookback\nlet _minOverallErrorRate = 0.10;      // 10% overall error rate floor — filters broken-report noise\nlet _minBadWindows = 1;               // min bad windows to trigger (1 = instant, 2+ = sustained pattern)\nlet _debug = false;                   // set to true to show all models regardless of trigger criteria\n//\n// Report-only OperationIds: QueryBegin events where XmlaProperties contains a non-empty ReportId\nlet reportOpIds = SemanticModelLogs\n    | where Timestamp between ((_now - _recentLookback) .. _now)\n    | where OperationName == \"QueryBegin\"\n    | where isnotempty(ItemId)\n    | where XmlaProperties has \"ReportId\"\n    | distinct OperationId;\n//\n// Base events filtered to report-only operations\nlet reportEvents = SemanticModelLogs\n    | where Timestamp between ((_now - _recentLookback) .. _now)\n    | where OperationName in (\"QueryBegin\", \"Error\")\n    | where isnotempty(ItemId)\n    | where not(OperationName == \"Error\" and EventText has \"operation was cancelled by the user\")\n    | join kind=leftsemi reportOpIds on OperationId;\n//\n// Per-user error rate evaluated within each window (no cross-window dilution)\nlet perUserPerWindow = reportEvents\n    | summarize\n        UserQueries = countif(OperationName == \"QueryBegin\"),\n        UserErrors  = dcountif(OperationId, OperationName == \"Error\")\n      by ItemName, ItemId, ExecutingUser, bin(Timestamp, _subWindow)\n    | where UserQueries >= _minUserQueries\n    | extend UserErrorRate = round(todouble(UserErrors) / UserQueries, 4)\n    | extend IsAffected = iff(UserErrorRate >= _userErrorThreshold, 1, 0);\n//\n// Per-window: aggregate user metrics to determine if a window is \"bad\"\nlet windowUserEval = perUserPerWindow\n    | summarize\n        EvaluatedUsers = count(),\n        AffectedUsers  = countif(IsAffected == 1)\n      by ItemName, ItemId, Timestamp\n    | extend AffectedUserRate = iff(EvaluatedUsers > 0, round(todouble(AffectedUsers) / EvaluatedUsers, 4), 0.0)\n    | extend IsWindowBad = iff(EvaluatedUsers >= _minEvaluatedUsers\n                           and AffectedUserRate >= _minAffectedUserRate, 1, 0);\n//\n// Cross-window totals for overall reporting\nlet crossWindowTotals = reportEvents\n    | summarize\n        TotalOperations      = countif(OperationName == \"QueryBegin\"),\n        TotalErrorOperations = dcountif(OperationId, OperationName == \"Error\"),\n        TotalUsers           = dcountif(ExecutingUser, OperationName == \"QueryBegin\")\n      by ItemName, ItemId;\n//\nlet errorDetails = reportEvents\n    | where OperationName == \"Error\"\n    | where isnotempty(EventText)\n    | extend TruncatedError = replace_string(replace_string(substring(EventText, 0, 150), \"<\", \"&lt;\"), \">\", \"&gt;\")\n    | summarize HitCount = count() by ItemName, ItemId, TruncatedError\n    | order by ItemName, ItemId, HitCount desc\n    | summarize\n        FormattedErrors   = strcat_array(array_slice(make_list(strcat(\"• [\", tostring(HitCount), \"x] \", TruncatedError)), 0, 4), \"\\n\")\n      by ItemName, ItemId;\n//\nlet result = windowUserEval\n    | summarize\n        BadWindowCount      = sum(IsWindowBad),\n        TotalWindows        = count(),\n        PeakAffectedUsers   = max(AffectedUsers),\n        PeakEvaluatedUsers  = max(EvaluatedUsers)\n      by ItemName, ItemId\n    | join kind=leftouter crossWindowTotals on ItemName, ItemId\n    | join kind=leftouter errorDetails on ItemName, ItemId\n    | extend TotalErrorOperations = coalesce(TotalErrorOperations, 0)\n    | extend AvgErrorRate = iff(TotalOperations > 0, round(todouble(TotalErrorOperations) / TotalOperations, 4), 0.0)\n    | extend Triggered = iff(BadWindowCount >= _minBadWindows\n                         and TotalErrorOperations >= _minTotalErrors\n                         and AvgErrorRate >= _minOverallErrorRate, 1, 0)\n    | where _debug or Triggered == 1\n    | extend FormattedErrorsHtml = replace_string(coalesce(FormattedErrors, \"\"), \"\\n\", \"<br>\")\n    | project\n        Timestamp    = _now,\n        ItemName,\n        ItemId,\n        Triggered,\n        BadWindowCount,\n        TotalWindows,\n        PeakAffectedUsers,\n        PeakEvaluatedUsers,\n        AlertType    = \"ErrorSpike\",\n        IncidentMessage   = iff(Triggered == 1 or _debug,\n            strcat(\n                \"Semantic Model Error Spike Alert<br><br>\",\n                \"Model '\", ItemName, \"' is returning an elevated rate of errors. \",\n                \"In the last \", tostring(_subWindowCount * toint(_subWindow / 1m)), \" minutes, \",\n                tostring(BadWindowCount), \" of \", tostring(TotalWindows),\n                \" evaluation windows had ≥\", tostring(round(_minAffectedUserRate * 100, 0)),\n                \"% of users experiencing error rates above \", tostring(_userErrorThreshold * 100), \"%.<br><br>\",\n                \"<b>Metrics:</b><br>\",\n                \"Overall Error Rate: \", tostring(round(AvgErrorRate * 100, 2)), \"%<br>\",\n                \"Total Queries: \", tostring(TotalOperations), \"<br>\",\n                \"Total Errors: \", tostring(TotalErrorOperations), \"<br>\",\n                \"Peak Affected Users: \", tostring(PeakAffectedUsers), \" of \", tostring(PeakEvaluatedUsers),\n                \" evaluated users (worst window)<br><br>\",\n                \"<b>Top Errors:</b><br>\",\n                FormattedErrorsHtml, \"<br><br>\",\n                \"<b>Investigation Steps:</b><br>\",\n                \"1. Open your monitoring dashboard and validate whether errors are still occurring.<br>\",\n                \"2. Check the Capacity Metrics App for throttling or capacity pressure that may cause timeouts.<br>\",\n                \"3. In Workspace Monitoring, identify the specific Report ID (from XmlaProperties) or query/table (from EventText) producing errors.<br>\",\n                \"4. If root cause is unclear, escalate to your platform / Analysis Services support contact.\"\n            ), \"\"),\n        TeamsMessage = iff(Triggered == 1 or _debug,\n            strcat(\n                \"🚨 <b>Error Spike — \", ItemName, \"</b><br><br>\",\n                \"Error rate: \", tostring(round(AvgErrorRate * 100, 1)), \"% (\",\n                tostring(TotalErrorOperations), \" errors out of \", tostring(TotalOperations), \" queries)<br>\",\n                \"Peak: \", tostring(PeakAffectedUsers), \" of \", tostring(PeakEvaluatedUsers),\n                \" users affected (worst window)<br>\",\n                tostring(BadWindowCount), \" window(s) triggered in last \",\n                tostring(_subWindowCount * toint(_subWindow / 1m)), \" min<br><br>\",\n                \"<b>Top Errors:</b><br>\",\n                coalesce(FormattedErrorsHtml, \"\")\n            ), \"\")\n    | order by Triggered desc, BadWindowCount desc;\nresult\n"
+      },
+      "eventhouseItem": {
+        "itemId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000e2",
+        "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000e3",
+        "itemType": "KustoDatabase"
+      },
+      "queryParameters": [],
+      "metadata": {
+        "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0",
+        "querySetId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000e1",
+        "queryId": "aaaaaaaa-aaaa-aaaa-aaaa-00000000002b"
+      },
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000025"
+      }
+    },
+    "type": "kqlSource-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000023",
+    "payload": {
+      "name": "Monitoring KQL database event",
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000025"
+      },
+      "definition": {
+        "type": "Event",
+        "instance": "{\"steps\":[{\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-00000000003e\",\"name\":\"SourceEventStep\",\"rows\":[{\"arguments\":[{\"name\":\"entityId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000033\"}],\"kind\":\"SourceReference\",\"name\":\"SourceSelector\"}]}],\"templateId\":\"SourceEvent\",\"templateVersion\":\"1.2.4\"}"
+      }
+    },
+    "type": "timeSeriesView-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-00000000002d",
+    "payload": {
+      "name": "ErrorSpike",
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000025"
+      },
+      "definition": {
+        "type": "Rule",
+        "instance": "{\"templateId\":\"EventTrigger\",\"templateVersion\":\"1.2.4\",\"steps\":[{\"name\":\"FieldsDefaultsStep\",\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-00000000002c\",\"rows\":[{\"name\":\"EventSelector\",\"kind\":\"Event\",\"arguments\":[{\"kind\":\"EventReference\",\"type\":\"complex\",\"arguments\":[{\"name\":\"entityId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000023\"}],\"name\":\"event\"}]}]},{\"name\":\"EventDetectStep\",\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-00000000002f\",\"rows\":[{\"name\":\"OnEveryValue\",\"kind\":\"OnEveryValue\",\"arguments\":[]}]},{\"name\":\"ActStep\",\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000031\",\"rows\":[{\"name\":\"FabricItemBinding\",\"kind\":\"FabricItemInvocation\",\"arguments\":[{\"name\":\"fabricJobConnectionDocumentId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000038\"},{\"name\":\"parameters\",\"type\":\"array\",\"values\":[{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"AlertType\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"AlertType\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"IncidentMessage\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"IncidentMessage\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"ItemId\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"ItemId\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"ItemName\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"ItemName\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"TeamsMessage\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"TeamsMessage\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]}]},{\"name\":\"additionalInformation\",\"type\":\"array\",\"values\":[]},{\"name\":\"workspaceId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0\"},{\"name\":\"itemId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-0000000000f1\"},{\"name\":\"itemType\",\"type\":\"string\",\"value\":\"Pipeline\"},{\"name\":\"jobType\",\"type\":\"string\",\"value\":\"Pipeline\"}]}]}]}",
+        "settings": {
+          "shouldRun": true,
+          "shouldApplyRuleOnUpdate": false
+        }
+      }
+    },
+    "type": "timeSeriesView-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000026",
+    "payload": {
+      "name": "Semantic Model Alerting System",
+      "description": "Container Description",
+      "type": "kqlQueries"
+    },
+    "type": "container-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000020",
+    "payload": {
+      "name": "Fabric item action",
+      "fabricItem": {
+        "itemId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000f1",
+        "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0",
+        "itemType": "Pipeline"
+      },
+      "jobType": "Pipeline",
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000026"
+      }
+    },
+    "type": "fabricItemAction-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-00000000003d",
+    "payload": {
+      "name": "Monitoring Eventhouse event",
+      "runSettings": {
+        "executionIntervalInSeconds": 60
+      },
+      "query": {
+        "queryString": "let _now = bin(now(), 1m);\nlet _lookback = 10m;\nlet _debug = false; // set true to emit a row even with no errors (wiring test)\nlet _modelIds = dynamic([\n    \"aaaaaaaa-aaaa-aaaa-aaaa-0000000000a1\", // Azure Data Insights\n    \"aaaaaaaa-aaaa-aaaa-aaaa-0000000000a2\"  // Azure Data Partner & Community\n]);\n//\n// Count OneLake security errors across the monitored models in the lookback window.\nlet errorCount = SemanticModelLogs\n    | where Timestamp between ((_now - _lookback) .. _now)\n    | where OperationName == \"Error\"\n    | where ItemId in (_modelIds)\n    | where EventText has \"permissions defined in OneLake\"\n    | count;\n//\nlet result = errorCount\n    | extend Triggered = iff(Count > 0, 1, 0)\n    | where _debug or Triggered == 1\n    | project\n        Timestamp       = _now,\n        ItemName        = \"Monitored Semantic Models\",\n        ItemId          = \"OneLakeSecurityError-Group\",\n        Triggered,\n        AlertType       = \"OneLakeSecurityError\",\n        IncidentMessage      = iff(Triggered == 1 or _debug,\n            strcat(\n                \"OneLake Security Error Alert<br><br>\",\n                \"Monitored semantic models are returning OneLake security errors. \",\n                \"Users are being blocked by security configuration sync failures or transient permission issues.<br><br>\",\n                \"A semantic model refresh has been triggered automatically for all affected models to re-sync the security configuration.<br><br>\",\n                \"<b>Investigation Steps:</b><br>\",\n                \"1. Monitor the models after the refresh completes to confirm errors have cleared.<br>\",\n                \"2. If errors persist, verify recent OneLake security changes (workspace roles, item permissions, sharing).<br>\",\n                \"3. If the refresh does not resolve the issue, escalate to your platform / Analysis Services support contact.\"\n            ), \"\"),\n        TeamsMessage    = iff(Triggered == 1 or _debug,\n            strcat(\n                \"🔒 <b>OneLake Security Error — Monitored Semantic Models</b><br><br>\",\n                \"OneLake security errors detected in the last 10 minutes.<br>\",\n                \"Users are being blocked by OneLake security sync failures.<br><br>\",\n                \"A refresh has been triggered automatically for all models.\"\n            ), \"\");\nresult\n"
+      },
+      "eventhouseItem": {
+        "itemId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000e2",
+        "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000e3",
+        "itemType": "KustoDatabase"
+      },
+      "queryParameters": [],
+      "metadata": {
+        "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0",
+        "querySetId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000e1",
+        "queryId": "aaaaaaaa-aaaa-aaaa-aaaa-00000000003a"
+      },
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000026"
+      }
+    },
+    "type": "kqlSource-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-00000000002e",
+    "payload": {
+      "name": "pbip event",
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000026"
+      },
+      "definition": {
+        "type": "Event",
+        "instance": "{\"steps\":[{\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000032\",\"name\":\"SourceEventStep\",\"rows\":[{\"arguments\":[{\"name\":\"entityId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-00000000003d\"}],\"kind\":\"SourceReference\",\"name\":\"SourceSelector\"}]}],\"templateId\":\"SourceEvent\",\"templateVersion\":\"1.2.5\"}"
+      }
+    },
+    "type": "timeSeriesView-v1"
+  },
+  {
+    "uniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000028",
+    "payload": {
+      "name": "OneLakeSecurityError",
+      "parentContainer": {
+        "targetUniqueIdentifier": "aaaaaaaa-aaaa-aaaa-aaaa-000000000026"
+      },
+      "definition": {
+        "type": "Rule",
+        "instance": "{\"templateId\":\"EventTrigger\",\"templateVersion\":\"1.2.5\",\"steps\":[{\"name\":\"FieldsDefaultsStep\",\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-00000000003f\",\"rows\":[{\"name\":\"EventSelector\",\"kind\":\"Event\",\"arguments\":[{\"kind\":\"EventReference\",\"type\":\"complex\",\"arguments\":[{\"name\":\"entityId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-00000000002e\"}],\"name\":\"event\"}]}]},{\"name\":\"EventDetectStep\",\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000027\",\"rows\":[{\"name\":\"OnEveryValue\",\"kind\":\"OnEveryValue\",\"arguments\":[]}]},{\"name\":\"ActStep\",\"id\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000040\",\"rows\":[{\"name\":\"FabricItemBinding\",\"kind\":\"FabricItemInvocation\",\"arguments\":[{\"name\":\"fabricJobConnectionDocumentId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-000000000020\"},{\"name\":\"parameters\",\"type\":\"array\",\"values\":[{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"AlertType\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"AlertType\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"IncidentMessage\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"IncidentMessage\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"ItemId\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"ItemId\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"ItemName\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"ItemName\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]},{\"kind\":\"FabricItemParameter\",\"type\":\"complex\",\"arguments\":[{\"name\":\"parameterName\",\"type\":\"string\",\"value\":\"TeamsMessage\"},{\"name\":\"parameterValue\",\"type\":\"complexArray\",\"values\":[{\"type\":\"string\",\"value\":\"​\"},{\"kind\":\"EventFieldReference\",\"type\":\"complexReference\",\"arguments\":[{\"name\":\"fieldName\",\"type\":\"string\",\"value\":\"TeamsMessage\"}]},{\"type\":\"string\",\"value\":\" \"}]},{\"name\":\"parameterType\",\"type\":\"string\",\"value\":\"String\"}]}]},{\"name\":\"additionalInformation\",\"type\":\"array\",\"values\":[]},{\"name\":\"workspaceId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0\"},{\"name\":\"itemId\",\"type\":\"string\",\"value\":\"aaaaaaaa-aaaa-aaaa-aaaa-0000000000f1\"},{\"name\":\"itemType\",\"type\":\"string\",\"value\":\"Pipeline\"},{\"name\":\"jobType\",\"type\":\"string\",\"value\":\"Pipeline\"}]}]}]}",
+        "settings": {
+          "shouldRun": true,
+          "shouldApplyRuleOnUpdate": false
+        }
+      }
+    },
+    "type": "timeSeriesView-v1"
+  }
+]

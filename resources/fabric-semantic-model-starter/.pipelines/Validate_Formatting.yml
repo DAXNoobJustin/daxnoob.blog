@@ -1,0 +1,48 @@
+trigger: none
+
+jobs:
+  - job: Job
+    displayName: Job
+    pool:
+      vmImage: windows-latest
+    steps:
+      - checkout: self
+      - task: PowerShell@2
+        displayName: Prettier Format Check
+        inputs:
+          targetType: "inline"
+          script: |
+            $ErrorActionPreference = 'Continue'
+            Write-Host "Checking formatting with Prettier..."
+
+            $result = npx prettier --check "**/*.{json,yml,yaml}" --ignore-path .prettierignore 2>&1
+            $exitCode = $LASTEXITCODE
+
+            Write-Host $result
+
+            if ($exitCode -ne 0) {
+                Write-Host "##vso[task.logissue type=error] Formatting issues found. Install: 'npm install -g prettier' then run: 'prettier --write `"**/*.{json,yml,yaml}`"' locally to fix."
+                Write-Host "##vso[task.complete result=Failed;]Formatting check failed"
+                exit 1
+            }
+
+            Write-Host "All files are properly formatted!"
+      - task: PowerShell@2
+        displayName: Fabric Format Check
+        inputs:
+          targetType: "inline"
+          script: |
+            $ErrorActionPreference = 'Continue'
+            Write-Host "Checking Fabric workspace formatting..."
+            $result = npx @jacobknightley/fabric-format check .\workspace\ 2>&1
+            $exitCode = $LASTEXITCODE
+
+            Write-Host $result
+
+            if ($exitCode -ne 0) {
+                Write-Host "##vso[task.logissue type=error] Fabric formatting issues found. Install: 'npm install -g @jacobknightley/fabric-format' then run: 'fabfmt format .\workspace\' locally to fix."
+                Write-Host "##vso[task.complete result=Failed;]Fabric format check failed"
+                exit 1
+            }
+
+            Write-Host "Fabric workspace is properly formatted!"

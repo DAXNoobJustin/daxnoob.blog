@@ -1,0 +1,4 @@
+expression exp_directlake = AzureStorage.DataLake("https://onelake.dfs.fabric.microsoft.com/aaaaaaaa-aaaa-aaaa-aaaa-000000000043/aaaaaaaa-aaaa-aaaa-aaaa-000000000007", [HierarchicalNavigation=true])
+
+expression exp_directlake_restricted = AzureStorage.DataLake("https://onelake.dfs.fabric.microsoft.com/aaaaaaaa-aaaa-aaaa-aaaa-000000000043/aaaaaaaa-aaaa-aaaa-aaaa-000000000037", [HierarchicalNavigation=true])
+

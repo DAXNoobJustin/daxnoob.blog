@@ -1,0 +1,25 @@
+find_replace:
+  - find_value: "aaaaaaaa-aaaa-aaaa-aaaa-000000000019" # helix-sql
+    replace_value:
+      dev: "aaaaaaaa-aaaa-aaaa-aaaa-000000000019" #helix-sql-dev01
+      test: "aaaaaaaa-aaaa-aaaa-aaaa-000000000040" #helix-sql-test01
+      prod: "aaaaaaaa-aaaa-aaaa-aaaa-000000000060" #helix-sql-prod01
+    # Optional fields:
+    item_type:
+    item_name:
+    file_path:
+
+spark_pool:
+  - instance_pool_id: "aaaaaaaa-aaaa-aaaa-aaaa-000000000056"
+    replace_value:
+      dev:
+        type: "Capacity"
+        name: "CapacityPool_Large_Static"
+      test:
+        type: "Capacity"
+        name: "CapacityPool_Large_Static"
+      prod:
+        type: "Capacity"
+        name: "CapacityPool_Large_Static"
+    # Optional field:
+    item_name:

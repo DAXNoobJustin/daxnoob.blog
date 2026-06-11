@@ -1,0 +1,91 @@
+relationship ff45978d-6628-dcaf-4eb6-c68a6fb1b061
+	fromColumn: 'Fabric Capacity Units'.DIM_CalendarKey
+	toColumn: Calendar.DIM_CalendarKey
+
+relationship 5aa3f85e-4fe8-0a07-ae1f-3898f8c5f46c
+	fromColumn: 'Fabric Capacity Units'.DIM_CapacityId
+	toColumn: Capacity.DIM_CapacityId
+
+relationship 912cb355-be7d-eb00-521e-f170437d34c0
+	fromColumn: 'Fabric Capacity Units'.DIM_EnvironmentId
+	toColumn: Environment.DIM_EnvironmentId
+
+relationship 8283f272-57c1-284e-a6fb-101d15656c40
+	fromColumn: 'Fabric Capacity Units'.DIM_SubSegmentId
+	toColumn: Segment.DIM_SubSegmentId
+
+relationship a4ab2625-ca06-c245-eeeb-acce90463d23
+	fromColumn: 'Fabric Capacity Units'.DIM_SubsidiarySubDistrictId
+	toColumn: Geography.DIM_SubsidiarySubDistrictId
+
+relationship f62d465a-c7fc-4776-74cf-1f25057a4138
+	fromColumn: 'Fabric Capacity Units'.DIM_AccountKey
+	toColumn: Account.DIM_AccountKey
+
+relationship 41f50d79-16c5-8381-af73-09b512a487ce
+	fromColumn: Revenue.DIM_CalendarKey
+	toColumn: Calendar.DIM_CalendarKey
+
+relationship 128d927a-29b0-725e-652a-9a445e005a49
+	fromColumn: Revenue.DIM_ProductMasterId
+	toColumn: 'Product Master'.DIM_ProductMasterId
+
+relationship bca84583-2665-58a8-4cbf-5bb13d95ab80
+	fromColumn: Revenue.DIM_SubSegmentId
+	toColumn: Segment.DIM_SubSegmentId
+
+relationship 1ca27b31-00b0-c513-f480-74f5a22c56ad
+	fromColumn: Revenue.DIM_SubsidiarySubDistrictId
+	toColumn: Geography.DIM_SubsidiarySubDistrictId
+
+relationship 62aa3c81-155c-3bce-8897-0ff7c9f3fb26
+	fromColumn: Revenue.DIM_AccountKey
+	toColumn: Account.DIM_AccountKey
+
+relationship 18270787-24d1-926d-ec95-93b5ba770104
+	fromColumn: 'Usage Fabric'.DIM_CalendarKey
+	toColumn: Calendar.DIM_CalendarKey
+
+relationship 736be3b1-536c-627d-e324-80cf69af98d5
+	fromColumn: 'Usage Fabric'.DIM_EnvironmentId
+	toColumn: Environment.DIM_EnvironmentId
+
+relationship 4bbb6dbf-c7db-e763-0a1a-3be6cc782a28
+	fromColumn: 'Usage Fabric'.DIM_ProductMasterId
+	toColumn: 'Product Master'.DIM_ProductMasterId
+
+relationship 499b2e41-b658-00ee-9778-79d61d535234
+	fromColumn: 'Usage Fabric'.DIM_SubSegmentId
+	toColumn: Segment.DIM_SubSegmentId
+
+relationship 68875521-3c65-16be-71ab-569044233c5b
+	fromColumn: 'Usage Fabric'.DIM_SubsidiarySubDistrictId
+	toColumn: Geography.DIM_SubsidiarySubDistrictId
+
+relationship 81072ff1-b5df-8cc2-28b4-b3485f1d6c97
+	fromColumn: 'Usage Fabric'.DIM_AccountKey
+	toColumn: Account.DIM_AccountKey
+
+relationship 78a44e2b-08e6-5718-0a25-eca07f40f6c6
+	fromColumn: 'Usage Fabric'.DIM_Usage_FabricProductId
+	toColumn: 'Usage Fabric Product'.DIM_Usage_FabricProductId
+
+relationship b26e8af1-b3a9-594f-a2de-56ccb05a29a4
+	fromColumn: 'Usage Summary'.DIM_CalendarKey
+	toColumn: Calendar.DIM_CalendarKey
+
+relationship d64ec86f-67da-20cb-a9ce-82993f3e0192
+	fromColumn: 'Usage Summary'.DIM_ProductMasterId
+	toColumn: 'Product Master'.DIM_ProductMasterId
+
+relationship 48c552ee-796e-ff6c-9a59-9d359c1a27f1
+	fromColumn: 'Usage Summary'.DIM_SubSegmentId
+	toColumn: Segment.DIM_SubSegmentId
+
+relationship dcbe6cdc-3bfd-7356-4e6e-c52eecaf60de
+	fromColumn: 'Usage Summary'.DIM_SubsidiarySubDistrictId
+	toColumn: Geography.DIM_SubsidiarySubDistrictId
+
+relationship 76f328d4-cf18-cc49-de57-92af6ab9f6a5
+	fromColumn: 'Usage Summary'.DIM_AccountKey
+	toColumn: Account.DIM_AccountKey

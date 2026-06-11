@@ -1,0 +1,20 @@
+# Single source of truth for the per-model Copilot dataset GUIDs used by the
+# generate_copilot_instructions deploy op (resolved via the instruction
+# package's _core/guids.py).
+# Keyed by canonical model slug, then by environment (release_type, lowercased).
+# Every environment a model deploys to MUST have an explicit GUID here -- there is
+# no prod fallback (a missing key fails the deploy loudly). `prod` is required as
+# the canonical baseline. To onboard a new environment, add its key to every model.
+#
+# This file is part of the self-contained AskADIA framework package
+# (askadia/). An adopting team fills in their own dataset GUIDs here;
+# nothing outside askadia/ needs to change.
+copilot_model_guids:
+  azure-data-insights:
+    dev:   "aaaaaaaa-aaaa-aaaa-aaaa-000000000108"
+    test:  "aaaaaaaa-aaaa-aaaa-aaaa-000000000090"
+    prod:  "aaaaaaaa-aaaa-aaaa-aaaa-000000000016"
+  azure-data-partner-community:
+    dev:   "aaaaaaaa-aaaa-aaaa-aaaa-000000000048"
+    test:  "aaaaaaaa-aaaa-aaaa-aaaa-000000000029"
+    prod:  "aaaaaaaa-aaaa-aaaa-aaaa-000000000038"

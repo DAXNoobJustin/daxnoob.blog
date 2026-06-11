@@ -1,0 +1,47 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/variables/1.0.0/schema.json",
+  "variables": [
+    {
+      "name": "vault_url",
+      "note": "",
+      "type": "String",
+      "value": "https://your-keyvault.vault.azure.net/"
+    },
+    {
+      "name": "app_data_cert_name",
+      "note": "",
+      "type": "String",
+      "value": "your-app-data-cert-name"
+    },
+    {
+      "name": "app_data_client_id",
+      "note": "",
+      "type": "String",
+      "value": "aaaaaaaa-aaaa-aaaa-aaaa-000000000062"
+    },
+    {
+      "name": "tenant_id",
+      "note": "",
+      "type": "String",
+      "value": "aaaaaaaa-aaaa-aaaa-aaaa-000000000042"
+    },
+    {
+      "name": "environment",
+      "note": "",
+      "type": "String",
+      "value": "dev"
+    },
+    {
+      "name": "insights_workspace",
+      "note": "",
+      "type": "String",
+      "value": "HelixFabric-Dev-Insights"
+    },
+    {
+      "name": "incident_webhook_url",
+      "note": "",
+      "type": "String",
+      "value": "https://example.com/webhooks/incident"
+    }
+  ]
+}

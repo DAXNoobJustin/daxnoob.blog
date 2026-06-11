@@ -1,0 +1,9 @@
+# Fabric reads blobs directly (no .gitattributes processing)
+# Use -text to store exactly as-is, preserving CRLF in blob
+* -text
+
+# Exception: notebook-content files should be normalized (LF)
+notebook-content* text=auto eol=lf
+
+# Exception: TMDL files should be normalized (LF)
+*.tmdl text eol=lf

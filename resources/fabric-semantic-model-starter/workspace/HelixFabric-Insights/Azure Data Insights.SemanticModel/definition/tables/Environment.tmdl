@@ -1,0 +1,40 @@
+/// Deployment environment dimension. Values: PROD, INTERNAL, N/A.
+table Environment
+
+	/// Surrogate integer primary key.
+	column DIM_EnvironmentId
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_EnvironmentId
+
+	/// Deployment environment code. Values: PROD, INTERNAL, N/A.
+	column Environment
+		dataType: string
+		sourceColumn: Environment
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms = Production=PROD, Test=INTERNAL, Internal=INTERNAL, Tenant=Environment
+
+		annotation Copilot_ValueSynonyms = PROD=Production|INTERNAL=Test;Internal
+
+	partition Environment = entity
+		mode: directLake
+		source
+			entityName: DIM_Environment
+			schemaName: Tabular_AzureDataInsights
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn
+		type: string
+
+	annotation TabularEditor_TableGroup = Dim
+

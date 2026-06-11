@@ -1,0 +1,1591 @@
+/// INTERNAL: Removes surrounding brackets from a measure reference. [MAU] -> MAU. Returns empty string if input is too short.
+function 'Local.AskADIA._StripBrackets' =
+		(measureRef: SCALAR STRING VAL) =>
+		IF(LEN(measureRef) > 2, MID(measureRef, 2, LEN(measureRef) - 2), "")
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Operator-aware split position for filter entries. Returns the position of '=' for plain entries (e.g. 'T'[C]=v), or the position of the leading '>'/'<' for range entries (e.g. 'T'[C]>=v / 'T'[C]<=v) — i.e. the index whose preceding chars are the bare column ref. Returns 0 if entry has neither '=' nor a recognized inline operator. Single source of truth for the parse used by _ParseFilterEntry, _DedupUserFilters, _ValidateColumns, _TagSuppressedDefaults, AnswerQuestion._UFWithSplit. Callers can derive 'is range op' from MID(entry, splitPos, 1) IN { ">", "<" }.
+function 'Local.AskADIA._GetFilterEntrySplitPos' =
+		(filterEntry: SCALAR STRING VAL) =>
+		VAR _B = FIND("]", filterEntry, 1, 0)
+		VAR _AB = IF(_B > 0 && _B < LEN(filterEntry), MID(filterEntry, _B + 1, 2), "")
+		RETURN IF(_AB = ">=" || _AB = "<=", _B + 1, FIND("=", filterEntry, 1, 0))
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Formats a measure name into a SUMMARIZECOLUMNS measure line fragment. e.g. MAU -> '"MAU", [MAU]'
+function 'Local.AskADIA._FormatMeasureLine' =
+		(measureName: SCALAR STRING VAL) =>
+		VAR _Q = """"
+		RETURN _Q & measureName & _Q & ", [" & measureName & "]"
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Formats pipe-delimited slice columns into indented SUMMARIZECOLUMNS column lines.
+function 'Local.AskADIA._FormatSlicePart' =
+		(sliceColumns: SCALAR STRING VAL) =>
+		VAR _NL = UNICHAR(10)
+		RETURN IF(LEN(sliceColumns) > 0,
+		    "    " & SUBSTITUTE(sliceColumns, "|", "," & _NL & "    ") & "," & _NL,
+		    "")
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Resolves measure name(s) to pipe-delimited column list, sorted ASC for deterministic output. If sliceableOnly=TRUE, filters to sliceable cols only; otherwise returns all valid filter cols.
+function 'Local.AskADIA._GetMeasureColsList' =
+		(measureNames: SCALAR STRING VAL, sliceableOnly: SCALAR BOOLEAN VAL) =>
+		CONCATENATEX(
+		    FILTER(
+		        _COPILOT_MEASURE_COLUMNS,
+		        CONTAINSSTRING(measureNames, "[" & _COPILOT_MEASURE_COLUMNS[MeasureName] & "]")
+		            && (NOT sliceableOnly || _COPILOT_MEASURE_COLUMNS[IsSliceable])
+		    ),
+		    _COPILOT_MEASURE_COLUMNS[FullColumnRef],
+		    "|",
+		    _COPILOT_MEASURE_COLUMNS[FullColumnRef], ASC
+		)
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Pipe-delimited configured variant suffixes.
+function 'Local.AskADIA._KnownVariantSuffixes' =
+		() =>
+		"|" & CONCATENATEX(
+		    _COPILOT_VARIANT_CONFIG,
+		    _COPILOT_VARIANT_CONFIG[Suffix],
+		    "|",
+		    _COPILOT_VARIANT_CONFIG[EmitOrder], ASC
+		) & "|"
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Pipe-delimited valid sort measures for a base measure, including existing measures with configured variant suffixes.
+function 'Local.AskADIA._VariantSortSet' =
+		(baseMeasure: SCALAR STRING VAL) =>
+		VAR _Rows =
+		    FILTER(
+		        _COPILOT_VARIANT_CONFIG,
+		        COUNTROWS(FILTER(_INFO_MEASURES, _INFO_MEASURES[Name] = baseMeasure & " " & _COPILOT_VARIANT_CONFIG[Suffix])) > 0
+		    )
+		VAR _VariantNames =
+		    CONCATENATEX(
+		        _Rows,
+		        baseMeasure & " " & _COPILOT_VARIANT_CONFIG[Suffix],
+		        "|",
+		        _COPILOT_VARIANT_CONFIG[EmitOrder], ASC
+		    )
+		RETURN "|" & baseMeasure & IF(LEN(_VariantNames) > 0, "|" & _VariantNames, "") & "|"
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Human-readable valid configured variant measures for errors.
+function 'Local.AskADIA._VariantSortOptions' =
+		(baseMeasure: SCALAR STRING VAL) =>
+		VAR _Rows =
+		    FILTER(
+		        _COPILOT_VARIANT_CONFIG,
+		        COUNTROWS(FILTER(_INFO_MEASURES, _INFO_MEASURES[Name] = baseMeasure & " " & _COPILOT_VARIANT_CONFIG[Suffix])) > 0
+		    )
+		RETURN
+		    CONCATENATEX(
+		        _Rows,
+		        "'" & baseMeasure & " " & _COPILOT_VARIANT_CONFIG[Suffix] & "'",
+		        ", ",
+		        _COPILOT_VARIANT_CONFIG[EmitOrder], ASC
+		    )
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Resolves a configured variant suffix to the full variant measure name.
+function 'Local.AskADIA._ResolveVariantSortMeasure' =
+		(baseMeasure: SCALAR STRING VAL, sortMeasure: SCALAR STRING VAL) =>
+		VAR _Sort = TRIM(sortMeasure)
+		VAR _KnownSuffixes = Local.AskADIA._KnownVariantSuffixes()
+		RETURN IF(LEN(_Sort) > 0 && CONTAINSSTRING(_KnownSuffixes, "|" & _Sort & "|"), baseMeasure & " " & _Sort, _Sort)
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Detects configured time intelligence variants and emits measure lines.
+function 'Local.AskADIA._VariantLines' =
+		(baseMeasure: SCALAR STRING VAL, existingMeasures: SCALAR STRING VAL) =>
+		VAR _NL = UNICHAR(10)
+		VAR _IsV =
+		    COUNTROWS(
+		        FILTER(
+		            _COPILOT_VARIANT_CONFIG,
+		            RIGHT(baseMeasure, LEN(" " & _COPILOT_VARIANT_CONFIG[Suffix])) = " " & _COPILOT_VARIANT_CONFIG[Suffix]
+		        )
+		    ) > 0
+		VAR _Variants = COALESCE(MAXX(FILTER(_COPILOT_MEASURE_COLUMNS, _COPILOT_MEASURE_COLUMNS[MeasureName] = baseMeasure), _COPILOT_MEASURE_COLUMNS[Variants]), "")
+		VAR _Rows =
+		    ADDCOLUMNS(
+		        FILTER(
+		            _COPILOT_VARIANT_CONFIG,
+		            PATHCONTAINS(_Variants, _COPILOT_VARIANT_CONFIG[Suffix])
+		        ),
+		        "_VariantName", baseMeasure & " " & _COPILOT_VARIANT_CONFIG[Suffix]
+		    )
+		RETURN IF(
+		    _IsV,
+		    "",
+		    CONCATENATEX(
+		        FILTER(_Rows, NOT CONTAINSSTRING(existingMeasures, [_VariantName])),
+		        "," & _NL & "    " & Local.AskADIA._FormatMeasureLine([_VariantName]),
+		        "",
+		        _COPILOT_VARIANT_CONFIG[EmitOrder], ASC
+		    )
+		)
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Wraps a SUMMARIZECOLUMNS template. autoFilterPart is the (possibly empty) generic Copilot_AutoFilterWhenSliced injection block built by _GenerateSectionDAX.
+function 'Local.AskADIA._CoreSummarize' =
+		(slicePart: SCALAR STRING VAL, filterPart: SCALAR STRING VAL, measurePart: SCALAR STRING VAL, autoFilterPart: SCALAR STRING VAL) =>
+		VAR _NL = UNICHAR(10)
+		RETURN
+		    "SUMMARIZECOLUMNS(" & _NL &
+		    slicePart &
+		    autoFilterPart &
+		    filterPart &
+		    measurePart &
+		    ")"
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Wraps SUMMARIZECOLUMNS with EVALUATE/TOPN/ORDER BY or DaxWrapper substitution. Auto-prepends EVALUATE to daxWrapper output if not already present (idempotent). Prepends /*ask-adia*/ tag to all generated DAX so executions are identifiable in xmla traces / capacity logs as originating from the AskADIA skill.
+function 'Local.AskADIA._WrapQuery' =
+		(innerExpr: SCALAR STRING VAL, rowLimit: SCALAR DOUBLE VAL, sortMeasure: SCALAR STRING VAL, sortDirection: SCALAR STRING VAL, daxWrapper: SCALAR STRING VAL) =>
+		VAR _NL = UNICHAR(10)
+		VAR _LimitInt = INT(rowLimit)
+		VAR _HasLimit = _LimitInt > 0 && LEN(sortMeasure) > 0
+		VAR _HasWrapper = LEN(daxWrapper) > 0
+		VAR _WrapperTrim = TRIM(daxWrapper)
+		VAR _WrapperHasEval = UPPER(LEFT(_WrapperTrim, 8)) = "EVALUATE"
+		VAR _Dir = IF(UPPER(TRIM(sortDirection)) = "ASC", "ASC", "DESC")
+		VAR _LimitWrapped = IF(
+		    _HasLimit && NOT _HasWrapper,
+		    "TOPN(" & _LimitInt & ", " & innerExpr & ", [" & sortMeasure & "], " & _Dir & ")",
+		    innerExpr
+		)
+		VAR _WrappedSubst = SUBSTITUTE(daxWrapper, "{query}", innerExpr)
+		VAR _DAX = IF(
+		    _HasWrapper,
+		    IF(_WrapperHasEval, _WrappedSubst, "EVALUATE" & _NL & _WrappedSubst),
+		    "EVALUATE" & _NL & _LimitWrapped &
+		    IF(_HasLimit, _NL & "ORDER BY [" & sortMeasure & "] " & _Dir, "")
+		)
+		RETURN SUBSTITUTE(_DAX, "EVALUATE", "EVALUATE /*ask-adia*/", 1)
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Builds measure expression lines for SUMMARIZECOLUMNS, auto-includes time variants. Supports up to 12 measures.
+function 'Local.AskADIA._BuildMeasureLines' =
+		(measures: SCALAR STRING VAL) =>
+		VAR _NL = UNICHAR(10)
+		VAR _M1 = PATHITEM(measures, 1, TEXT)
+		VAR _M2 = PATHITEM(measures, 2, TEXT)
+		VAR _M3 = PATHITEM(measures, 3, TEXT)
+		VAR _M4 = PATHITEM(measures, 4, TEXT)
+		VAR _M5 = PATHITEM(measures, 5, TEXT)
+		VAR _M6 = PATHITEM(measures, 6, TEXT)
+		VAR _M7 = PATHITEM(measures, 7, TEXT)
+		VAR _M8 = PATHITEM(measures, 8, TEXT)
+		VAR _M9 = PATHITEM(measures, 9, TEXT)
+		VAR _M10 = PATHITEM(measures, 10, TEXT)
+		VAR _M11 = PATHITEM(measures, 11, TEXT)
+		VAR _M12 = PATHITEM(measures, 12, TEXT)
+		VAR _N1 = Local.AskADIA._StripBrackets(_M1)
+		VAR _N2 = Local.AskADIA._StripBrackets(_M2)
+		VAR _N3 = Local.AskADIA._StripBrackets(_M3)
+		VAR _N4 = Local.AskADIA._StripBrackets(_M4)
+		VAR _N5 = Local.AskADIA._StripBrackets(_M5)
+		VAR _N6 = Local.AskADIA._StripBrackets(_M6)
+		VAR _N7 = Local.AskADIA._StripBrackets(_M7)
+		VAR _N8 = Local.AskADIA._StripBrackets(_M8)
+		VAR _N9 = Local.AskADIA._StripBrackets(_M9)
+		VAR _N10 = Local.AskADIA._StripBrackets(_M10)
+		VAR _N11 = Local.AskADIA._StripBrackets(_M11)
+		VAR _N12 = Local.AskADIA._StripBrackets(_M12)
+		VAR _V1 = IF(LEN(_N1) > 0, Local.AskADIA._VariantLines(_N1, measures), "")
+		VAR _V2 = IF(LEN(_N2) > 0, Local.AskADIA._VariantLines(_N2, measures), "")
+		VAR _V3 = IF(LEN(_N3) > 0, Local.AskADIA._VariantLines(_N3, measures), "")
+		VAR _V4 = IF(LEN(_N4) > 0, Local.AskADIA._VariantLines(_N4, measures), "")
+		VAR _V5 = IF(LEN(_N5) > 0, Local.AskADIA._VariantLines(_N5, measures), "")
+		VAR _V6 = IF(LEN(_N6) > 0, Local.AskADIA._VariantLines(_N6, measures), "")
+		VAR _V7 = IF(LEN(_N7) > 0, Local.AskADIA._VariantLines(_N7, measures), "")
+		VAR _V8 = IF(LEN(_N8) > 0, Local.AskADIA._VariantLines(_N8, measures), "")
+		VAR _V9 = IF(LEN(_N9) > 0, Local.AskADIA._VariantLines(_N9, measures), "")
+		VAR _V10 = IF(LEN(_N10) > 0, Local.AskADIA._VariantLines(_N10, measures), "")
+		VAR _V11 = IF(LEN(_N11) > 0, Local.AskADIA._VariantLines(_N11, measures), "")
+		VAR _V12 = IF(LEN(_N12) > 0, Local.AskADIA._VariantLines(_N12, measures), "")
+		RETURN
+		    IF(LEN(_N1) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N1) & _V1 & IF(LEN(_N2) > 0, ",", "") & _NL, "") &
+		    IF(LEN(_N2) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N2) & _V2 & IF(LEN(_N3) > 0, ",", "") & _NL, "") &
+		    IF(LEN(_N3) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N3) & _V3 & IF(LEN(_N4) > 0, ",", "") & _NL, "") &
+		    IF(LEN(_N4) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N4) & _V4 & IF(LEN(_N5) > 0, ",", "") & _NL, "") &
+		    IF(LEN(_N5) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N5) & _V5 & IF(LEN(_N6) > 0, ",", "") & _NL, "") &
+		    IF(LEN(_N6) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N6) & _V6 & IF(LEN(_N7) > 0, ",", "") & _NL, "") &
+		    IF(LEN(_N7) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N7) & _V7 & IF(LEN(_N8) > 0, ",", "") & _NL, "") &
+		    IF(LEN(_N8) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N8) & _V8 & IF(LEN(_N9) > 0, ",", "") & _NL, "") &
+		    IF(LEN(_N9) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N9) & _V9 & IF(LEN(_N10) > 0, ",", "") & _NL, "") &
+		    IF(LEN(_N10) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N10) & _V10 & IF(LEN(_N11) > 0, ",", "") & _NL, "") &
+		    IF(LEN(_N11) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N11) & _V11 & IF(LEN(_N12) > 0, ",", "") & _NL, "") &
+		    IF(LEN(_N12) > 0, "    " & Local.AskADIA._FormatMeasureLine(_N12) & _V12 & _NL, "")
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Parses 'Table'[Col]=Val1;Val2 into filter DAX. Trims col token only — values passed verbatim (DAX TRIM collapses internal spaces, would corrupt real values like 'Some  Vendor  Inc'). filterType: hardcoded/notin/default/user. ! prefix produces NOT IN for any filterType except notin (which is already negated). Supports range predicates: >=X, <=X, >=X..<=Y in value position. ISO date values (YYYY-MM-DD) auto-formatted as DATE(yyyy,mm,dd) for non-text columns — both equality (TREATAS) and range paths.
+function 'Local.AskADIA._ParseFilterEntry' =
+		(filterEntry: SCALAR STRING VAL, filterType: SCALAR STRING VAL) =>
+		VAR _IsEmpty = LEN(filterEntry) = 0 || FIND("=", filterEntry, 1, 0) = 0
+		VAR _eqPos = FIND("=", filterEntry, 1, 0)
+		VAR _SplitPos = Local.AskADIA._GetFilterEntrySplitPos(filterEntry)
+		VAR _HasInlineOp = _SplitPos <> _eqPos
+		VAR _colRaw = IF(_IsEmpty, "", LEFT(filterEntry, _SplitPos - 1))
+		VAR _col = TRIM(_colRaw)
+		VAR _vals = IF(_IsEmpty, "", IF(_HasInlineOp, MID(filterEntry, _SplitPos, LEN(filterEntry) - _SplitPos + 1), MID(filterEntry, _eqPos + 1, LEN(filterEntry) - _eqPos)))
+		VAR _IsRange = LEFT(_vals, 2) = ">=" || LEFT(_vals, 2) = "<="
+		VAR _NormVals = SUBSTITUTE(_vals, ";", "|")
+		VAR _IsNeg = LEFT(_NormVals, 1) = "!" && filterType <> "notin"
+		VAR _StripBang = IF(_IsNeg, MID(_NormVals, 2, LEN(_NormVals)), _NormVals)
+		VAR _StripLeading = IF(_IsNeg && LEFT(_StripBang, 1) = "=", MID(_StripBang, 2, LEN(_StripBang)), _StripBang)
+		VAR _CleanVal = IF(_IsNeg, SUBSTITUTE(_StripLeading, "|!", "|"), _NormVals)
+		VAR _Q = """"
+		VAR _ColNorm = SUBSTITUTE(_col, "'", "")
+		VAR _BracketPos = FIND("[", _ColNorm, 1, 0)
+		VAR _CloseBracketPos = FIND("]", _ColNorm, 1, 0)
+		VAR _TableName = IF(_BracketPos > 0, LEFT(_ColNorm, _BracketPos - 1), "")
+		VAR _ColNameParsed = IF(_BracketPos > 0 && _CloseBracketPos > _BracketPos, MID(_ColNorm, _BracketPos + 1, _CloseBracketPos - _BracketPos - 1), "")
+		VAR _InfoRow = FILTER(_INFO_COLUMNS, _INFO_COLUMNS[Table] = _TableName && _INFO_COLUMNS[Name] = _ColNameParsed)
+		VAR _DataType = IF(COUNTROWS(_InfoRow) > 0, MAXX(_InfoRow, _INFO_COLUMNS[DataType]), "Text")
+		VAR _IsText = _DataType = "Text" || ISBLANK(_DataType)
+		VAR _NonTextRows = ADDCOLUMNS(
+		    FILTER(GENERATESERIES(1, 32), LEN(PATHITEM(_CleanVal, [Value], TEXT)) > 0),
+		    "Formatted",
+		        VAR _V = PATHITEM(_CleanVal, [Value], TEXT)
+		        VAR _IsIso = LEN(_V) = 10 && MID(_V, 5, 1) = "-" && MID(_V, 8, 1) = "-"
+		        RETURN IF(_IsIso, "DATE(" & LEFT(_V, 4) & ", " & MID(_V, 6, 2) & ", " & MID(_V, 9, 2) & ")", _V)
+		)
+		VAR _NonTextFormatted = CONCATENATEX(_NonTextRows, [Formatted], ", ", [Value], ASC)
+		VAR _FormattedVals = IF(_IsText, _Q & SUBSTITUTE(_CleanVal, "|", _Q & ", " & _Q) & _Q, _NonTextFormatted)
+		VAR _DotDotPos = FIND("..", _vals, 1, 0)
+		VAR _HasBoth = _DotDotPos > 0
+		VAR _LowerRaw = IF(_HasBoth, LEFT(_vals, _DotDotPos - 1), IF(LEFT(_vals, 2) = ">=", _vals, ""))
+		VAR _UpperRaw = IF(_HasBoth, MID(_vals, _DotDotPos + 2, LEN(_vals)), IF(LEFT(_vals, 2) = "<=", _vals, ""))
+		VAR _LowerOp = IF(LEN(_LowerRaw) > 0, LEFT(_LowerRaw, 2), "")
+		VAR _UpperOp = IF(LEN(_UpperRaw) > 0, LEFT(_UpperRaw, 2), "")
+		VAR _LowerVal = IF(_LowerOp = ">=", MID(_LowerRaw, 3, LEN(_LowerRaw)), "")
+		VAR _UpperVal = IF(_UpperOp = "<=", MID(_UpperRaw, 3, LEN(_UpperRaw)), "")
+		VAR _LIsDate = LEN(_LowerVal) = 10 && MID(_LowerVal, 5, 1) = "-" && MID(_LowerVal, 8, 1) = "-"
+		VAR _UIsDate = LEN(_UpperVal) = 10 && MID(_UpperVal, 5, 1) = "-" && MID(_UpperVal, 8, 1) = "-"
+		VAR _LFmt = IF(LEN(_LowerVal) = 0, "", IF(_LIsDate, "DATE(" & LEFT(_LowerVal, 4) & ", " & MID(_LowerVal, 6, 2) & ", " & MID(_LowerVal, 9, 2) & ")", IF(_IsText, _Q & _LowerVal & _Q, _LowerVal)))
+		VAR _UFmt = IF(LEN(_UpperVal) = 0, "", IF(_UIsDate, "DATE(" & LEFT(_UpperVal, 4) & ", " & MID(_UpperVal, 6, 2) & ", " & MID(_UpperVal, 9, 2) & ")", IF(_IsText, _Q & _UpperVal & _Q, _UpperVal)))
+		VAR _RangePred = IF(LEN(_LFmt) > 0 && LEN(_UFmt) > 0, _col & " >= " & _LFmt & " && " & _col & " <= " & _UFmt, IF(LEN(_LFmt) > 0, _col & " >= " & _LFmt, _col & " <= " & _UFmt))
+		VAR _RangeResult = "FILTER(ALL(" & _col & "), " & _RangePred & ")"
+		VAR _result =
+		    IF(_IsRange,
+		        _RangeResult,
+		        IF(filterType = "notin" || _IsNeg,
+		            "FILTER(ALL(" & _col & "), NOT " & _col & " IN {" & _FormattedVals & "})",
+		            IF(filterType = "hardcoded",
+		                "KEEPFILTERS(TREATAS({" & _FormattedVals & "}, " & _col & "))",
+		                "TREATAS({" & _FormattedVals & "}, " & _col & ")"
+		            )
+		        )
+		    )
+		VAR _finalResult = IF(_IsEmpty, "", _result)
+		RETURN ROW("FilterDAX", _finalResult)
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Pipe-delimited entries → concatenated filter DAX. Supports up to 8 entries (vs V1's 5).
+function 'Local.AskADIA._BuildFilterSection' =
+		(filterEntries: SCALAR STRING VAL, filterType: SCALAR STRING VAL) =>
+		VAR _NL = UNICHAR(10)
+		VAR _E1 = PATHITEM(filterEntries, 1, TEXT)
+		VAR _E2 = PATHITEM(filterEntries, 2, TEXT)
+		VAR _E3 = PATHITEM(filterEntries, 3, TEXT)
+		VAR _E4 = PATHITEM(filterEntries, 4, TEXT)
+		VAR _E5 = PATHITEM(filterEntries, 5, TEXT)
+		VAR _E6 = PATHITEM(filterEntries, 6, TEXT)
+		VAR _E7 = PATHITEM(filterEntries, 7, TEXT)
+		VAR _E8 = PATHITEM(filterEntries, 8, TEXT)
+		VAR _D1 = IF(LEN(_E1) > 0, "    " & MAXX(Local.AskADIA._ParseFilterEntry(_E1, filterType), [FilterDAX]) & "," & _NL, "")
+		VAR _D2 = IF(LEN(_E2) > 0, "    " & MAXX(Local.AskADIA._ParseFilterEntry(_E2, filterType), [FilterDAX]) & "," & _NL, "")
+		VAR _D3 = IF(LEN(_E3) > 0, "    " & MAXX(Local.AskADIA._ParseFilterEntry(_E3, filterType), [FilterDAX]) & "," & _NL, "")
+		VAR _D4 = IF(LEN(_E4) > 0, "    " & MAXX(Local.AskADIA._ParseFilterEntry(_E4, filterType), [FilterDAX]) & "," & _NL, "")
+		VAR _D5 = IF(LEN(_E5) > 0, "    " & MAXX(Local.AskADIA._ParseFilterEntry(_E5, filterType), [FilterDAX]) & "," & _NL, "")
+		VAR _D6 = IF(LEN(_E6) > 0, "    " & MAXX(Local.AskADIA._ParseFilterEntry(_E6, filterType), [FilterDAX]) & "," & _NL, "")
+		VAR _D7 = IF(LEN(_E7) > 0, "    " & MAXX(Local.AskADIA._ParseFilterEntry(_E7, filterType), [FilterDAX]) & "," & _NL, "")
+		VAR _D8 = IF(LEN(_E8) > 0, "    " & MAXX(Local.AskADIA._ParseFilterEntry(_E8, filterType), [FilterDAX]) & "," & _NL, "")
+		RETURN _D1 & _D2 & _D3 & _D4 & _D5 & _D6 & _D7 & _D8
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Dedups same-col entries in user filters string, merging values with semicolons. Preserves first-seen casing and ordering. Cap 8 entries.
+function 'Local.AskADIA._DedupUserFilters' =
+		(userFilters: SCALAR STRING VAL) =>
+		VAR _Raw = SELECTCOLUMNS(GENERATESERIES(1, 8), "Pos", [Value], "Entry", PATHITEM(userFilters, [Value], TEXT))
+		VAR _NonEmpty = FILTER(_Raw, LEN([Entry]) > 0 && FIND("=", [Entry], 1, 0) > 0)
+		VAR _WithSplit = ADDCOLUMNS(_NonEmpty,
+		    "SplitPos", Local.AskADIA._GetFilterEntrySplitPos([Entry])
+		)
+		VAR _Parsed = ADDCOLUMNS(_WithSplit,
+		    "Col", TRIM(LEFT([Entry], [SplitPos] - 1)),
+		    "Vals",
+		        VAR _IsOp = MID([Entry], [SplitPos], 1) = ">" || MID([Entry], [SplitPos], 1) = "<"
+		        RETURN IF(_IsOp, MID([Entry], [SplitPos], LEN([Entry]) - [SplitPos] + 1), MID([Entry], [SplitPos] + 1, LEN([Entry]) - [SplitPos])),
+		    "LowerCol", LOWER(TRIM(LEFT([Entry], [SplitPos] - 1)))
+		)
+		VAR _DistinctCols = SELECTCOLUMNS(SUMMARIZE(_Parsed, [LowerCol]), "LC", [LowerCol])
+		VAR _Aggregated = ADDCOLUMNS(
+		    _DistinctCols,
+		    "DispCol",
+		        VAR _LC = [LC]
+		        VAR _Matches = FILTER(_Parsed, [LowerCol] = _LC)
+		        RETURN MINX(TOPN(1, _Matches, [Pos], ASC), [Col]),
+		    "MergedVals",
+		        VAR _LC = [LC]
+		        VAR _Matches = FILTER(_Parsed, [LowerCol] = _LC)
+		        RETURN CONCATENATEX(_Matches, [Vals], ";", [Pos], ASC),
+		    "FirstPos",
+		        VAR _LC = [LC]
+		        VAR _Matches = FILTER(_Parsed, [LowerCol] = _LC)
+		        RETURN MINX(_Matches, [Pos])
+		)
+		RETURN CONCATENATEX(_Aggregated, [DispCol] & "=" & [MergedVals], "|", [FirstPos], ASC)
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Validates slice columns and user filter columns against allow-lists. Returns ROW(InvalidSlices, InvalidFilters, UserFilterCols) where UserFilterCols is pipe-delimited list of cols user passed in (for default-override and required-filter checks downstream).
+function 'Local.AskADIA._ValidateColumns' =
+		(validSliceColsList: SCALAR STRING VAL, validFilterColsList: SCALAR STRING VAL, sliceColumns: SCALAR STRING VAL, userFilters: SCALAR STRING VAL) =>
+		VAR _PaddedSlice = "|" & validSliceColsList & "|"
+		VAR _PaddedFilter = "|" & validFilterColsList & "|"
+		VAR _SliceRows = ADDCOLUMNS(FILTER(GENERATESERIES(1, 8), LEN(PATHITEM(sliceColumns, [Value], TEXT)) > 0), "Raw", PATHITEM(sliceColumns, [Value], TEXT), "Trimmed", TRIM(PATHITEM(sliceColumns, [Value], TEXT)), "Norm", SUBSTITUTE(TRIM(PATHITEM(sliceColumns, [Value], TEXT)), "'", ""))
+		VAR _InvalidSlice = FILTER(_SliceRows, NOT CONTAINSSTRING(_PaddedSlice, "|" & [Norm] & "|"))
+		VAR _IS = CONCATENATEX(_InvalidSlice, "'" & [Trimmed] & "'", ", ", [Value], ASC)
+		VAR _UFRaw = SELECTCOLUMNS(GENERATESERIES(1, 8), "Pos", [Value], "Entry", PATHITEM(userFilters, [Value], TEXT))
+		VAR _UFNonEmpty = FILTER(_UFRaw, LEN([Entry]) > 0 && FIND("=", [Entry], 1, 0) > 0)
+		VAR _UFWithSplit = ADDCOLUMNS(_UFNonEmpty,
+		    "SplitPos", Local.AskADIA._GetFilterEntrySplitPos([Entry])
+		)
+		VAR _UFCols = ADDCOLUMNS(_UFWithSplit, "Col", TRIM(LEFT([Entry], [SplitPos] - 1)), "ColNorm", SUBSTITUTE(TRIM(LEFT([Entry], [SplitPos] - 1)), "'", ""))
+		VAR _UFColsList = CONCATENATEX(_UFCols, [Col], "|", [Pos], ASC)
+		VAR _UFInvalid = FILTER(_UFCols, NOT CONTAINSSTRING(_PaddedFilter, "|" & [ColNorm] & "|"))
+		VAR _IF = CONCATENATEX(_UFInvalid, "'" & [Col] & "'", ", ", [Pos], ASC)
+		RETURN ROW("InvalidSlices", _IS, "InvalidFilters", _IF, "UserFilterCols", _UFColsList)
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Hierarchy auto-injection helper. Given a measure's valid sliceable column list and a user slice, returns ROW(Expanded, Injected) where Expanded is the slice with parent levels prepended (only when parent is in valid cols list AND the level's hierarchy is opted in via Copilot_AutoIncludeParents=true on the hierarchy itself), and Injected lists only the auto-added parents. Idempotent: re-expanding an already-expanded slice yields the same result.
+function 'Local.AskADIA._ExpandSliceWithHierarchy' = ```
+		(validSliceColsList: SCALAR STRING VAL, sliceColumns: SCALAR STRING VAL) =>
+		VAR _AutoIncludeHiers = SELECTCOLUMNS(FILTER(_INFO_ANNOTATIONS, _INFO_ANNOTATIONS[ObjectType] = "Hierarchy" && _INFO_ANNOTATIONS[AnnotationName] = "Copilot_AutoIncludeParents" && _INFO_ANNOTATIONS[AnnotationValue] = "true"), "Tbl", _INFO_ANNOTATIONS[TableName], "Hier", _INFO_ANNOTATIONS[ObjectName])
+		VAR _OptInLevels = FILTER(ADDCOLUMNS(_INFO_HIERARCHIES, "Qualified", "'" & _INFO_HIERARCHIES[TableName] & "'[" & _INFO_HIERARCHIES[ColumnName] & "]", "NormKey", _INFO_HIERARCHIES[TableName] & "[" & _INFO_HIERARCHIES[ColumnName] & "]"), COUNTROWS(FILTER(_AutoIncludeHiers, [Tbl] = _INFO_HIERARCHIES[TableName] && [Hier] = _INFO_HIERARCHIES[HierarchyName])) > 0)
+		VAR _UserSliceRows = ADDCOLUMNS(FILTER(GENERATESERIES(1, 8), LEN(PATHITEM(sliceColumns, [Value])) > 0), "OutOrdinal", [Value] + 1000, "Qualified", PATHITEM(sliceColumns, [Value]), "NormKey", SUBSTITUTE(PATHITEM(sliceColumns, [Value]), "'", ""))
+		VAR _ParentRows = SELECTCOLUMNS(GENERATE(_UserSliceRows, VAR _ThisNK = [NormKey] VAR _MatchRow = FILTER(_OptInLevels, [NormKey] = _ThisNK) VAR _HN = MAXX(_MatchRow, _INFO_HIERARCHIES[HierarchyName]) VAR _Tbl = MAXX(_MatchRow, _INFO_HIERARCHIES[TableName]) VAR _Ord = IF(COUNTROWS(_MatchRow) > 0, MAXX(_MatchRow, _INFO_HIERARCHIES[LevelOrdinal]), -1) RETURN SELECTCOLUMNS(FILTER(_OptInLevels, _Ord >= 0 && _INFO_HIERARCHIES[TableName] = _Tbl && _INFO_HIERARCHIES[HierarchyName] = _HN && _INFO_HIERARCHIES[LevelOrdinal] < _Ord && CONTAINSSTRING("|" & validSliceColsList & "|", "|" & [NormKey] & "|")), "POutOrd", _INFO_HIERARCHIES[LevelOrdinal], "PQualified", [Qualified], "PNormKey", [NormKey])), "OutOrdinal", [POutOrd], "Qualified", [PQualified], "NormKey", [PNormKey])
+		VAR _UnionRows = UNION(SELECTCOLUMNS(_UserSliceRows, "OutOrdinal", [OutOrdinal], "Qualified", [Qualified], "NormKey", [NormKey]), _ParentRows)
+		VAR _Deduped = GROUPBY(_UnionRows, [NormKey], "MinOrd", MINX(CURRENTGROUP(), [OutOrdinal]), "OutQual", MAXX(CURRENTGROUP(), [Qualified]))
+		VAR _ExpandedSlice = CONCATENATEX(_Deduped, [OutQual], "|", [MinOrd], ASC)
+		VAR _InjectedList = CONCATENATEX(FILTER(_Deduped, [MinOrd] < 1000), [OutQual], "|", [MinOrd], ASC)
+		RETURN ROW("Expanded", _ExpandedSlice, "Injected", _InjectedList)
+		
+		```
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Generates DAX for a single question section AND returns the audit data needed by GenerateQuery/AnswerQuestion to populate [AutoApplied]. Returns ROW(GeneratedDAX, PairsAdded, AutoFiltersFired, MergedDefaults, MergedHardcoded, EffectiveSlice). GeneratedDAX = SUMMARIZECOLUMNS expression for the section. PairsAdded = pipe-delimited list of columns auto-injected via Copilot_PairWith (when one column of a pair is in the slice but its partner is not); empty when nothing applies. AutoFiltersFired = pipe-delimited list of 'T'[C]=expression entries for Copilot_AutoFilterWhenSliced annotations whose trigger fired (any trigger column in slice AND no user/default/hardcoded filter touches any column on the trigger's table); empty when nothing applies. MergedDefaults = pipe-delimited 'T'[C]=v entries combining caller-supplied defaultFilters (question-level) with measure-level Copilot_DefaultFilter annotations — caller wins on column conflict (any measure-level entry whose column already appears in caller defaultFilters / hardcodedFilters / hardcodedNotIn is suppressed); empty when no defaults apply. MergedHardcoded = same merge pattern for measure-level Copilot_HardcodedFilter + caller-supplied hardcodedFilters; empty when none apply. EffectiveSlice = the post-hierarchy-expansion slice the section's emitter ACTUALLY used to drop defaults — combines question-level hardcodedGroupBy with user sliceColumns (deduped) — pipe-delimited 'T'[C] tokens. Pass this verbatim to _TagSuppressedDefaults so the audit's "(suppressed by slice)" tag matches reality regardless of whether the slice came from the user or from a question annotation. Both Merged* outputs include columns that may also appear in userFilters / sliceColumns — caller is responsible for suppression-tagging via _TagSuppressedDefaults at consumption time. Includes generic Copilot_PairWith column-pair auto-injection (symmetric, dedup'd), generic Copilot_AutoFilterWhenSliced sticky-default injection (trigger-list scoped: annotation value must be 'trigger:col1,col2,...|<filterDAX>'; fires when any trigger column is in slice AND no user/default/hardcoded filter touches any column on the trigger's table), default-filter override detection, sort variant validation. Up to 8 user slice cols. Hierarchy auto-injection of parent levels via _ExpandSliceWithHierarchy is applied to sliceColumns at the top so AnswerQuestion and GenerateQuery share the same per-section expansion behavior. Idempotent. Used by AnswerQuestion and GenerateQuery.
+function 'Local.AskADIA._GenerateSectionDAX' = ```
+		(
+		    measures: SCALAR STRING VAL,
+		    hardcodedGroupBy: SCALAR STRING VAL,
+		    defaultFilters: SCALAR STRING VAL,
+		    hardcodedFilters: SCALAR STRING VAL,
+		    hardcodedNotIn: SCALAR STRING VAL,
+		    daxWrapper: SCALAR STRING VAL,
+		    sliceColumns: SCALAR STRING VAL,
+		    userFilters: SCALAR STRING VAL,
+		    rowLimit: SCALAR DOUBLE VAL,
+		    sortMeasure: SCALAR STRING VAL,
+		    sortDirection: SCALAR STRING VAL
+		) =>
+		-- Section generator + audit. Looks up measure DefaultFilter / HardcodedFilter
+		-- annotations from _COPILOT_MEASURE_COLUMNS and merges them with caller-supplied
+		-- defaultFilters / hardcodedFilters. Any measure-annotation entry whose column
+		-- already appears in caller's defaultFilters / hardcodedFilters / hardcodedNotIn
+		-- is suppressed (caller wins). Default filters whose column also appears in
+		-- userFilters / sliceColumns are dropped at emission time (existing behavior).
+		-- Hierarchy auto-injection of parent levels via _ExpandSliceWithHierarchy is
+		-- applied to sliceColumns at the top so AnswerQuestion and GenerateQuery share
+		-- the same per-section expansion behavior. Idempotent.
+		-- Returns ROW(GeneratedDAX, PairsAdded, AutoFiltersFired, MergedDefaults,
+		-- MergedHardcoded) — see function docstring for field semantics.
+		VAR _NL = UNICHAR(10)
+		VAR _SliceCols = Local.AskADIA._GetMeasureColsList(measures, TRUE)
+		VAR _ExpandRow = Local.AskADIA._ExpandSliceWithHierarchy(_SliceCols, sliceColumns)
+		VAR _ExpandedSlice = MAXX(_ExpandRow, [Expanded])
+		VAR _MeasureName = Local.AskADIA._StripBrackets(PATHITEM(measures, 1, TEXT))
+		VAR _M2 = Local.AskADIA._StripBrackets(PATHITEM(measures, 2, TEXT))
+		VAR _M3 = Local.AskADIA._StripBrackets(PATHITEM(measures, 3, TEXT))
+		VAR _M4 = Local.AskADIA._StripBrackets(PATHITEM(measures, 4, TEXT))
+		VAR _M5 = Local.AskADIA._StripBrackets(PATHITEM(measures, 5, TEXT))
+		VAR _MNamesTbl = SELECTCOLUMNS(
+		    FILTER(GENERATESERIES(1, 5), LEN(Local.AskADIA._StripBrackets(PATHITEM(measures, [Value], TEXT))) > 0),
+		    "MOrd", [Value],
+		    "MName", Local.AskADIA._StripBrackets(PATHITEM(measures, [Value], TEXT))
+		)
+		VAR _MAnnoRows = ADDCOLUMNS(
+		    _MNamesTbl,
+		    "MDF", COALESCE(MAXX(FILTER(_COPILOT_MEASURE_COLUMNS, _COPILOT_MEASURE_COLUMNS[MeasureName] = [MName]), _COPILOT_MEASURE_COLUMNS[DefaultFilter]), ""),
+		    "MHF", COALESCE(MAXX(FILTER(_COPILOT_MEASURE_COLUMNS, _COPILOT_MEASURE_COLUMNS[MeasureName] = [MName]), _COPILOT_MEASURE_COLUMNS[HardcodedFilter]), "")
+		)
+		VAR _MDFConcat = CONCATENATEX(FILTER(_MAnnoRows, LEN([MDF]) > 0), [MDF], "|", [MOrd], ASC)
+		VAR _MHFConcat = CONCATENATEX(FILTER(_MAnnoRows, LEN([MHF]) > 0), [MHF], "|", [MOrd], ASC)
+		VAR _CallerColRows = ADDCOLUMNS(
+		    GENERATESERIES(1, 8),
+		    "DFCol", IF(LEN(PATHITEM(defaultFilters, [Value], TEXT)) > 0 && FIND("=", PATHITEM(defaultFilters, [Value], TEXT), 1, 0) > 0, SUBSTITUTE(LEFT(PATHITEM(defaultFilters, [Value], TEXT), FIND("=", PATHITEM(defaultFilters, [Value], TEXT), 1, 0) - 1), "'", ""), ""),
+		    "HFCol", IF(LEN(PATHITEM(hardcodedFilters, [Value], TEXT)) > 0 && FIND("=", PATHITEM(hardcodedFilters, [Value], TEXT), 1, 0) > 0, SUBSTITUTE(LEFT(PATHITEM(hardcodedFilters, [Value], TEXT), FIND("=", PATHITEM(hardcodedFilters, [Value], TEXT), 1, 0) - 1), "'", ""), ""),
+		    "HNFCol", IF(LEN(PATHITEM(hardcodedNotIn, [Value], TEXT)) > 0 && FIND("=", PATHITEM(hardcodedNotIn, [Value], TEXT), 1, 0) > 0, SUBSTITUTE(LEFT(PATHITEM(hardcodedNotIn, [Value], TEXT), FIND("=", PATHITEM(hardcodedNotIn, [Value], TEXT), 1, 0) - 1), "'", ""), "")
+		)
+		VAR _SuppressBag = "|" & CONCATENATEX(_CallerColRows, [DFCol], "|", [Value], ASC) & "|" & CONCATENATEX(_CallerColRows, [HFCol], "|", [Value], ASC) & "|" & CONCATENATEX(_CallerColRows, [HNFCol], "|", [Value], ASC) & "|"
+		VAR _MDFAnnoEntries = SUMMARIZE(
+		    ADDCOLUMNS(
+		        FILTER(GENERATESERIES(1, 8), LEN(PATHITEM(_MDFConcat, [Value], TEXT)) > 0 && FIND("=", PATHITEM(_MDFConcat, [Value], TEXT), 1, 0) > 0),
+		        "E", PATHITEM(_MDFConcat, [Value], TEXT),
+		        "ColNorm", SUBSTITUTE(LEFT(PATHITEM(_MDFConcat, [Value], TEXT), FIND("=", PATHITEM(_MDFConcat, [Value], TEXT), 1, 0) - 1), "'", "")
+		    ),
+		    [E],
+		    [ColNorm]
+		)
+		VAR _MDFKept = FILTER(_MDFAnnoEntries, NOT CONTAINSSTRING(_SuppressBag, "|" & [ColNorm] & "|"))
+		VAR _MDFFiltered = CONCATENATEX(_MDFKept, [E], "|", [E], ASC)
+		VAR _MHFAnnoEntries = SUMMARIZE(
+		    ADDCOLUMNS(
+		        FILTER(GENERATESERIES(1, 8), LEN(PATHITEM(_MHFConcat, [Value], TEXT)) > 0 && FIND("=", PATHITEM(_MHFConcat, [Value], TEXT), 1, 0) > 0),
+		        "E", PATHITEM(_MHFConcat, [Value], TEXT),
+		        "ColNorm", SUBSTITUTE(LEFT(PATHITEM(_MHFConcat, [Value], TEXT), FIND("=", PATHITEM(_MHFConcat, [Value], TEXT), 1, 0) - 1), "'", "")
+		    ),
+		    [E],
+		    [ColNorm]
+		)
+		VAR _MHFKept = FILTER(_MHFAnnoEntries, NOT CONTAINSSTRING(_SuppressBag, "|" & [ColNorm] & "|"))
+		VAR _MHFFiltered = CONCATENATEX(_MHFKept, [E], "|", [E], ASC)
+		VAR _MergedDF = defaultFilters & IF(LEN(defaultFilters) > 0 && LEN(_MDFFiltered) > 0, "|", "") & _MDFFiltered
+		VAR _MergedHF = hardcodedFilters & IF(LEN(hardcodedFilters) > 0 && LEN(_MHFFiltered) > 0, "|", "") & _MHFFiltered
+		VAR _UFRaw = SELECTCOLUMNS(GENERATESERIES(1, 8), "Pos", [Value], "Entry", PATHITEM(userFilters, [Value], TEXT))
+		VAR _UFNonEmpty = FILTER(_UFRaw, LEN([Entry]) > 0 && FIND("=", [Entry], 1, 0) > 0)
+		VAR _UFCols = ADDCOLUMNS(_UFNonEmpty, "Col", LEFT([Entry], FIND("=", [Entry], 1, 0) - 1))
+		VAR _UserCols = CONCATENATEX(_UFCols, [Col], "|", [Pos], ASC)
+		VAR _UserColsNorm = SUBSTITUTE(_UserCols, "'", "")
+		VAR _UserSliceTokens = ADDCOLUMNS(FILTER(GENERATESERIES(1, 8), LEN(PATHITEM(_ExpandedSlice, [Value], TEXT)) > 0), "Tok", PATHITEM(_ExpandedSlice, [Value], TEXT), "Keep", IF(NOT CONTAINSSTRING(hardcodedGroupBy, PATHITEM(_ExpandedSlice, [Value], TEXT)), 1, 0))
+		VAR _KeptSlice = FILTER(_UserSliceTokens, [Keep] = 1)
+		VAR _UniqueUserSlice = CONCATENATEX(_KeptSlice, [Tok], "|", [Value], ASC)
+		VAR _AllSliceRaw = IF(LEN(hardcodedGroupBy) > 0 && LEN(_UniqueUserSlice) > 0, hardcodedGroupBy & "|" & _UniqueUserSlice, IF(LEN(hardcodedGroupBy) > 0, hardcodedGroupBy, _UniqueUserSlice))
+		VAR _AllSliceNorm = "|" & SUBSTITUTE(_AllSliceRaw, "'", "") & "|"
+		VAR _PairsFwd =
+		    CALCULATETABLE(
+		        SELECTCOLUMNS(
+		            _INFO_ANNOTATIONS,
+		            "Primary", "'" & _INFO_ANNOTATIONS[TableName] & "'[" & _INFO_ANNOTATIONS[ObjectName] & "]",
+		            "Secondary", _INFO_ANNOTATIONS[AnnotationValue]
+		        ),
+		        _INFO_ANNOTATIONS[AnnotationName] = "Copilot_PairWith",
+		        _INFO_ANNOTATIONS[ObjectType] = "Column"
+		    )
+		VAR _ToAppend =
+		    SELECTCOLUMNS(
+		        FILTER(
+		            _PairsFwd,
+		            CONTAINSSTRING(_AllSliceNorm, "|" & SUBSTITUTE([Primary], "'", "") & "|")
+		                && NOT CONTAINSSTRING(_AllSliceNorm, "|" & SUBSTITUTE([Secondary], "'", "") & "|")
+		        ),
+		        "Col", [Secondary]
+		    )
+		VAR _ToPrepend =
+		    SELECTCOLUMNS(
+		        FILTER(
+		            _PairsFwd,
+		            CONTAINSSTRING(_AllSliceNorm, "|" & SUBSTITUTE([Secondary], "'", "") & "|")
+		                && NOT CONTAINSSTRING(_AllSliceNorm, "|" & SUBSTITUTE([Primary], "'", "") & "|")
+		        ),
+		        "Col", [Primary]
+		    )
+		VAR _AppendStr = CONCATENATEX(_ToAppend, [Col], "|")
+		VAR _AppendNormSet = "|" & SUBSTITUTE(_AppendStr, "'", "") & "|"
+		VAR _ToPrependDedup = FILTER(_ToPrepend, NOT CONTAINSSTRING(_AppendNormSet, "|" & SUBSTITUTE([Col], "'", "") & "|"))
+		VAR _PrependStr = CONCATENATEX(_ToPrependDedup, [Col], "|")
+		VAR _AllSliceWithPrepend = IF(LEN(_PrependStr) > 0, _PrependStr & "|" & _AllSliceRaw, _AllSliceRaw)
+		VAR _AllSlice = IF(LEN(_AppendStr) > 0, _AllSliceWithPrepend & "|" & _AppendStr, _AllSliceWithPrepend)
+		VAR _AllSliceNormFinal = "|" & SUBSTITUTE(_AllSlice, "'", "") & "|"
+		VAR _SlicePart = Local.AskADIA._FormatSlicePart(_AllSlice)
+		VAR _HCSection = Local.AskADIA._BuildFilterSection(_MergedHF, "hardcoded")
+		VAR _NISection = Local.AskADIA._BuildFilterSection(hardcodedNotIn, "notin")
+		VAR _MergedDFEntries = ADDCOLUMNS(
+		    FILTER(GENERATESERIES(1, 8), LEN(PATHITEM(_MergedDF, [Value], TEXT)) > 0 && FIND("=", PATHITEM(_MergedDF, [Value], TEXT), 1, 0) > 0),
+		    "E", PATHITEM(_MergedDF, [Value], TEXT),
+		    "ColNorm", SUBSTITUTE(LEFT(PATHITEM(_MergedDF, [Value], TEXT), FIND("=", PATHITEM(_MergedDF, [Value], TEXT), 1, 0) - 1), "'", "")
+		)
+		VAR _MergedDFKept = FILTER(_MergedDFEntries, NOT (CONTAINSSTRING(_UserColsNorm, [ColNorm]) || CONTAINSSTRING(_AllSliceNormFinal, "|" & [ColNorm] & "|")))
+		VAR _DFSection = CONCATENATEX(_MergedDFKept, "    " & MAXX(Local.AskADIA._ParseFilterEntry([E], "default"), [FilterDAX]) & "," & _NL, "", [Value], ASC)
+		VAR _SV1 = IF(LEN(_MeasureName) > 0, Local.AskADIA._VariantSortSet(_MeasureName), "")
+		VAR _SV2 = IF(LEN(_M2) > 0, Local.AskADIA._VariantSortSet(_M2), "")
+		VAR _SV3 = IF(LEN(_M3) > 0, Local.AskADIA._VariantSortSet(_M3), "")
+		VAR _SV4 = IF(LEN(_M4) > 0, Local.AskADIA._VariantSortSet(_M4), "")
+		VAR _SV5 = IF(LEN(_M5) > 0, Local.AskADIA._VariantSortSet(_M5), "")
+		VAR _ValidSortSet = _SV1 & _SV2 & _SV3 & _SV4 & _SV5
+		VAR _KnownSuffixes = Local.AskADIA._KnownVariantSuffixes()
+		VAR _SortRaw = TRIM(sortMeasure)
+		VAR _UserSortTrim = IF(LEN(_SortRaw) >= 2 && LEFT(_SortRaw, 1) = "[" && RIGHT(_SortRaw, 1) = "]", MID(_SortRaw, 2, LEN(_SortRaw) - 2), _SortRaw)
+		VAR _IsSuffixOnly = LEN(_UserSortTrim) > 0 && CONTAINSSTRING(_KnownSuffixes, "|" & _UserSortTrim & "|")
+		VAR _ResolvedUserSort = IF(_IsSuffixOnly, _MeasureName & " " & _UserSortTrim, _UserSortTrim)
+		VAR _UseUserSort = LEN(_ResolvedUserSort) > 0 && CONTAINSSTRING(_ValidSortSet, "|" & _ResolvedUserSort & "|")
+		VAR _EffectiveSortMeasure = IF(_UseUserSort, _ResolvedUserSort, _MeasureName)
+		VAR _UserFiltersDeduped = Local.AskADIA._DedupUserFilters(userFilters)
+		VAR _UserSection = Local.AskADIA._BuildFilterSection(_UserFiltersDeduped, "user")
+		VAR _FilterPart = _HCSection & _NISection & _DFSection & _UserSection
+		VAR _MeasurePart = Local.AskADIA._BuildMeasureLines(measures)
+		VAR _AutoFilterRaw =
+		    CALCULATETABLE(
+		        SELECTCOLUMNS(
+		            _INFO_ANNOTATIONS,
+		            "HostCol", "'" & _INFO_ANNOTATIONS[TableName] & "'[" & _INFO_ANNOTATIONS[ObjectName] & "]",
+		            "RawValue", _INFO_ANNOTATIONS[AnnotationValue]
+		        ),
+		        _INFO_ANNOTATIONS[AnnotationName] = "Copilot_AutoFilterWhenSliced",
+		        _INFO_ANNOTATIONS[ObjectType] = "Column"
+		    )
+		VAR _UserColsBounded = "|" & _UserColsNorm & "|"
+		VAR _DFNorm = SUBSTITUTE(_MergedDF, "'", "")
+		VAR _HCNorm = SUBSTITUTE(_MergedHF, "'", "")
+		VAR _AutoFilterParsed =
+		    FILTER(
+		        ADDCOLUMNS(
+		            _AutoFilterRaw,
+		            "TriggerList",
+		                IF(
+		                    LEFT([RawValue], 8) = "trigger:" && FIND("|", [RawValue], 1, 0) > 8,
+		                    SUBSTITUTE(SUBSTITUTE(MID([RawValue], 9, FIND("|", [RawValue], 1, 0) - 9), "'", ""), ",", "|"),
+		                    ""
+		                ),
+		            "FilterExpr",
+		                IF(
+		                    LEFT([RawValue], 8) = "trigger:" && FIND("|", [RawValue], 1, 0) > 8,
+		                    MID([RawValue], FIND("|", [RawValue], 1, 0) + 1, LEN([RawValue])),
+		                    ""
+		                )
+		        ),
+		        LEN([TriggerList]) > 0
+		    )
+		VAR _AutoFilterChecked =
+		    ADDCOLUMNS(
+		        _AutoFilterParsed,
+		        "ShouldFire",
+		            VAR _T1 = PATHITEM([TriggerList], 1, TEXT)
+		            VAR _T2 = PATHITEM([TriggerList], 2, TEXT)
+		            VAR _T3 = PATHITEM([TriggerList], 3, TEXT)
+		            VAR _T4 = PATHITEM([TriggerList], 4, TEXT)
+		            VAR _T5 = PATHITEM([TriggerList], 5, TEXT)
+		            VAR _T6 = PATHITEM([TriggerList], 6, TEXT)
+		            VAR _T7 = PATHITEM([TriggerList], 7, TEXT)
+		            VAR _T8 = PATHITEM([TriggerList], 8, TEXT)
+		            VAR _T1Tbl = IF(LEN(_T1) > 0 && FIND("[", _T1, 1, 0) > 0, LEFT(_T1, FIND("[", _T1, 1, 0) - 1), "")
+		            VAR _T2Tbl = IF(LEN(_T2) > 0 && FIND("[", _T2, 1, 0) > 0, LEFT(_T2, FIND("[", _T2, 1, 0) - 1), "")
+		            VAR _T3Tbl = IF(LEN(_T3) > 0 && FIND("[", _T3, 1, 0) > 0, LEFT(_T3, FIND("[", _T3, 1, 0) - 1), "")
+		            VAR _T4Tbl = IF(LEN(_T4) > 0 && FIND("[", _T4, 1, 0) > 0, LEFT(_T4, FIND("[", _T4, 1, 0) - 1), "")
+		            VAR _T5Tbl = IF(LEN(_T5) > 0 && FIND("[", _T5, 1, 0) > 0, LEFT(_T5, FIND("[", _T5, 1, 0) - 1), "")
+		            VAR _T6Tbl = IF(LEN(_T6) > 0 && FIND("[", _T6, 1, 0) > 0, LEFT(_T6, FIND("[", _T6, 1, 0) - 1), "")
+		            VAR _T7Tbl = IF(LEN(_T7) > 0 && FIND("[", _T7, 1, 0) > 0, LEFT(_T7, FIND("[", _T7, 1, 0) - 1), "")
+		            VAR _T8Tbl = IF(LEN(_T8) > 0 && FIND("[", _T8, 1, 0) > 0, LEFT(_T8, FIND("[", _T8, 1, 0) - 1), "")
+		            VAR _AnySliced =
+		                (LEN(_T1) > 0 && CONTAINSSTRING(_AllSliceNormFinal, "|" & _T1 & "|"))
+		                    || (LEN(_T2) > 0 && CONTAINSSTRING(_AllSliceNormFinal, "|" & _T2 & "|"))
+		                    || (LEN(_T3) > 0 && CONTAINSSTRING(_AllSliceNormFinal, "|" & _T3 & "|"))
+		                    || (LEN(_T4) > 0 && CONTAINSSTRING(_AllSliceNormFinal, "|" & _T4 & "|"))
+		                    || (LEN(_T5) > 0 && CONTAINSSTRING(_AllSliceNormFinal, "|" & _T5 & "|"))
+		                    || (LEN(_T6) > 0 && CONTAINSSTRING(_AllSliceNormFinal, "|" & _T6 & "|"))
+		                    || (LEN(_T7) > 0 && CONTAINSSTRING(_AllSliceNormFinal, "|" & _T7 & "|"))
+		                    || (LEN(_T8) > 0 && CONTAINSSTRING(_AllSliceNormFinal, "|" & _T8 & "|"))
+		            VAR _AnyFiltered =
+		                (LEN(_T1Tbl) > 0 && (CONTAINSSTRING(_UserColsBounded, "|" & _T1Tbl & "[") || CONTAINSSTRING(_DFNorm, _T1Tbl & "[") || CONTAINSSTRING(_HCNorm, _T1Tbl & "[")))
+		                    || (LEN(_T2Tbl) > 0 && (CONTAINSSTRING(_UserColsBounded, "|" & _T2Tbl & "[") || CONTAINSSTRING(_DFNorm, _T2Tbl & "[") || CONTAINSSTRING(_HCNorm, _T2Tbl & "[")))
+		                    || (LEN(_T3Tbl) > 0 && (CONTAINSSTRING(_UserColsBounded, "|" & _T3Tbl & "[") || CONTAINSSTRING(_DFNorm, _T3Tbl & "[") || CONTAINSSTRING(_HCNorm, _T3Tbl & "[")))
+		                    || (LEN(_T4Tbl) > 0 && (CONTAINSSTRING(_UserColsBounded, "|" & _T4Tbl & "[") || CONTAINSSTRING(_DFNorm, _T4Tbl & "[") || CONTAINSSTRING(_HCNorm, _T4Tbl & "[")))
+		                    || (LEN(_T5Tbl) > 0 && (CONTAINSSTRING(_UserColsBounded, "|" & _T5Tbl & "[") || CONTAINSSTRING(_DFNorm, _T5Tbl & "[") || CONTAINSSTRING(_HCNorm, _T5Tbl & "[")))
+		                    || (LEN(_T6Tbl) > 0 && (CONTAINSSTRING(_UserColsBounded, "|" & _T6Tbl & "[") || CONTAINSSTRING(_DFNorm, _T6Tbl & "[") || CONTAINSSTRING(_HCNorm, _T6Tbl & "[")))
+		                    || (LEN(_T7Tbl) > 0 && (CONTAINSSTRING(_UserColsBounded, "|" & _T7Tbl & "[") || CONTAINSSTRING(_DFNorm, _T7Tbl & "[") || CONTAINSSTRING(_HCNorm, _T7Tbl & "[")))
+		                    || (LEN(_T8Tbl) > 0 && (CONTAINSSTRING(_UserColsBounded, "|" & _T8Tbl & "[") || CONTAINSSTRING(_DFNorm, _T8Tbl & "[") || CONTAINSSTRING(_HCNorm, _T8Tbl & "[")))
+		            RETURN _AnySliced && NOT _AnyFiltered
+		    )
+		VAR _AutoToInject = FILTER(_AutoFilterChecked, [ShouldFire])
+		VAR _AutoFilterPart = CONCATENATEX(_AutoToInject, "    " & [FilterExpr] & "," & _NL, "")
+		VAR _Inner = Local.AskADIA._CoreSummarize(_SlicePart, _FilterPart, _MeasurePart, _AutoFilterPart)
+		VAR _GeneratedDAX = Local.AskADIA._WrapQuery(_Inner, rowLimit, _EffectiveSortMeasure, sortDirection, daxWrapper)
+		-- Audit fields. Use sorted CONCATENATEX over _ToAppend / _ToPrependDedup
+		-- (preserves the deterministic output the legacy _GetSectionAuditData
+		-- produced) — distinct from the unsorted _AppendStr / _PrependStr above
+		-- which drive _AllSlice ordering for the generated DAX itself.
+		VAR _AppendStrAudit = CONCATENATEX(_ToAppend, [Col], "|", [Col], ASC)
+		VAR _PrependStrAudit = CONCATENATEX(_ToPrependDedup, [Col], "|", [Col], ASC)
+		VAR _PairsAdded = IF(LEN(_PrependStrAudit) > 0 && LEN(_AppendStrAudit) > 0, _PrependStrAudit & "|" & _AppendStrAudit, _PrependStrAudit & _AppendStrAudit)
+		VAR _AutoFiltersFired = CONCATENATEX(_AutoToInject, [HostCol] & "=" & [FilterExpr], "|", [HostCol], ASC)
+		RETURN
+		    ROW(
+		        "GeneratedDAX", _GeneratedDAX,
+		        "PairsAdded", _PairsAdded,
+		        "AutoFiltersFired", _AutoFiltersFired,
+		        "MergedDefaults", _MergedDF,
+		        "MergedHardcoded", _MergedHF,
+		        "EffectiveSlice", _AllSliceRaw
+		    )
+		
+		```
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Builds a normalized column bag `|col|col|` from a pipe-delimited entry list. Handles three entry shapes uniformly via _GetFilterEntrySplitPos: (1) filter entries with operators — 'T'[C]=v / 'T'[C]>=v / 'T'[C]<=v — column is the prefix before the operator; (2) default-filter entries — 'T'[C]=v (always '=') — same prefix logic; (3) slice tokens — 'T'[C] (no operator) — _GetFilterEntrySplitPos returns 0, so the whole token is the column. Quotes and surrounding whitespace are stripped from each column to produce a quote-free, trimmed bag suitable for `CONTAINSSTRING(bag, "|" & colNorm & "|")` membership tests. Returns "||" when entries is empty. Up to 8 entries. Single source of truth for the column-bag-building pattern used by _TagSuppressedDefaults (user vs. slice precedence labelling) — extend this helper before reaching for the loop again.
+function 'Local.AskADIA._BuildColBag' = ```
+		(entries: SCALAR STRING VAL) =>
+		VAR _Rows =
+		    SELECTCOLUMNS(
+		        FILTER(GENERATESERIES(1, 8), LEN(PATHITEM(entries, [Value], TEXT)) > 0),
+		        "Pos", [Value],
+		        "Entry", PATHITEM(entries, [Value], TEXT)
+		    )
+		VAR _Cols =
+		    ADDCOLUMNS(
+		        _Rows,
+		        "Col",
+		            VAR _E = [Entry]
+		            VAR _SP = Local.AskADIA._GetFilterEntrySplitPos(_E)
+		            VAR _ColRaw = IF(_SP > 0, LEFT(_E, _SP - 1), _E)
+		            RETURN SUBSTITUTE(TRIM(_ColRaw), "'", "")
+		    )
+		RETURN "|" & CONCATENATEX(_Cols, [Col], "|", [Pos], ASC) & "|"
+		
+		```
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Tags entries in defaultsText with " (suppressed by user)" when their column also appears in userFilters, or " (suppressed by slice)" when their column appears in sliceColumns (but not userFilters). Returns the same pipe-delimited entry list with the tag appended in-place. Used by GenerateQuery / AnswerQuestion for the `defaults:` line in [AutoApplied] so the audit keeps the entry visible (transparency: LLM sees what *was* configured) while flagging WHY the default was overridden per the framework's "user > section default > measure default" precedence rule plus "slice on same column drops default at emission" behavior. Precedence: user filter wins over slice when both target the same column (the user filter is the operative override; slice is just grouping). defaultsText is always 'T'[C]=v|... (defaults never use operators); userFilters can use 'T'[C]=v / 'T'[C]>=v / 'T'[C]<=v (mirroring AnswerQuestion's _UFWithSplit parser); sliceColumns is pipe-delimited 'T'[C] tokens — pass the SAME effective slice the emitter uses to drop defaults (combines user slice AND any question-level hardcodedGroupBy), available as _GenerateSectionDAX's EffectiveSlice return field. Both userFilters and sliceColumns are normalized via _BuildColBag (shared piping).
+function 'Local.AskADIA._TagSuppressedDefaults' = ```
+		(defaultsText: SCALAR STRING VAL, userFilters: SCALAR STRING VAL, sliceColumns: SCALAR STRING VAL) =>
+		VAR _UserBag = Local.AskADIA._BuildColBag(userFilters)
+		VAR _SliceBag = Local.AskADIA._BuildColBag(sliceColumns)
+		VAR _DefRows =
+		    SELECTCOLUMNS(
+		        FILTER(GENERATESERIES(1, 8), LEN(PATHITEM(defaultsText, [Value], TEXT)) > 0),
+		        "Pos", [Value],
+		        "Entry", PATHITEM(defaultsText, [Value], TEXT)
+		    )
+		VAR _Tagged =
+		    ADDCOLUMNS(
+		        _DefRows,
+		        "Out",
+		            VAR _E = [Entry]
+		            VAR _SP = FIND("=", _E, 1, 0)
+		            VAR _Col = IF(_SP > 0, SUBSTITUTE(TRIM(LEFT(_E, _SP - 1)), "'", ""), "")
+		            VAR _SuppressedByUser = LEN(_Col) > 0 && CONTAINSSTRING(_UserBag, "|" & _Col & "|")
+		            VAR _SuppressedBySlice = LEN(_Col) > 0 && NOT _SuppressedByUser && CONTAINSSTRING(_SliceBag, "|" & _Col & "|")
+		            RETURN _E & IF(_SuppressedByUser, " (suppressed by user)", IF(_SuppressedBySlice, " (suppressed by slice)", ""))
+		    )
+		RETURN CONCATENATEX(_Tagged, [Out], "|", [Pos], ASC)
+		
+		```
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Builds the [AutoApplied] return string from the 8 framework-key components in canonical order: parents, defaults, hardcoded, hardcodedNotIn, hardcodedGroupBy, wrapper, pairs, autoFilters. Each non-empty arg is rendered as a 'key: value' line; empty args are dropped (no leading newline). Returns "" when every arg is empty. Used by GenerateQuery (passes "" for hardcodedNotIn + hardcodedGroupBy — those are question-only) and AnswerQuestion (passes "" for wrapper — AnswerQuestion has no daxWrapper). When adding a new [AutoApplied] key, add the param here and to both call sites — single source of truth for the audit-string format.
+function 'Local.AskADIA._FormatAutoApplied' = ```
+		(parents: SCALAR STRING VAL, defaults: SCALAR STRING VAL, hardcoded: SCALAR STRING VAL, hardcodedNotIn: SCALAR STRING VAL, hardcodedGroupBy: SCALAR STRING VAL, wrapper: SCALAR STRING VAL, pairs: SCALAR STRING VAL, autoFilters: SCALAR STRING VAL) =>
+		VAR _NL = UNICHAR(10)
+		VAR _Body =
+		    IF(LEN(parents) > 0, _NL & "parents: " & parents, "") &
+		    IF(LEN(defaults) > 0, _NL & "defaults: " & defaults, "") &
+		    IF(LEN(hardcoded) > 0, _NL & "hardcoded: " & hardcoded, "") &
+		    IF(LEN(hardcodedNotIn) > 0, _NL & "hardcodedNotIn: " & hardcodedNotIn, "") &
+		    IF(LEN(hardcodedGroupBy) > 0, _NL & "hardcodedGroupBy: " & hardcodedGroupBy, "") &
+		    IF(LEN(wrapper) > 0, _NL & "wrapper: " & wrapper, "") &
+		    IF(LEN(pairs) > 0, _NL & "pairs: " & pairs, "") &
+		    IF(LEN(autoFilters) > 0, _NL & "autoFilters: " & autoFilters, "")
+		RETURN IF(LEN(_Body) > 0, MID(_Body, 2, LEN(_Body)), "")
+		
+		```
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Splits a `;` or `|` separated topic string into a sorted, deduplicated, comma-separated list. Returns "" for empty/blank input. Used both for per-fact topic labels and for aggregating distinct topics across the result set.
+function 'Local.AskADIA._FormatTopicsCSV' = ```
+		(raw: SCALAR STRING VAL) =>
+		    VAR _Trim = TRIM(COALESCE(raw, ""))
+		    VAR _Pipe = SUBSTITUTE(_Trim, ";", "|")
+		    VAR _PartCount = IF(LEN(_Pipe) = 0, 0, LEN(_Pipe) - LEN(SUBSTITUTE(_Pipe, "|", "")) + 1)
+		    VAR _Items = SELECTCOLUMNS(GENERATESERIES(1, MAX(_PartCount, 1)), "T", TRIM(PATHITEM(_Pipe, [Value], TEXT)))
+		    VAR _NonEmpty = FILTER(_Items, LEN([T]) > 0)
+		    VAR _Distinct = DISTINCT(_NonEmpty)
+		    RETURN IF(_PartCount = 0, "", CONCATENATEX(_Distinct, [T], ", ", [T], ASC))
+		
+		```
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Builds the formatted Body block for one fact table given the matching measure names (pipe-wrapped: |m1|m2|...). `topicsLabel` is a pre-formatted suffix appended to the fact header (e.g. "; topics: consumption, usage" or ""). Computes shared ValidColumns (cols used by every matching measure), per-measure exceptions (cols used by only some), and assembles the human-readable body.
+function 'Local.AskADIA._FormatFactBody' = ```
+		(factName: SCALAR STRING VAL, topicsLabel: SCALAR STRING VAL, matchingMeasureNames: SCALAR STRING VAL) =>
+		    VAR _NL = UNICHAR(10)
+		    VAR _EM = UNICHAR(8212)
+		    VAR _FactDesc = COALESCE(CALCULATE(MAX(_COPILOT_MEASURE_COLUMNS[FactDescription]), _COPILOT_MEASURE_COLUMNS[MeasureTable] = factName), "")
+		    VAR _ColRows = FILTER(
+		        _COPILOT_MEASURE_COLUMNS,
+		        _COPILOT_MEASURE_COLUMNS[MeasureTable] = factName
+		        && CONTAINSSTRING(matchingMeasureNames, "|" & _COPILOT_MEASURE_COLUMNS[MeasureName] & "|")
+		    )
+		    VAR _MeasureList = SUMMARIZE(
+		        _ColRows,
+		        _COPILOT_MEASURE_COLUMNS[MeasureName],
+		        _COPILOT_MEASURE_COLUMNS[MeasureDescription],
+		        _COPILOT_MEASURE_COLUMNS[Alias],
+		        _COPILOT_MEASURE_COLUMNS[Synonyms],
+		        _COPILOT_MEASURE_COLUMNS[DefaultFilter],
+		        _COPILOT_MEASURE_COLUMNS[HardcodedFilter]
+		    )
+		    VAR _MeasureCount = COUNTROWS(_MeasureList)
+		    VAR _PairRows = SUMMARIZE(
+		        _ColRows,
+		        _COPILOT_MEASURE_COLUMNS[MeasureName],
+		        _COPILOT_MEASURE_COLUMNS[FullColumnRef],
+		        _COPILOT_MEASURE_COLUMNS[ColumnTagsRendered]
+		    )
+		    VAR _PairsAnnotated = ADDCOLUMNS(
+		        _PairRows,
+		        "_UseCount",
+		            VAR _Col = _COPILOT_MEASURE_COLUMNS[FullColumnRef]
+		            RETURN COUNTROWS(FILTER(_PairRows, _COPILOT_MEASURE_COLUMNS[FullColumnRef] = _Col))
+		    )
+		    VAR _SharedRows = FILTER(_PairsAnnotated, [_UseCount] = _MeasureCount)
+		    VAR _SharedText = CONCATENATEX(
+		        SUMMARIZE(_SharedRows, _COPILOT_MEASURE_COLUMNS[FullColumnRef], _COPILOT_MEASURE_COLUMNS[ColumnTagsRendered]),
+		        _COPILOT_MEASURE_COLUMNS[ColumnTagsRendered],
+		        " | ",
+		        _COPILOT_MEASURE_COLUMNS[FullColumnRef], ASC
+		    )
+		    VAR _MeasureLinesText = CONCATENATEX(
+		        _MeasureList,
+		        "- [" & _COPILOT_MEASURE_COLUMNS[MeasureName] & "]" &
+		            IF(LEN(_COPILOT_MEASURE_COLUMNS[MeasureDescription]) > 0, " " & _EM & " " & _COPILOT_MEASURE_COLUMNS[MeasureDescription], "") &
+		            IF(LEN(_COPILOT_MEASURE_COLUMNS[Alias]) > 0, " Alias: " & _COPILOT_MEASURE_COLUMNS[Alias] & ".", "") &
+		            IF(LEN(_COPILOT_MEASURE_COLUMNS[Synonyms]) > 0, " Synonyms: " & _COPILOT_MEASURE_COLUMNS[Synonyms] & ".", "") &
+		            IF(LEN(_COPILOT_MEASURE_COLUMNS[DefaultFilter]) > 0, " DefaultFilters: " & _COPILOT_MEASURE_COLUMNS[DefaultFilter], "") &
+		            IF(LEN(_COPILOT_MEASURE_COLUMNS[HardcodedFilter]) > 0, " HardcodedFilters: " & _COPILOT_MEASURE_COLUMNS[HardcodedFilter], ""),
+		        _NL,
+		        _COPILOT_MEASURE_COLUMNS[MeasureName], ASC
+		    )
+		    VAR _ExceptionPairs = FILTER(_PairsAnnotated, [_UseCount] < _MeasureCount)
+		    VAR _MeasuresWithExceptions = DISTINCT(SELECTCOLUMNS(_ExceptionPairs, "_MN", _COPILOT_MEASURE_COLUMNS[MeasureName]))
+		    VAR _ExceptionsText = CONCATENATEX(
+		        _MeasuresWithExceptions,
+		        VAR _curMN = [_MN]
+		        RETURN
+		            "- [" & _curMN & "]: + " &
+		            CONCATENATEX(
+		                FILTER(_ExceptionPairs, _COPILOT_MEASURE_COLUMNS[MeasureName] = _curMN),
+		                _COPILOT_MEASURE_COLUMNS[ColumnTagsRendered],
+		                " | ",
+		                _COPILOT_MEASURE_COLUMNS[FullColumnRef], ASC
+		            ),
+		        _NL,
+		        [_MN], ASC
+		    )
+		    VAR _Plural = IF(_MeasureCount = 1, "", "s")
+		    VAR _Header = "**Fact: " & factName & "** (" & FORMAT(_MeasureCount, "0") & " measure" & _Plural & topicsLabel & ")"
+		    VAR _DescLine = IF(LEN(_FactDesc) > 0, _NL & _FactDesc, "")
+		    VAR _SharedSection = "Shared columns: " & IF(LEN(_SharedText) > 0, _SharedText, "(none)")
+		    VAR _MeasureSection = "Measures:" & _NL & _MeasureLinesText
+		    VAR _ExceptionsSection = IF(LEN(_ExceptionsText) > 0, _NL & "Exceptions:" & _NL & _ExceptionsText, "")
+		    RETURN _Header & _DescLine & _NL & _SharedSection & _NL & _MeasureSection & _ExceptionsSection
+		
+		```
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL: Builds the formatted Body block for one fact's questions given matching question IDs (pipe-wrapped: |q1|q2|...). `topicsLabel` is a pre-formatted suffix appended to the fact header (e.g. "; topics: usage" or ""). Filters to SectionIndex=1 to dedup orchestrators. Renders Fact header + fact description + shared ValidColumns + one line per question.
+function 'Local.AskADIA._FormatTopicFactBody' =
+		(factName: SCALAR STRING VAL, topicsLabel: SCALAR STRING VAL, matchingQuestionIds: SCALAR STRING VAL) =>
+		    VAR _NL = UNICHAR(10)
+		    VAR _EM = UNICHAR(8212)
+		    VAR _DQ = UNICHAR(34)
+		    VAR _FactDesc = COALESCE(CALCULATE(MAX(_COPILOT_MEASURE_COLUMNS[FactDescription]), _COPILOT_MEASURE_COLUMNS[MeasureTable] = factName), "")
+		    VAR _Questions = FILTER(
+		        _COPILOT_QUESTIONS,
+		        _COPILOT_QUESTIONS[SectionIndex] = 1
+		        && CONTAINSSTRING(matchingQuestionIds, "|" & _COPILOT_QUESTIONS[QuestionId] & "|")
+		    )
+		    VAR _QuestionCount = COUNTROWS(_Questions)
+		    VAR _MeasureNamesUnion = CONCATENATEX(_Questions, _COPILOT_QUESTIONS[Measures], "|")
+		    VAR _ColRows = FILTER(
+		        _COPILOT_MEASURE_COLUMNS,
+		        _COPILOT_MEASURE_COLUMNS[MeasureTable] = factName
+		        && CONTAINSSTRING(_MeasureNamesUnion, "[" & _COPILOT_MEASURE_COLUMNS[MeasureName] & "]")
+		    )
+		    VAR _SharedRows = SUMMARIZE(
+		        _ColRows,
+		        _COPILOT_MEASURE_COLUMNS[FullColumnRef],
+		        _COPILOT_MEASURE_COLUMNS[ColumnTagsRendered]
+		    )
+		    VAR _SharedText = CONCATENATEX(
+		        _SharedRows,
+		        _COPILOT_MEASURE_COLUMNS[ColumnTagsRendered],
+		        " | ",
+		        _COPILOT_MEASURE_COLUMNS[FullColumnRef], ASC
+		    )
+		    VAR _QuestionLinesText = CONCATENATEX(
+		        _Questions,
+		        "- " & _COPILOT_QUESTIONS[QuestionId] & " " & _EM & " " & _DQ & _COPILOT_QUESTIONS[Question] & _DQ &
+		            IF(LEN(_COPILOT_QUESTIONS[Description]) > 0, " | " & _COPILOT_QUESTIONS[Description], "") &
+		            " | Measures: " & _COPILOT_QUESTIONS[Measures] &
+		            " | RequiredFilters: " & IF(LEN(_COPILOT_QUESTIONS[RequiredFilters]) > 0, _COPILOT_QUESTIONS[RequiredFilters], "(none)") &
+		            IF(LEN(_COPILOT_QUESTIONS[DefaultFilters]) > 0, " | DefaultFilters: " & _COPILOT_QUESTIONS[DefaultFilters], "") &
+		            IF(LEN(_COPILOT_QUESTIONS[HardcodedFilters]) > 0, " | HardcodedFilters: " & _COPILOT_QUESTIONS[HardcodedFilters], "") &
+		            IF(LEN(_COPILOT_QUESTIONS[HardcodedNotInFilters]) > 0, " | HardcodedNotInFilters: " & _COPILOT_QUESTIONS[HardcodedNotInFilters], "") &
+		            IF(LEN(_COPILOT_QUESTIONS[HardcodedGroupBy]) > 0, " | HardcodedGroupBy: " & _COPILOT_QUESTIONS[HardcodedGroupBy], ""),
+		        _NL,
+		        _COPILOT_QUESTIONS[QuestionId], ASC
+		    )
+		    VAR _QPlural = IF(_QuestionCount = 1, "", "s")
+		    VAR _Header = "**Fact: " & factName & "** (" & FORMAT(_QuestionCount, "0") & " question" & _QPlural & topicsLabel & ")"
+		    VAR _FactDescLine = IF(LEN(_FactDesc) > 0, _NL & "Fact: " & _FactDesc, "")
+		    VAR _SharedSection = _NL & "Shared columns: " & IF(LEN(_SharedText) > 0, _SharedText, "(none)")
+		    VAR _QSection = _NL & "Questions:" & _NL & _QuestionLinesText
+		    RETURN _Header & _FactDescLine & _SharedSection & _QSection
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// Generates DAX for a single measure with auto-included time intelligence variants. Returns ROW(GeneratedDAX, AutoApplied). AutoApplied is a newline-separated, key:value summary of system-applied modifications (parents=auto-injected hierarchy parents; defaults=measure-level Copilot_DefaultFilter; hardcoded=measure-level Copilot_HardcodedFilter; wrapper=user-supplied daxWrapper) — empty string when nothing was auto-applied. Single user filter param accepts pipe-delimited 'T'[C]=v1;v2|'T'[C2]=v3 format. Same-col entries merged (dedup). Filter VALUES passed verbatim (preserves internal whitespace). Hierarchy auto-injection of parent levels via _INFO_HIERARCHIES + Copilot_AutoIncludeParents annotation. Up to 8 slice columns and 8 filter entries. Only measureName is required; all other parameters are optional with defaults — GenerateQuery("MAU") returns a top-100 for that measure.
+/// 
+/// Parameters:
+/// - measureName: Exact measure name from DiscoverMeasures()
+/// - sliceColumns: Pipe-separated columns for GROUP BY (max 8 after auto-injection)
+/// - filters: Pipe-delimited filter entries. Format: 'T'[C]=v1;v2|'T'[C2]=v3. Use ; for multi-value, ! or != prefix on first value for NOT-IN. Range: >=X, <=X, or >=X..<=Y for date/number ranges. Empty string for no filters.
+/// - rowLimit: Max rows (default 100 if ≤ 0). Sort by sortMeasure DESC.
+/// - sortMeasure: Optional. Base measure or a variant suffix (' MoM %', ' YoY %', ' WoW %', ' PM', ' PY', ' PW'). Pass without brackets.
+/// - sortDirection: 'ASC' or 'DESC' (default DESC).
+/// - daxWrapper: Optional. Custom DAX template wrapping the generated SUMMARIZECOLUMNS. Must contain {query} placeholder. EVALUATE is auto-prepended (do not include it). When provided, replaces the default TOPN/ORDER BY wrapping. Example: 'TOPN(5, {query}, [MAU], DESC)'. Empty string for default behavior.
+function 'Local.AskADIA.GenerateQuery' = ```
+		(measureName: SCALAR STRING VAL, sliceColumns: SCALAR STRING VAL = "", filters: SCALAR STRING VAL = "", rowLimit: SCALAR DOUBLE VAL = 100, sortMeasure: SCALAR STRING VAL = "", sortDirection: SCALAR STRING VAL = "DESC", daxWrapper: SCALAR STRING VAL = "") =>
+		        VAR _TrimmedName = TRIM(measureName)
+		        VAR _TrimmedSlice = TRIM(sliceColumns)
+		        VAR _RawFilters = filters
+		        VAR _SafeLimit = IF(rowLimit < 1, 100, rowLimit)
+		        VAR _SortRaw = TRIM(sortMeasure)
+		        VAR _SortMeasureUnbracket = IF(LEN(_SortRaw) >= 2 && LEFT(_SortRaw, 1) = "[" && RIGHT(_SortRaw, 1) = "]", MID(_SortRaw, 2, LEN(_SortRaw) - 2), _SortRaw)
+		        VAR _DaxWrapperTrim = TRIM(daxWrapper)
+		        VAR _MRow = FILTER(_COPILOT_MEASURE_COLUMNS, _COPILOT_MEASURE_COLUMNS[MeasureName] = _TrimmedName)
+		        VAR _MExists = COUNTROWS(_MRow) > 0
+		        VAR _CanonicalName = IF(_MExists, MAXX(_MRow, _COPILOT_MEASURE_COLUMNS[MeasureName]), _TrimmedName)
+		        VAR _MeasureRef = "[" & _CanonicalName & "]"
+		        VAR _KnownSuffixes = Local.AskADIA._KnownVariantSuffixes()
+		        VAR _IsSuffixOnly = LEN(_SortMeasureUnbracket) > 0 && CONTAINSSTRING(_KnownSuffixes, "|" & _SortMeasureUnbracket & "|")
+		        VAR _SortMeasureTrim = IF(_IsSuffixOnly && LEN(_CanonicalName) > 0, _CanonicalName & " " & _SortMeasureUnbracket, _SortMeasureUnbracket)
+		        VAR _SliceColsList = Local.AskADIA._GetMeasureColsList(_MeasureRef, TRUE)
+		        VAR _FilterColsList = Local.AskADIA._GetMeasureColsList(_MeasureRef, FALSE)
+		        VAR _ValResult = Local.AskADIA._ValidateColumns(_SliceColsList, _FilterColsList, _TrimmedSlice, _RawFilters)
+		        VAR _InvalidSlices = MAXX(_ValResult, [InvalidSlices])
+		        VAR _InvalidFilters = MAXX(_ValResult, [InvalidFilters])
+		        VAR _HasInvalidSlice = LEN(_InvalidSlices) > 0
+		        VAR _HasInvalidFilter = LEN(_InvalidFilters) > 0
+		        VAR _RawSliceCount = IF(LEN(_TrimmedSlice) = 0, 0, LEN(_TrimmedSlice) - LEN(SUBSTITUTE(_TrimmedSlice, "|", "")) + 1)
+		        VAR _ExpandRow = Local.AskADIA._ExpandSliceWithHierarchy(_SliceColsList, _TrimmedSlice)
+		        VAR _ExpandedSlice = MAXX(_ExpandRow, [Expanded])
+		        VAR _InjectedList = MAXX(_ExpandRow, [Injected])
+		        VAR _SliceCount = IF(LEN(_ExpandedSlice) = 0, 0, LEN(_ExpandedSlice) - LEN(SUBSTITUTE(_ExpandedSlice, "|", "")) + 1)
+		        VAR _TooManySlices = _RawSliceCount > 8 || _SliceCount > 8
+		        VAR _ValidSortSet = Local.AskADIA._VariantSortSet(_CanonicalName)
+		        VAR _ValidSortOptions = Local.AskADIA._VariantSortOptions(_CanonicalName)
+		        VAR _SortInvalid = LEN(_SortMeasureTrim) > 0 && NOT CONTAINSSTRING(_ValidSortSet, "|" & _SortMeasureTrim & "|")
+		        VAR _WrapperValid = LEN(_DaxWrapperTrim) = 0 || CONTAINSSTRING(_DaxWrapperTrim, "{query}")
+		        VAR _ValidationError = IF(_TooManySlices, "ERROR: Maximum 8 slice columns supported (after hierarchy auto-injection). You provided " & FORMAT(_RawSliceCount, "0") & " raw, " & FORMAT(_SliceCount, "0") & " expanded. Reduce sliceColumns and retry.", IF(NOT _MExists, "ERROR: Unknown measure '" & _TrimmedName & "'. Call DiscoverMeasures() to see available measures.", IF(_HasInvalidSlice, "ERROR: Invalid slice column(s): " & _InvalidSlices & " for measure '" & _CanonicalName & "'. Column is not sliceable. Call DiscoverMeasures(""" & _CanonicalName & """) to see valid columns (marked 'sliceable').", IF(_HasInvalidFilter, "ERROR: Invalid filter column(s): " & _InvalidFilters & " for measure '" & _CanonicalName & "'. Call DiscoverMeasures(""" & _CanonicalName & """) to see valid columns.", IF(_SortInvalid, "ERROR: Invalid sortMeasure '" & _SortMeasureUnbracket & "'. Must be empty OR '" & _CanonicalName & "' OR one of its variants: " & _ValidSortOptions & ". You may pass either the full form or just the suffix (e.g., 'MoM %'). Pass without brackets.", IF(NOT _WrapperValid, "ERROR: daxWrapper must contain the placeholder {query} which will be replaced with the generated SUMMARIZECOLUMNS expression. Example: 'TOPN(10, {query}, [MyMeasure], DESC)'", ""))))))
+		        VAR _HasError = LEN(_ValidationError) > 0
+		        VAR _SectionRow = Local.AskADIA._GenerateSectionDAX(_MeasureRef, "", "", "", "", _DaxWrapperTrim, _TrimmedSlice, _RawFilters, _SafeLimit, _SortMeasureTrim, sortDirection)
+		        VAR _DAX = MAXX(_SectionRow, [GeneratedDAX])
+		        VAR _MeasureDefaults = MAXX(_MRow, _COPILOT_MEASURE_COLUMNS[DefaultFilter])
+		        VAR _MeasureHardcoded = MAXX(_MRow, _COPILOT_MEASURE_COLUMNS[HardcodedFilter])
+		        VAR _Pairs = MAXX(_SectionRow, [PairsAdded])
+		        VAR _AutoFilters = MAXX(_SectionRow, [AutoFiltersFired])
+		        VAR _AutoApplied = Local.AskADIA._FormatAutoApplied(
+		            _InjectedList,
+		            IF(LEN(_MeasureDefaults) > 0, Local.AskADIA._TagSuppressedDefaults(_MeasureDefaults, _RawFilters, _ExpandedSlice), ""),
+		            _MeasureHardcoded,
+		            "",
+		            "",
+		            _DaxWrapperTrim,
+		            _Pairs,
+		            _AutoFilters
+		        )
+		        RETURN ROW("GeneratedDAX", IF(_HasError, "/*ask-adia*/ -- " & _ValidationError, _DAX), "AutoApplied", IF(_HasError, "", _AutoApplied))
+		
+		```
+
+/// Generates complete DAX for a curated question. Returns ROW(GeneratedDAX, AutoApplied). AutoApplied is a newline-separated, key:value summary of system-applied modifications (parents=auto-injected hierarchy parents; defaults=measure-level Copilot_DefaultFilter merged per section with question-level Copilot_DefaultFilters (question wins on column conflict; suppression-tagged when user filter overrides) concatenated across sections with ";" separator; hardcoded=measure-level Copilot_HardcodedFilter merged per section with question-level Copilot_HardcodedFilters (question wins on column conflict) concatenated across sections; hardcodedNotIn=Copilot_HardcodedNotInFilters (question-only); hardcodedGroupBy=Copilot_HardcodedGroupBy (question-only); pairs=Copilot_PairWith column-pair injections (symmetric, dedup'd); autoFilters=Copilot_AutoFilterWhenSliced sticky-default filter injections in 'T'[C]=expression form) — empty string when nothing was auto-applied. Supports single-section and multi-section (orchestrator) questions. VALIDATES questionId, measures present, RequiredFilters supplied, all slice/filter columns valid. Per section, merges question-level DefaultFilters with the section's measure-level Copilot_DefaultFilter (question DF wins on column conflict). Single user filter param accepts pipe-delimited 'T'[C]=v1;v2|'T'[C2]=v3 format with same-col dedup and NOT-IN via ! prefix. Filter VALUES passed verbatim (preserves internal whitespace). Hierarchy auto-injection of parent levels via _INFO_HIERARCHIES + Copilot_AutoIncludeParents annotation (shared with GenerateQuery via _ExpandSliceWithHierarchy). Only questionId is required; all other parameters are optional with defaults — AnswerQuestion("q-id") runs the question with its curated defaults.
+/// 
+/// Parameters:
+/// - questionId: From DiscoverQuestions()
+/// - sliceColumns: Pipe-separated columns for GROUP BY or empty string
+/// - filters: Pipe-delimited filter entries. Format: 'T'[C]=v1;v2|'T'[C2]=v3. Use ; for multi-value, ! or != prefix on first value for NOT-IN. Must include all RequiredFilters columns. Empty string for none.
+/// - rowLimit: Number of top rows (0 = all; default 100 when omitted)
+/// - sortMeasure: Optional. Base measure or variant suffix; per-section validated for orchestrators.
+/// - sortDirection: 'ASC' or 'DESC' (default DESC).
+function 'Local.AskADIA.AnswerQuestion' = ```
+		(questionId: SCALAR STRING VAL, sliceColumns: SCALAR STRING VAL = "", filters: SCALAR STRING VAL = "", rowLimit: SCALAR DOUBLE VAL = 100, sortMeasure: SCALAR STRING VAL = "", sortDirection: SCALAR STRING VAL = "DESC") =>
+		VAR _NL = UNICHAR(10)
+		VAR _TrimmedId = TRIM(questionId)
+		VAR _RawFilters = filters
+		VAR _QRow = FILTER(_COPILOT_QUESTIONS, _COPILOT_QUESTIONS[QuestionId] = _TrimmedId)
+		VAR _QExists = COUNTROWS(_QRow) > 0
+		VAR _IsMulti = COUNTROWS(_QRow) > 1
+		VAR _FirstRow = FILTER(_QRow, _COPILOT_QUESTIONS[SectionIndex] = 1)
+		VAR _Measures = MAXX(_FirstRow, _COPILOT_QUESTIONS[Measures])
+		VAR _DefaultFilters = MAXX(_FirstRow, _COPILOT_QUESTIONS[DefaultFilters])
+		VAR _RequiredFilters = MAXX(_FirstRow, _COPILOT_QUESTIONS[RequiredFilters])
+		VAR _UFRaw = SELECTCOLUMNS(GENERATESERIES(1, 8), "Pos", [Value], "Entry", PATHITEM(_RawFilters, [Value], TEXT))
+		VAR _UFNonEmpty = FILTER(_UFRaw, LEN([Entry]) > 0 && FIND("=", [Entry], 1, 0) > 0)
+		VAR _UFWithSplit = ADDCOLUMNS(_UFNonEmpty,
+		    "SplitPos", Local.AskADIA._GetFilterEntrySplitPos([Entry])
+		)
+		VAR _UFCols = ADDCOLUMNS(_UFWithSplit, "Col", TRIM(LEFT([Entry], [SplitPos] - 1)))
+		VAR _UserCols = CONCATENATEX(_UFCols, [Col], "|", [Pos], ASC)
+		VAR _UserColsNorm = SUBSTITUTE(_UserCols, "'", "")
+		VAR _DF1 = PATHITEM(_DefaultFilters, 1, TEXT)
+		VAR _DF2 = PATHITEM(_DefaultFilters, 2, TEXT)
+		VAR _DF3 = PATHITEM(_DefaultFilters, 3, TEXT)
+		VAR _DF1Col = IF(LEN(_DF1) > 0 && FIND("=", _DF1, 1, 0) > 0, LEFT(_DF1, FIND("=", _DF1, 1, 0) - 1), "")
+		VAR _DF2Col = IF(LEN(_DF2) > 0 && FIND("=", _DF2, 1, 0) > 0, LEFT(_DF2, FIND("=", _DF2, 1, 0) - 1), "")
+		VAR _DF3Col = IF(LEN(_DF3) > 0 && FIND("=", _DF3, 1, 0) > 0, LEFT(_DF3, FIND("=", _DF3, 1, 0) - 1), "")
+		VAR _DF1ColNorm = SUBSTITUTE(_DF1Col, "'", "")
+		VAR _DF2ColNorm = SUBSTITUTE(_DF2Col, "'", "")
+		VAR _DF3ColNorm = SUBSTITUTE(_DF3Col, "'", "")
+		VAR _DFColsExtra = IF(LEN(_DF1ColNorm) > 0, "|" & _DF1ColNorm, "") & IF(LEN(_DF2ColNorm) > 0, "|" & _DF2ColNorm, "") & IF(LEN(_DF3ColNorm) > 0, "|" & _DF3ColNorm, "")
+		VAR _SliceColsFromMeasures = Local.AskADIA._GetMeasureColsList(_Measures, TRUE)
+		VAR _FilterColsFromMeasures = Local.AskADIA._GetMeasureColsList(_Measures, FALSE)
+		VAR _ReqFiltersNorm = SUBSTITUTE(_RequiredFilters, "'", "")
+		VAR _SliceColsList = _SliceColsFromMeasures & IF(LEN(_ReqFiltersNorm) > 0, "|" & _ReqFiltersNorm, "") & _DFColsExtra
+		VAR _FilterColsList = _FilterColsFromMeasures & IF(LEN(_ReqFiltersNorm) > 0, "|" & _ReqFiltersNorm, "") & _DFColsExtra
+		VAR _RF1 = PATHITEM(_RequiredFilters, 1, TEXT)
+		VAR _RF2 = PATHITEM(_RequiredFilters, 2, TEXT)
+		VAR _RF1Norm = SUBSTITUTE(_RF1, "'", "")
+		VAR _RF2Norm = SUBSTITUTE(_RF2, "'", "")
+		VAR _RF1OK = LEN(_RF1Norm) = 0 || CONTAINSSTRING(_UserColsNorm, _RF1Norm)
+		VAR _RF2OK = LEN(_RF2Norm) = 0 || CONTAINSSTRING(_UserColsNorm, _RF2Norm)
+		VAR _MissingReq = IF(NOT _RF1OK, _RF1, "") & IF(NOT _RF2OK, IF(NOT _RF1OK, ", ", "") & _RF2, "")
+		VAR _HasMissingReq = LEN(_MissingReq) > 0
+		VAR _HasNoMeasures = LEN(_Measures) = 0 || _Measures = BLANK()
+		VAR _ValResult = Local.AskADIA._ValidateColumns(_SliceColsList, _FilterColsList, sliceColumns, _RawFilters)
+		VAR _InvalidSlices = MAXX(_ValResult, [InvalidSlices])
+		VAR _InvalidFilters = MAXX(_ValResult, [InvalidFilters])
+		VAR _HasInvalidSlice = LEN(_InvalidSlices) > 0
+		VAR _HasInvalidFilter = LEN(_InvalidFilters) > 0
+		VAR _ValidationError = IF(NOT _QExists, "ERROR: Unknown questionId '" & _TrimmedId & "'. Call DiscoverQuestions() to see available questions.", IF(_HasNoMeasures, "ERROR: Question '" & _TrimmedId & "' uses a specialized workflow and cannot be answered with AnswerQuestion(). See its Description in DiscoverQuestions(""" & _TrimmedId & """) for guidance.", IF(_HasMissingReq, "ERROR: Question '" & _TrimmedId & "' requires filter(s): " & _MissingReq & ". Add to filters param using format: '" & _MissingReq & "=value'.", IF(_HasInvalidSlice, "ERROR: Invalid slice column(s): " & _InvalidSlices & " for question '" & _TrimmedId & "'. Column is not sliceable. Call DiscoverQuestions(""" & _TrimmedId & """) to see ValidColumns.", IF(_HasInvalidFilter, "ERROR: Invalid filter column(s): " & _InvalidFilters & " for question '" & _TrimmedId & "'. Call DiscoverQuestions(""" & _TrimmedId & """) to see ValidColumns.", "")))))
+		VAR _HasError = LEN(_ValidationError) > 0
+		VAR _ExpandRow = Local.AskADIA._ExpandSliceWithHierarchy(_SliceColsFromMeasures, sliceColumns)
+		VAR _InjectedList = MAXX(_ExpandRow, [Injected])
+		VAR _SectionResults =
+		    GENERATE(
+		        _QRow,
+		        VAR _Label = _COPILOT_QUESTIONS[SectionLabel]
+		        VAR _Row = Local.AskADIA._GenerateSectionDAX(_COPILOT_QUESTIONS[Measures], _COPILOT_QUESTIONS[HardcodedGroupBy], _COPILOT_QUESTIONS[DefaultFilters], _COPILOT_QUESTIONS[HardcodedFilters], _COPILOT_QUESTIONS[HardcodedNotInFilters], _COPILOT_QUESTIONS[DaxWrapper], sliceColumns, _RawFilters, rowLimit, sortMeasure, sortDirection)
+		        VAR _SectionDAX = MAXX(_Row, [GeneratedDAX])
+		        VAR _Labeled = IF(_IsMulti && LEN(_Label) > 0, "-- " & _Label & _NL, "") & _SectionDAX
+		        VAR _MD = MAXX(_Row, [MergedDefaults])
+		        RETURN
+		            ROW(
+		                "_SectionDAX", _Labeled,
+		                "_PA", MAXX(_Row, [PairsAdded]),
+		                "_AF", MAXX(_Row, [AutoFiltersFired]),
+		                "_MDTagged", IF(LEN(_MD) > 0, Local.AskADIA._TagSuppressedDefaults(_MD, _RawFilters, MAXX(_Row, [EffectiveSlice])), ""),
+		                "_MH", MAXX(_Row, [MergedHardcoded])
+		            )
+		    )
+		VAR _DAX = CONCATENATEX(_SectionResults, [_SectionDAX], _NL & _NL, _COPILOT_QUESTIONS[SectionIndex], ASC)
+		VAR _AggHardcodedNotIn = CONCATENATEX(FILTER(_QRow, LEN(_COPILOT_QUESTIONS[HardcodedNotInFilters]) > 0), _COPILOT_QUESTIONS[HardcodedNotInFilters], "; ", _COPILOT_QUESTIONS[SectionIndex], ASC)
+		VAR _AggHardcodedGroupBy = CONCATENATEX(FILTER(_QRow, LEN(_COPILOT_QUESTIONS[HardcodedGroupBy]) > 0), _COPILOT_QUESTIONS[HardcodedGroupBy], "; ", _COPILOT_QUESTIONS[SectionIndex], ASC)
+		VAR _AggPairs = CONCATENATEX(FILTER(_SectionResults, LEN([_PA]) > 0), [_PA], "; ", _COPILOT_QUESTIONS[SectionIndex], ASC)
+		VAR _AggAutoFilters = CONCATENATEX(FILTER(_SectionResults, LEN([_AF]) > 0), [_AF], "; ", _COPILOT_QUESTIONS[SectionIndex], ASC)
+		VAR _AggMergedDefaults = CONCATENATEX(FILTER(_SectionResults, LEN([_MDTagged]) > 0), [_MDTagged], "; ", _COPILOT_QUESTIONS[SectionIndex], ASC)
+		VAR _AggHardcoded = CONCATENATEX(FILTER(_SectionResults, LEN([_MH]) > 0), [_MH], "; ", _COPILOT_QUESTIONS[SectionIndex], ASC)
+		VAR _AutoApplied = Local.AskADIA._FormatAutoApplied(
+		    _InjectedList,
+		    _AggMergedDefaults,
+		    _AggHardcoded,
+		    _AggHardcodedNotIn,
+		    _AggHardcodedGroupBy,
+		    "",
+		    _AggPairs,
+		    _AggAutoFilters
+		)
+		RETURN ROW("GeneratedDAX", IF(_HasError, "/*ask-adia*/ -- " & _ValidationError, _DAX), "AutoApplied", IF(_HasError, "", _AutoApplied))
+		
+		```
+
+/// Returns the catalog of Copilot-visible measures grouped flat by Fact (alphabetical). Output is a single-cell string. Top of output renders a `Topics in scope` map (topic → list of facts in that topic, with a final `(no topic)` line for unannotated facts). Each fact header includes inline `; topics: a, b` when annotated. Search filter substring-matches on MeasureName, MeasureTable, MeasureDescription, Alias, Synonyms, FactDescription, and Topic — pass a topic name to scope to facts tagged with that topic. Multi-topic facts use `;`-separated annotation values (e.g. `consumption;usage`). searchTerm is optional — omit it (DiscoverMeasures()) or pass empty string for all.
+function 'Local.AskADIA.DiscoverMeasures' =
+		(searchTerm: SCALAR STRING VAL = "") =>
+		    VAR _NL = UNICHAR(10)
+		    VAR _Sep = _NL & _NL & "---" & _NL & _NL
+		    VAR _T = TRIM(SUBSTITUTE(SUBSTITUTE(searchTerm, "[", ""), "]", ""))
+		    VAR _MatchedRows = FILTER(
+		        _COPILOT_MEASURE_COLUMNS,
+		        LEN(_T) = 0
+		        || CONTAINSSTRING(_COPILOT_MEASURE_COLUMNS[MeasureName], _T)
+		        || CONTAINSSTRING(_COPILOT_MEASURE_COLUMNS[MeasureTable], _T)
+		        || CONTAINSSTRING(_COPILOT_MEASURE_COLUMNS[MeasureDescription], _T)
+		        || (LEN(_COPILOT_MEASURE_COLUMNS[Alias]) > 0 && CONTAINSSTRING(_COPILOT_MEASURE_COLUMNS[Alias], _T))
+		        || (LEN(_COPILOT_MEASURE_COLUMNS[Synonyms]) > 0 && CONTAINSSTRING(_COPILOT_MEASURE_COLUMNS[Synonyms], _T))
+		        || (LEN(_COPILOT_MEASURE_COLUMNS[FactDescription]) > 0 && CONTAINSSTRING(_COPILOT_MEASURE_COLUMNS[FactDescription], _T))
+		        || (LEN(_COPILOT_MEASURE_COLUMNS[Topic]) > 0 && CONTAINSSTRING(_COPILOT_MEASURE_COLUMNS[Topic], _T))
+		    )
+		    VAR _MatchedMeasures = SUMMARIZE(
+		        _MatchedRows,
+		        _COPILOT_MEASURE_COLUMNS[MeasureName],
+		        _COPILOT_MEASURE_COLUMNS[MeasureTable],
+		        _COPILOT_MEASURE_COLUMNS[Topic]
+		    )
+		    VAR _MatchedMCount = COUNTROWS(_MatchedMeasures) + 0
+		    VAR _Facts = SUMMARIZE(_MatchedMeasures, _COPILOT_MEASURE_COLUMNS[MeasureTable], _COPILOT_MEASURE_COLUMNS[Topic])
+		    VAR _MatchedFCount = COUNTROWS(_Facts) + 0
+		    VAR _FactsExpanded = GENERATE(
+		        ADDCOLUMNS(_Facts, "_Pipe", SUBSTITUTE(_COPILOT_MEASURE_COLUMNS[Topic], ";", "|")),
+		        VAR _Pipe = [_Pipe]
+		        VAR _Cnt = IF(LEN(_Pipe) = 0, 1, LEN(_Pipe) - LEN(SUBSTITUTE(_Pipe, "|", "")) + 1)
+		        RETURN ADDCOLUMNS(GENERATESERIES(1, _Cnt), "_Topic", TRIM(PATHITEM(_Pipe, [Value], TEXT)))
+		    )
+		    VAR _TopicMap = SUMMARIZE(_FactsExpanded, [_Topic])
+		    VAR _TopicLines = ADDCOLUMNS(
+		        _TopicMap,
+		        "_SortKey", IF(LEN([_Topic]) = 0, "ZZZ_(no topic)", [_Topic]),
+		        "_DisplayTopic", IF(LEN([_Topic]) = 0, "(no topic)", [_Topic]),
+		        "_FactList",
+		            VAR _t = [_Topic]
+		            RETURN CONCATENATEX(
+		                FILTER(_FactsExpanded, [_Topic] = _t),
+		                _COPILOT_MEASURE_COLUMNS[MeasureTable],
+		                ", ",
+		                _COPILOT_MEASURE_COLUMNS[MeasureTable], ASC
+		            )
+		    )
+		    VAR _IndexBody = CONCATENATEX(_TopicLines, "- " & [_DisplayTopic] & ": " & [_FactList], _NL, [_SortKey], ASC)
+		    VAR _IndexBlock = IF(LEN(_IndexBody) = 0, "", "Topics in scope:" & _NL & _IndexBody & _NL & _NL & "---" & _NL & _NL)
+		    VAR _FactBodies = ADDCOLUMNS(
+		        _Facts,
+		        "_FactBody",
+		            VAR _f = _COPILOT_MEASURE_COLUMNS[MeasureTable]
+		            VAR _topicsRaw = _COPILOT_MEASURE_COLUMNS[Topic]
+		            VAR _topicsCsv = Local.AskADIA._FormatTopicsCSV(_topicsRaw)
+		            VAR _topicsLabel = IF(LEN(_topicsCsv) > 0, "; topics: " & _topicsCsv, "")
+		            VAR _MNamesPipe = "|" & CONCATENATEX(
+		                FILTER(_MatchedMeasures, _COPILOT_MEASURE_COLUMNS[MeasureTable] = _f),
+		                _COPILOT_MEASURE_COLUMNS[MeasureName],
+		                "|"
+		            ) & "|"
+		            RETURN Local.AskADIA._FormatFactBody(_f, _topicsLabel, _MNamesPipe)
+		    )
+		    VAR _Body = CONCATENATEX(_FactBodies, [_FactBody], _Sep, _COPILOT_MEASURE_COLUMNS[MeasureTable], ASC)
+		    VAR _BodyOrEmpty = IF(LEN(_Body) = 0, "(no measures matched search '" & TRIM(searchTerm) & "')", _Body)
+		    VAR _Preamble = "Total measures: " & _MatchedMCount & " across " & _MatchedFCount & " fact tables." & _NL & _NL
+		    RETURN { _Preamble & _IndexBlock & _BodyOrEmpty }
+
+/// Returns the catalog of Copilot-visible questions grouped flat by Fact (alphabetical). Output is a single-cell string. Top of output renders a `Topics in scope` map (topic → list of facts in that topic, with a final `(no topic)` line for unannotated facts). Each fact header includes inline `; topics: a, b` when annotated. Search filter substring-matches on QuestionId, Topic, Question, Description, and the underlying measures' name/table/desc/alias/synonyms — pass a topic name to scope to questions on facts tagged with that topic. searchTerm is optional — omit it (DiscoverQuestions()) or pass empty string for all.
+function 'Local.AskADIA.DiscoverQuestions' =
+		(searchTerm: SCALAR STRING VAL = "") =>
+		    VAR _NL = UNICHAR(10)
+		    VAR _Sep = _NL & _NL & "---" & _NL & _NL
+		    VAR _T = TRIM(SUBSTITUTE(SUBSTITUTE(searchTerm, "[", ""), "]", ""))
+		    VAR _Filtered = FILTER(
+		        _COPILOT_QUESTIONS,
+		        _COPILOT_QUESTIONS[SectionIndex] = 1
+		        && (
+		            LEN(_T) = 0
+		            || CONTAINSSTRING(_COPILOT_QUESTIONS[QuestionId], _T)
+		            || CONTAINSSTRING(_COPILOT_QUESTIONS[Topic], _T)
+		            || CONTAINSSTRING(_COPILOT_QUESTIONS[Question], _T)
+		            || CONTAINSSTRING(_COPILOT_QUESTIONS[Description], _T)
+		            || (
+		                VAR _MeasuresStr = _COPILOT_QUESTIONS[Measures]
+		                VAR _MatchedM = FILTER(
+		                    _COPILOT_MEASURE_COLUMNS,
+		                    CONTAINSSTRING(_MeasuresStr, "[" & _COPILOT_MEASURE_COLUMNS[MeasureName] & "]")
+		                )
+		                VAR _Names = CONCATENATEX(_MatchedM, _COPILOT_MEASURE_COLUMNS[MeasureName], "|")
+		                VAR _Tables = CONCATENATEX(_MatchedM, _COPILOT_MEASURE_COLUMNS[MeasureTable], "|")
+		                VAR _Descs = CONCATENATEX(_MatchedM, _COPILOT_MEASURE_COLUMNS[MeasureDescription], "|")
+		                VAR _Aliases = CONCATENATEX(_MatchedM, _COPILOT_MEASURE_COLUMNS[Alias], "|")
+		                VAR _Syns = CONCATENATEX(_MatchedM, _COPILOT_MEASURE_COLUMNS[Synonyms], "|")
+		                VAR _FactDescs = CONCATENATEX(_MatchedM, _COPILOT_MEASURE_COLUMNS[FactDescription], "|")
+		                RETURN
+		                    (LEN(_Names) > 0 && CONTAINSSTRING(_Names, _T))
+		                    || (LEN(_Tables) > 0 && CONTAINSSTRING(_Tables, _T))
+		                    || (LEN(_Descs) > 0 && CONTAINSSTRING(_Descs, _T))
+		                    || (LEN(_Aliases) > 0 && CONTAINSSTRING(_Aliases, _T))
+		                    || (LEN(_Syns) > 0 && CONTAINSSTRING(_Syns, _T))
+		                    || (LEN(_FactDescs) > 0 && CONTAINSSTRING(_FactDescs, _T))
+		            )
+		        )
+		    )
+		    VAR _MatchedQCount = COUNTROWS(_Filtered) + 0
+		    VAR _Facts = SUMMARIZE(_Filtered, _COPILOT_QUESTIONS[FactName], _COPILOT_QUESTIONS[Topic])
+		    VAR _MatchedFCount = COUNTROWS(_Facts) + 0
+		    VAR _FactsExpanded = GENERATE(
+		        ADDCOLUMNS(_Facts, "_Pipe", SUBSTITUTE(_COPILOT_QUESTIONS[Topic], ";", "|")),
+		        VAR _Pipe = [_Pipe]
+		        VAR _Cnt = IF(LEN(_Pipe) = 0, 1, LEN(_Pipe) - LEN(SUBSTITUTE(_Pipe, "|", "")) + 1)
+		        RETURN ADDCOLUMNS(GENERATESERIES(1, _Cnt), "_Topic", TRIM(PATHITEM(_Pipe, [Value], TEXT)))
+		    )
+		    VAR _TopicMap = SUMMARIZE(_FactsExpanded, [_Topic])
+		    VAR _TopicLines = ADDCOLUMNS(
+		        _TopicMap,
+		        "_SortKey", IF(LEN([_Topic]) = 0, "ZZZ_(no topic)", [_Topic]),
+		        "_DisplayTopic", IF(LEN([_Topic]) = 0, "(no topic)", [_Topic]),
+		        "_FactList",
+		            VAR _t = [_Topic]
+		            RETURN CONCATENATEX(
+		                FILTER(_FactsExpanded, [_Topic] = _t),
+		                _COPILOT_QUESTIONS[FactName],
+		                ", ",
+		                _COPILOT_QUESTIONS[FactName], ASC
+		            )
+		    )
+		    VAR _IndexBody = CONCATENATEX(_TopicLines, "- " & [_DisplayTopic] & ": " & [_FactList], _NL, [_SortKey], ASC)
+		    VAR _IndexBlock = IF(LEN(_IndexBody) = 0, "", "Topics in scope:" & _NL & _IndexBody & _NL & _NL & "---" & _NL & _NL)
+		    VAR _FactBodies = ADDCOLUMNS(
+		        _Facts,
+		        "_FactBody",
+		            VAR _fact = _COPILOT_QUESTIONS[FactName]
+		            VAR _topicsRaw = _COPILOT_QUESTIONS[Topic]
+		            VAR _topicsCsv = Local.AskADIA._FormatTopicsCSV(_topicsRaw)
+		            VAR _topicsLabel = IF(LEN(_topicsCsv) > 0, "; topics: " & _topicsCsv, "")
+		            VAR _matchingIds = "|" & CONCATENATEX(
+		                FILTER(_Filtered, _COPILOT_QUESTIONS[FactName] = _fact),
+		                _COPILOT_QUESTIONS[QuestionId],
+		                "|"
+		            ) & "|"
+		            RETURN Local.AskADIA._FormatTopicFactBody(_fact, _topicsLabel, _matchingIds)
+		    )
+		    VAR _Body = CONCATENATEX(_FactBodies, [_FactBody], _Sep, _COPILOT_QUESTIONS[FactName], ASC)
+		    VAR _BodyOrEmpty = IF(LEN(_Body) = 0, "(no questions matched search '" & TRIM(searchTerm) & "')", _Body)
+		    VAR _Preamble = "Total questions: " & _MatchedQCount & " across " & _MatchedFCount & " fact tables." & _NL & _NL
+		    RETURN { _Preamble & _IndexBlock & _BodyOrEmpty }
+
+/// Returns registry rows scoped to a single output surface. Single chokepoint for consumers — when askadia_config.json grows new annotationRegistry rows or surfaces, callers see the change automatically without touching code. Returns (AnnotationKey, ObjectType, EmitOrder, RenderedValue) — caller orders by EmitOrder (with AnnotationKey as deterministic tie-break) when concatenating. ObjectType is exposed so callers can correctly scope their _INFO_ANNOTATIONS join (e.g. a "Column"-typed registry row should not match a Measure with the same name carrying the same annotation key).
+function 'Local.AskADIA._GetAnnotationsForSurface' =
+		(surfaceName: SCALAR STRING VAL) =>
+		SELECTCOLUMNS(
+		    FILTER(_COPILOT_ANNOTATIONS_REGISTRY, _COPILOT_ANNOTATIONS_REGISTRY[Surface] = surfaceName),
+		    "AnnotationKey", _COPILOT_ANNOTATIONS_REGISTRY[AnnotationKey],
+		    "ObjectType", _COPILOT_ANNOTATIONS_REGISTRY[ObjectType],
+		    "EmitOrder", _COPILOT_ANNOTATIONS_REGISTRY[EmitOrder],
+		    "RenderedValue", _COPILOT_ANNOTATIONS_REGISTRY[RenderedValue]
+		)
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// Returns a flat (TableName, ColumnName, AnnotationKey, EmitOrder, RenderedValue) table of every (column, annotation) pair contributing to the given surface. Joins the registry surface rows against _INFO_ANNOTATIONS (ObjectType-scoped) and, for Hierarchy-typed registry rows, projects through _INFO_HIERARCHIES so a hierarchy-level annotation surfaces once per member column. Consumers can simply FILTER by ([TableName], [ColumnName]) and CONCATENATEX ordered by [EmitOrder], [AnnotationKey] without rewriting the GENERATE pattern. Object types beyond Column and Hierarchy are silently dropped — those would need their own projection rule (Measure/Table/Level aren't projectable onto the per-column output surface).
+function 'Local.AskADIA._GetTaggedObjectsForSurface' =
+		(surfaceName: SCALAR STRING VAL) =>
+		VAR _Registry = Local.AskADIA._GetAnnotationsForSurface(surfaceName)
+		VAR _Annotated =
+		    GENERATE(
+		        _Registry,
+		        VAR _annKey = [AnnotationKey]
+		        VAR _objType = [ObjectType]
+		        RETURN SELECTCOLUMNS(
+		            FILTER(
+		                _INFO_ANNOTATIONS,
+		                _INFO_ANNOTATIONS[AnnotationName] = _annKey
+		                    && _INFO_ANNOTATIONS[AnnotationValue] = "true"
+		                    && _INFO_ANNOTATIONS[ObjectType] = _objType
+		            ),
+		            "_TableName", _INFO_ANNOTATIONS[TableName],
+		            "_ObjectName", _INFO_ANNOTATIONS[ObjectName]
+		        )
+		    )
+		VAR _ColumnRows = SELECTCOLUMNS(
+		    FILTER(_Annotated, [ObjectType] = "Column"),
+		    "TableName", [_TableName],
+		    "ColumnName", [_ObjectName],
+		    "AnnotationKey", [AnnotationKey],
+		    "EmitOrder", [EmitOrder],
+		    "RenderedValue", [RenderedValue]
+		)
+		VAR _HierarchyRows =
+		    SELECTCOLUMNS(
+		        GENERATE(
+		            FILTER(_Annotated, [ObjectType] = "Hierarchy"),
+		            VAR _ht = [_TableName]
+		            VAR _hn = [_ObjectName]
+		            RETURN SELECTCOLUMNS(
+		                FILTER(
+		                    _INFO_HIERARCHIES,
+		                    _INFO_HIERARCHIES[TableName] = _ht
+		                        && _INFO_HIERARCHIES[HierarchyName] = _hn
+		                ),
+		                "_MemberCol", _INFO_HIERARCHIES[ColumnName]
+		            )
+		        ),
+		        "TableName", [_TableName],
+		        "ColumnName", [_MemberCol],
+		        "AnnotationKey", [AnnotationKey],
+		        "EmitOrder", [EmitOrder],
+		        "RenderedValue", [RenderedValue]
+		    )
+		RETURN UNION(_ColumnRows, _HierarchyRows)
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// Returns catalog of Copilot-visible columns with metadata.
+/// @param searchTerm Substring filter (matches column/table name, description, synonyms, value synonyms). Optional — omit it (DiscoverColumns()) or pass empty string to return all visible columns. The `ValueSynonyms` output column surfaces the column's `Copilot_ValueSynonyms` annotation verbatim — agents can read the canonical→synonym mapping directly without calling `SearchHierarchy`. The `Behaviors` output column lists framework-applied behaviors a column participates in (e.g. AutoIncludeParents, PairWith, AutoFilterWhenSliced) so callers can see at-a-glance which columns trigger auto-magic when sliced.
+function 'Local.AskADIA.DiscoverColumns' =
+		(searchTerm: SCALAR STRING VAL = "") =>
+		VAR _TrimmedSearch = TRIM(searchTerm)
+		VAR _AllAnnotations = _INFO_ANNOTATIONS
+		VAR _VisibleCols = SELECTCOLUMNS(
+		    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_Visibility" && _INFO_ANNOTATIONS[AnnotationValue] = "Visible" && _INFO_ANNOTATIONS[ObjectType] = "Column"),
+		    "VTable", _INFO_ANNOTATIONS[TableName], "VCol", _INFO_ANNOTATIONS[ObjectName])
+		VAR _Synonyms = SELECTCOLUMNS(
+		    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_Synonyms" && _INFO_ANNOTATIONS[ObjectType] = "Column"),
+		    "STable", _INFO_ANNOTATIONS[TableName], "SCol", _INFO_ANNOTATIONS[ObjectName], "SVal", _INFO_ANNOTATIONS[AnnotationValue])
+		VAR _ValueSynonyms = SELECTCOLUMNS(
+		    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_ValueSynonyms" && _INFO_ANNOTATIONS[ObjectType] = "Column"),
+		    "VSTable", _INFO_ANNOTATIONS[TableName], "VSCol", _INFO_ANNOTATIONS[ObjectName], "VSVal", _INFO_ANNOTATIONS[AnnotationValue])
+		VAR _TagLookup = Local.AskADIA._GetTaggedObjectsForSurface("DiscoverColumnsTags")
+		VAR _BehaviorLookup = Local.AskADIA._GetTaggedObjectsForSurface("DiscoverColumnsBehavior")
+		VAR _LadderHiers = SELECTCOLUMNS(
+		    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_SearchLadder" && _INFO_ANNOTATIONS[AnnotationValue] = "true" && _INFO_ANNOTATIONS[ObjectType] = "Hierarchy"),
+		    "LHTable", _INFO_ANNOTATIONS[TableName], "LHName", _INFO_ANNOTATIONS[ObjectName])
+		VAR _HierCols = SELECTCOLUMNS(
+		    FILTER(_INFO_HIERARCHIES, NOT ISEMPTY(FILTER(_LadderHiers, [LHTable] = _INFO_HIERARCHIES[TableName] && [LHName] = _INFO_HIERARCHIES[HierarchyName]))),
+		    "HCTable", _INFO_HIERARCHIES[TableName], "HCCol", _INFO_HIERARCHIES[ColumnName])
+		VAR _ColInfo = SELECTCOLUMNS(_INFO_COLUMNS, "CTable", _INFO_COLUMNS[Table], "CCol", _INFO_COLUMNS[Name], "CDesc", _INFO_COLUMNS[Description], "CType", _INFO_COLUMNS[DataType])
+		VAR _Enriched = ADDCOLUMNS(
+		    _VisibleCols,
+		    "_Description",
+		        VAR _t = [VTable] VAR _c = [VCol]
+		        RETURN MAXX(FILTER(_ColInfo, [CTable] = _t && [CCol] = _c), [CDesc]),
+		    "_DataType",
+		        VAR _t = [VTable] VAR _c = [VCol]
+		        RETURN MAXX(FILTER(_ColInfo, [CTable] = _t && [CCol] = _c), [CType]),
+		    "_Synonyms",
+		        VAR _t = [VTable] VAR _c = [VCol]
+		        RETURN MAXX(FILTER(_Synonyms, [STable] = _t && [SCol] = _c), [SVal]),
+		    "_ValueSynonyms",
+		        VAR _t = [VTable] VAR _c = [VCol]
+		        RETURN MAXX(FILTER(_ValueSynonyms, [VSTable] = _t && [VSCol] = _c), [VSVal]),
+		    "_TagsFromRegistry",
+		        VAR _t = [VTable] VAR _c = [VCol]
+		        VAR _Matches = FILTER(_TagLookup, [TableName] = _t && [ColumnName] = _c)
+		        RETURN COALESCE(CONCATENATEX(_Matches, [RenderedValue], ", ", [EmitOrder], ASC, [AnnotationKey], ASC), ""),
+		    "_Behaviors",
+		        VAR _t = [VTable] VAR _c = [VCol]
+		        VAR _Matches = FILTER(_BehaviorLookup, [TableName] = _t && [ColumnName] = _c)
+		        RETURN COALESCE(CONCATENATEX(_Matches, [RenderedValue], ", ", [EmitOrder], ASC, [AnnotationKey], ASC), ""),
+		    "_IsHierarchy",
+		        VAR _t = [VTable] VAR _c = [VCol]
+		        RETURN COUNTROWS(FILTER(_HierCols, [HCTable] = _t && [HCCol] = _c)) > 0
+		)
+		VAR _Filtered = FILTER(
+		    _Enriched,
+		    LEN(_TrimmedSearch) = 0
+		        || CONTAINSSTRING([VCol], _TrimmedSearch)
+		        || CONTAINSSTRING([VTable], _TrimmedSearch)
+		        || (NOT ISBLANK([_Description]) && CONTAINSSTRING([_Description], _TrimmedSearch))
+		        || (NOT ISBLANK([_Synonyms]) && LEN([_Synonyms]) > 0 && CONTAINSSTRING([_Synonyms], _TrimmedSearch))
+		        || (NOT ISBLANK([_ValueSynonyms]) && LEN([_ValueSynonyms]) > 0 && CONTAINSSTRING([_ValueSynonyms], _TrimmedSearch))
+		)
+		VAR _WithTags = ADDCOLUMNS(
+		    _Filtered,
+		    "_Tags",
+		        VAR _base = [_TagsFromRegistry]
+		        VAR _baseNotEmpty = LEN(_base) > 0
+		        VAR _h = IF([_IsHierarchy], "hierarchy", "")
+		        VAR _hasH = LEN(_h) > 0
+		        RETURN TRIM(_base & IF(_baseNotEmpty && _hasH, ", ", "") & _h)
+		)
+		RETURN SELECTCOLUMNS(
+		    _WithTags,
+		    "TableName", [VTable],
+		    "ColumnName", [VCol],
+		    "ColumnRef", "'" & [VTable] & "'[" & [VCol] & "]",
+		    "Description", [_Description],
+		    "DataType", [_DataType],
+		    "Synonyms", [_Synonyms],
+		    "ValueSynonyms", [_ValueSynonyms],
+		    "Tags", [_Tags],
+		    "Behaviors", [_Behaviors]
+		)
+
+/// Generic value-search dispatcher. Routes searchColumn to: (1) ranked-cross-col branch if column has Copilot_SearchRanker (or its Copilot_PairWith partner does), (2) ladder branch if column is a level in a hierarchy with Copilot_SearchLadder=true, (3) generic VALUES+CONTAINSSTRING branch otherwise. Uses scalar IF short-circuit + CONCATENATEX to avoid evaluating untouched branches' table helpers (_SearchAllValues / _SearchAllLadderColumns) — DAX would otherwise eagerly evaluate every IF/UNION table branch even when the dispatch decides only one applies. The active branch's rows are CONCATENATEX'd into a string with UNICHAR(10) record sep + UNICHAR(9) field sep, then split back into a [SearchResult, Rank] table via PATHITEM. Pipe characters in source values are escape-substituted to UNICHAR(57344) (U+E000, Unicode Private Use Area — reserved by Unicode for application-defined sentinels, never appears in production text) before concat and reverse-substituted in the final SELECTCOLUMNS, because PATHITEM is hardcoded to split on "|" and any literal pipe in a source value (for example partner names like "Solnet | Part of Accenture") would otherwise fragment a row into multiple tokens and corrupt downstream extraction. Sentinel is C0-control-free so the XMLA serializer accepts it (UNICHAR(31) and other C0 controls would fail with "UNICHAR does not return invalid XML characters").
+function 'Local.AskADIA.SearchValues' =
+		(searchColumn: ANYREF EXPR, searchTerm: SCALAR STRING VAL) =>
+		VAR _ColName = NAMEOF(searchColumn)
+		VAR _ColNorm = SUBSTITUTE(_ColName, "'", "")
+		VAR _ColInRegistry =
+		    COUNTROWS(
+		        FILTER(
+		            _COPILOT_MEASURE_COLUMNS,
+		            _COPILOT_MEASURE_COLUMNS[FullColumnRef] = _ColNorm
+		        )
+		    ) > 0
+		VAR _BarePos = FIND("[", _ColNorm, 1, 0)
+		VAR _BareTable = IF(_BarePos > 0, LEFT(_ColNorm, _BarePos - 1), _ColNorm)
+		VAR _BareCol = IF(_BarePos > 0, MID(_ColNorm, _BarePos + 1, LEN(_ColNorm) - _BarePos - 1), "")
+		VAR _SelfHasRanker =
+		    COUNTROWS(
+		        FILTER(
+		            _INFO_ANNOTATIONS,
+		            _INFO_ANNOTATIONS[AnnotationName] = "Copilot_SearchRanker"
+		                && _INFO_ANNOTATIONS[ObjectType] = "Column"
+		                && _INFO_ANNOTATIONS[TableName] = _BareTable
+		                && _INFO_ANNOTATIONS[ObjectName] = _BareCol
+		        )
+		    ) > 0
+		VAR _PartnerPrimary =
+		    MAXX(
+		        FILTER(
+		            _INFO_ANNOTATIONS,
+		            _INFO_ANNOTATIONS[AnnotationName] = "Copilot_PairWith"
+		                && _INFO_ANNOTATIONS[ObjectType] = "Column"
+		                && _INFO_ANNOTATIONS[AnnotationValue] = _ColName
+		        ),
+		        "'" & _INFO_ANNOTATIONS[TableName] & "'[" & _INFO_ANNOTATIONS[ObjectName] & "]"
+		    )
+		VAR _PartnerPrimaryNorm = SUBSTITUTE(COALESCE(_PartnerPrimary, ""), "'", "")
+		VAR _PartnerHasRanker =
+		    LEN(_PartnerPrimaryNorm) > 0 &&
+		    COUNTROWS(
+		        FILTER(
+		            _INFO_ANNOTATIONS,
+		            _INFO_ANNOTATIONS[AnnotationName] = "Copilot_SearchRanker"
+		                && _INFO_ANNOTATIONS[ObjectType] = "Column"
+		                && (_INFO_ANNOTATIONS[TableName] & "[" & _INFO_ANNOTATIONS[ObjectName] & "]") = _PartnerPrimaryNorm
+		        )
+		    ) > 0
+		VAR _IsRanked = _SelfHasRanker || _PartnerHasRanker
+		VAR _EffectivePrimary = IF(_SelfHasRanker, _ColName, _PartnerPrimary)
+		VAR _MyHierarchies =
+		    SELECTCOLUMNS(
+		        FILTER(
+		            _INFO_HIERARCHIES,
+		            _INFO_HIERARCHIES[TableName] = _BareTable
+		                && _INFO_HIERARCHIES[ColumnName] = _BareCol
+		        ),
+		        "T", _INFO_HIERARCHIES[TableName],
+		        "H", _INFO_HIERARCHIES[HierarchyName]
+		    )
+		VAR _IsLadder =
+		    COUNTROWS(
+		        FILTER(
+		            _INFO_ANNOTATIONS,
+		            _INFO_ANNOTATIONS[AnnotationName] = "Copilot_SearchLadder"
+		                && _INFO_ANNOTATIONS[ObjectType] = "Hierarchy"
+		                && _INFO_ANNOTATIONS[AnnotationValue] = "true"
+		                && COUNTROWS(
+		                    FILTER(
+		                        _MyHierarchies,
+		                        [T] = _INFO_ANNOTATIONS[TableName]
+		                            && [H] = _INFO_ANNOTATIONS[ObjectName]
+		                    )
+		                ) > 0
+		        )
+		    ) > 0
+		VAR _IsSupported = _ColInRegistry || _IsRanked || _IsLadder
+		VAR _RS = UNICHAR(10)
+		VAR _FS = UNICHAR(9)
+		VAR _PE = UNICHAR(57344)
+		VAR _ConcatRanker =
+		    IF(_IsSupported && _IsRanked,
+		        Local.AskADIA._SearchAllValues(searchTerm, _EffectivePrimary)
+		    )
+		VAR _ConcatLadder =
+		    IF(_IsSupported && NOT _IsRanked && _IsLadder,
+		        CONCATENATEX(
+		            FILTER(
+		                Local.AskADIA._SearchAllLadderColumns(searchTerm),
+		                [TableName] = _BareTable
+		                    && [Ladder] IN SELECTCOLUMNS(_MyHierarchies, "@Ladder", [H])
+		            ),
+		            "1" & _FS & SUBSTITUTE(SUBSTITUTE([ColumnName] & ": " & [MatchedValue], _RS, " "), "|", _PE),
+		            _RS
+		        )
+		    )
+		VAR _ConcatGeneric =
+		    IF(_IsSupported && NOT _IsRanked && NOT _IsLadder,
+		        VAR _Lit =
+		            SELECTCOLUMNS(
+		                FILTER(VALUES(searchColumn), CONTAINSSTRING(searchColumn, searchTerm)),
+		                "MatchedValue", searchColumn & ""
+		            )
+		        VAR _Syn = Local.AskADIA._GetColumnSynonymMatches(searchColumn, searchTerm)
+		        VAR _All = DISTINCT(UNION(_Lit, _Syn))
+		        RETURN
+		            CONCATENATEX(
+		                TOPN(20, _All, [MatchedValue], ASC),
+		                "1" & _FS & SUBSTITUTE(SUBSTITUTE([MatchedValue], _RS, " "), "|", _PE),
+		                _RS
+		            )
+		    )
+		VAR _ConcatError =
+		    IF(NOT _IsSupported,
+		        "0" & _FS & "ERROR: Column '" & _ColName & "' is not a supported searchable column. Call DiscoverQuestions() or DiscoverMeasures() to see valid columns."
+		    )
+		VAR _Concat = COALESCE(_ConcatRanker, _ConcatLadder, _ConcatGeneric, _ConcatError, "")
+		VAR _RowCount =
+		    IF(LEN(_Concat) = 0, 0,
+		        LEN(_Concat) - LEN(SUBSTITUTE(_Concat, _RS, "")) + 1
+		    )
+		VAR _PathReady = SUBSTITUTE(_Concat, _RS, "|")
+		VAR _Series = GENERATESERIES(1, _RowCount)
+		VAR _Tokens = SELECTCOLUMNS(_Series, "Token", PATHITEM(_PathReady, [Value]))
+		RETURN
+		    SELECTCOLUMNS(
+		        _Tokens,
+		        "SearchResult", SUBSTITUTE(MID([Token], FIND(_FS, [Token]) + 1, LEN([Token])), _PE, "|"),
+		        "Rank", VALUE(LEFT([Token], FIND(_FS, [Token]) - 1))
+		    )
+
+/// Searches curated hierarchy ladders (Copilot_SearchLadder=true) scoped to tables reachable from the given measure. Empty searchTerm returns no rows.
+/// 
+/// Parameters:
+/// - searchTerm: Substring to search for across hierarchy levels (case-insensitive CONTAINSSTRING).
+/// - measureName: Measure name from DiscoverMeasures(). Restricts the searched ladders to those reachable by the measure.
+/// 
+/// Returns rows: [Ladder], [Position], [TableName], [ColumnName], [MatchedValue]. Use [TableName]+[ColumnName] in GenerateQuery filters string.
+function 'Local.AskADIA.SearchHierarchy' =
+		(searchTerm: SCALAR STRING VAL, measureName: SCALAR STRING VAL) =>
+		VAR _MeasureRow = FILTER(_INFO_MEASURES, _INFO_MEASURES[Name] = measureName)
+		VAR _MeasureExists = COUNTROWS(_MeasureRow) > 0
+		VAR _HasSearchTerm = LEN(TRIM(searchTerm)) > 0
+		VAR _ReachableTables =
+		    CALCULATETABLE(
+		        DISTINCT(_COPILOT_MEASURE_COLUMNS[ColumnTable]),
+		        _COPILOT_MEASURE_COLUMNS[MeasureName] = measureName
+		    )
+		VAR _ActiveLadderTables =
+		    CALCULATETABLE(
+		        SELECTCOLUMNS(_INFO_ANNOTATIONS, "LT", _INFO_ANNOTATIONS[TableName]),
+		        _INFO_ANNOTATIONS[AnnotationName] = "Copilot_SearchLadder",
+		        _INFO_ANNOTATIONS[AnnotationValue] = "true",
+		        _INFO_ANNOTATIONS[ObjectType] = "Hierarchy"
+		    )
+		VAR _ReachableLadderTables = FILTER(_ActiveLadderTables, [LT] IN _ReachableTables)
+		VAR _AllMatches = Local.AskADIA._SearchAllLadderColumns(searchTerm)
+		VAR _ValidColRefs =
+		    CALCULATETABLE(
+		        SELECTCOLUMNS(
+		            _COPILOT_MEASURE_COLUMNS,
+		            "Ref", _COPILOT_MEASURE_COLUMNS[ColumnTable] & "|" & _COPILOT_MEASURE_COLUMNS[ColumnName]
+		        ),
+		        _COPILOT_MEASURE_COLUMNS[MeasureName] = measureName
+		    )
+		VAR _Gated =
+		    FILTER(
+		        _AllMatches,
+		        [TableName] IN _ReachableLadderTables
+		            && ([TableName] & "|" & [ColumnName]) IN _ValidColRefs
+		    )
+		VAR _HitCount = COUNTROWS(_Gated)
+		VAR _Attempted =
+		    SELECTCOLUMNS(
+		        FILTER(
+		            _INFO_HIERARCHIES,
+		            _INFO_HIERARCHIES[TableName] IN _ReachableLadderTables
+		                && (_INFO_HIERARCHIES[TableName] & "|" & _INFO_HIERARCHIES[ColumnName]) IN _ValidColRefs
+		        ),
+		        "Ladder", _INFO_HIERARCHIES[HierarchyName],
+		        "Position", _INFO_HIERARCHIES[LevelOrdinal],
+		        "TableName", _INFO_HIERARCHIES[TableName],
+		        "ColumnName", _INFO_HIERARCHIES[ColumnName],
+		        "MatchedValue", "(no match for '" & searchTerm & "')"
+		    )
+		RETURN
+		    UNION(
+		        FILTER(
+		            ROW("Ladder", "ERROR", "Position", 0, "TableName", "", "ColumnName", "", "MatchedValue", "Measure '" & measureName & "' not found. Call DiscoverMeasures()."),
+		            NOT _MeasureExists
+		        ),
+		        FILTER(_Gated, _MeasureExists && _HasSearchTerm && _HitCount > 0),
+		        FILTER(_Attempted, _MeasureExists && _HasSearchTerm && _HitCount = 0)
+		    )
+
+/// INTERNAL: Resolves Copilot_ValueSynonyms matches for any column. Returns (MatchedValue) where MatchedValue is the canonical column value whose synonym text contains searchTerm. Reads pre-parsed (synonym, canonical) tuples from _COPILOT_VALUE_SYNONYMS, then gates by canonical-existence in the column's current filter context (so a synonym pointing at a value filtered out elsewhere doesn't surface). Single source of truth for synonym matching across the ladder branch (called from _SearchAllLadderColumns codegen) and the generic branch (called from SearchValues._ConcatGeneric). Type-safe canonical gate via "& """ string-coercion of column values, so non-string columns work too.
+function 'Local.AskADIA._GetColumnSynonymMatches' = ```
+		(searchColumn: ANYREF EXPR, searchTerm: SCALAR STRING VAL) =>
+		VAR _ColRef = NAMEOF(searchColumn)
+		VAR _ColNorm = SUBSTITUTE(_ColRef, "'", "")
+		VAR _BarePos = FIND("[", _ColNorm, 1, 0)
+		VAR _BareT = IF(_BarePos > 0, LEFT(_ColNorm, _BarePos - 1), _ColNorm)
+		VAR _BareC = IF(_BarePos > 0, MID(_ColNorm, _BarePos + 1, LEN(_ColNorm) - _BarePos - 1), "")
+		VAR _Pairs =
+		    FILTER(
+		        _COPILOT_VALUE_SYNONYMS,
+		        _COPILOT_VALUE_SYNONYMS[TableName] = _BareT
+		            && _COPILOT_VALUE_SYNONYMS[ColumnName] = _BareC
+		            && CONTAINSSTRING(_COPILOT_VALUE_SYNONYMS[Synonym], searchTerm)
+		    )
+		VAR _ColValues = SELECTCOLUMNS(VALUES(searchColumn), "_V", searchColumn & "")
+		VAR _Matched = FILTER(_Pairs, CONTAINSROW(_ColValues, _COPILOT_VALUE_SYNONYMS[Canonical]))
+		RETURN DISTINCT(SELECTCOLUMNS(_Matched, "MatchedValue", _COPILOT_VALUE_SYNONYMS[Canonical]))
+		
+		```
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL per-model search helper. Returns (Ladder, Position, TableName, ColumnName, MatchedValue) for any value in any annotated ladder column that contains searchTerm. Per-column VALUES + CONTAINSSTRING — dictionary-only, never touches base data. Used by SearchHierarchy directly and by _SearchAllValues (via reshape). This declaration is the empty-stub shared canonical: body is regenerated PER-MODEL by .deploy/workspace/askadia/deploy/tabular_scripts/generateSearchHelpers.csx from each model's Copilot_SearchLadder annotations — DO NOT hand-edit between BEGIN/END GENERATED markers.
+function 'Local.AskADIA._SearchAllLadderColumns' =
+		(searchTerm: SCALAR STRING VAL) =>
+		// BEGIN GENERATED — DO NOT EDIT (regenerated by generateSearchHelpers.csx)
+		VAR _Empty =
+		    SELECTCOLUMNS(
+		        FILTER(ROW("_", 1), FALSE()),
+		        "Ladder", "", "Position", 0, "TableName", "", "ColumnName", "", "MatchedValue", ""
+		    )
+		// END GENERATED
+		RETURN _Empty
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin
+
+/// INTERNAL per-model ranker dispatcher. Returns a CONCATENATEX'd scalar string of [Rank]<TAB>[SearchResult] rows joined by UNICHAR(10), for the single Copilot_SearchRanker column whose fully-qualified name (e.g. "'Account'[Account]") matches targetCol. Per-ranker branches are guarded by scalar IF so only the matching ranker materializes — non-matching branches return BLANK without evaluating their CONCATENATEX subtree. Caller SearchValues splits the result back into rows via PATHITEM on UNICHAR(10). This declaration is the empty-stub shared canonical: body is regenerated PER-MODEL by .deploy/workspace/askadia/deploy/tabular_scripts/generateSearchHelpers.csx from each model's Copilot_SearchRanker annotations — DO NOT hand-edit between BEGIN/END GENERATED markers.
+function 'Local.AskADIA._SearchAllValues' =
+		(searchTerm: SCALAR STRING VAL, targetCol: SCALAR STRING VAL) =>
+		// BEGIN GENERATED — DO NOT EDIT (regenerated by generateSearchHelpers.csx)
+		""
+		// END GENERATED
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin

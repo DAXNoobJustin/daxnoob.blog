@@ -1,0 +1,42 @@
+source_model: Azure Data Insights
+# General-purpose example — these have NOTHING to do with the AskADIA UDFs.
+# They show the harness asserting plain business/data-quality invariants, the
+# kind of check any team would gate a model on. The idiom for an invariant is:
+# write DAX that returns rows ONLY when the rule is violated, then assert the
+# result is empty (expected_row_count.exact = 0). A healthy model => 0 rows;
+# a failure surfaces exactly which rows broke the rule.
+cases:
+  # Pattern 1 — "row count above N". A date dimension should span at least a
+  # full year. Returns a row only if Calendar has fewer than 360 rows.
+  - id: smoke_calendar_spans_full_year
+    description: Calendar dimension covers at least a full fiscal year (>= 360 rows).
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+        ROW("CalendarRows", COUNTROWS('Calendar')),
+        [CalendarRows] < 360
+      )
+    expected_row_count:
+      exact: 0
+
+  # Pattern 2 — "we expect X relates to Z". Revenue should never be negative
+  # for any product. Returns the offending products (and their value) if the
+  # invariant is broken; healthy data => 0 rows.
+  - id: smoke_revenue_is_non_negative
+    description: No product has negative year-to-date revenue.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+        SUMMARIZECOLUMNS(
+          'Product Master'[Product],
+          "RevYTD", [Consumed + Adjusted Revenue (YTD)]
+        ),
+        [RevYTD] < 0
+      )
+    expected_columns:
+      - "Product Master[Product]"
+      - "[RevYTD]"
+    expected_row_count:
+      exact: 0

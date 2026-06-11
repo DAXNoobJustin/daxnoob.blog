@@ -1,0 +1,31 @@
+source_model: Azure Data Insights
+cases:
+  - id: list_columns_tenant
+    description: DiscoverColumns filtered with the "tenant" search term — matches the Environment dimension via its Copilot synonym (Insights-specific search term).
+    category: structural
+    dax: 'EVALUATE Local.AskADIA.DiscoverColumns("tenant")
+
+      '
+    expected_columns:
+      - "[TableName]"
+      - "[ColumnName]"
+      - "[ColumnRef]"
+      - "[Description]"
+      - "[DataType]"
+      - "[Synonyms]"
+      - "[Tags]"
+      - "[Behaviors]"
+    expected_row_count:
+      min: 1
+  - id: discover_columns_tenant_snapshot
+    description: DiscoverColumns("tenant") full-rowset baseline. Diff-on-refactor for Behavior column add.
+    category: snapshot
+    dax: 'EVALUATE Local.AskADIA.DiscoverColumns("tenant")
+
+      '
+  - id: discover_columns_account_accountkey_snapshot
+    description: DiscoverColumns("AccountKey") full-rowset baseline — verifies Account[AccountKey] (Sliceable + Searchable).
+    category: snapshot
+    dax: 'EVALUATE Local.AskADIA.DiscoverColumns("AccountKey")
+
+      '

@@ -1,0 +1,87 @@
+/// Copilot question registry. Contains all curated questions with measures, group-by columns, filters, DAX wrappers, and multi-section orchestrator support. Pipe-separated encoding: use PATHITEM() to split at runtime. Filter format: 'Table'[Column]=Value1;Value2 (| between entries, ; between values within one entry). SectionIndex=1 for standalone questions and first section of orchestrators. SectionIndex>1 for additional orchestrator sections.
+table _COPILOT_QUESTIONS
+	isHidden
+
+	column QuestionId
+		isNameInferred
+		sourceColumn: [QuestionId]
+
+	column Question
+		isNameInferred
+		sourceColumn: [Question]
+
+	column Description
+		isNameInferred
+		sourceColumn: [Description]
+
+	column Measures
+		isNameInferred
+		sourceColumn: [Measures]
+
+	column HardcodedGroupBy
+		isNameInferred
+		sourceColumn: [HardcodedGroupBy]
+
+	column DefaultFilters
+		isNameInferred
+		sourceColumn: [DefaultFilters]
+
+	column HardcodedFilters
+		isNameInferred
+		sourceColumn: [HardcodedFilters]
+
+	column HardcodedNotInFilters
+		isNameInferred
+		sourceColumn: [HardcodedNotInFilters]
+
+	column RequiredFilters
+		isNameInferred
+		sourceColumn: [RequiredFilters]
+
+	column DaxWrapper
+		isNameInferred
+		sourceColumn: [DaxWrapper]
+
+	column IsOrchestrator
+		isNameInferred
+		sourceColumn: [IsOrchestrator]
+
+	column SectionIndex
+		isNameInferred
+		sourceColumn: [SectionIndex]
+
+	column SectionLabel
+		isNameInferred
+		sourceColumn: [SectionLabel]
+
+	column FactName = VAR _M = _COPILOT_QUESTIONS[Measures] RETURN MAXX(FILTER(_COPILOT_MEASURE_COLUMNS, CONTAINSSTRING(_M, "[" & _COPILOT_MEASURE_COLUMNS[MeasureName] & "]")), _COPILOT_MEASURE_COLUMNS[MeasureTable])
+		dataType: string
+
+	column Topic = VAR _Fact = _COPILOT_QUESTIONS[FactName] RETURN COALESCE(MAXX(FILTER(_COPILOT_MEASURE_COLUMNS, _COPILOT_MEASURE_COLUMNS[MeasureTable] = _Fact), _COPILOT_MEASURE_COLUMNS[Topic]), "")
+		dataType: string
+
+	partition _COPILOT_QUESTIONS = calculated
+		mode: import
+		source =
+					DATATABLE(
+					    "QuestionId", STRING,
+					    "Question", STRING,
+					    "Description", STRING,
+					    "Measures", STRING,
+					    "HardcodedGroupBy", STRING,
+					    "DefaultFilters", STRING,
+					    "HardcodedFilters", STRING,
+					    "HardcodedNotInFilters", STRING,
+					    "RequiredFilters", STRING,
+					    "DaxWrapper", STRING,
+					    "IsOrchestrator", BOOLEAN,
+					    "SectionIndex", INTEGER,
+					    "SectionLabel", STRING,
+					    {
+					        {"_PLACEHOLDER", "_PLACEHOLDER", "_PLACEHOLDER", "_PLACEHOLDER", "_PLACEHOLDER", "_PLACEHOLDER", "_PLACEHOLDER", "_PLACEHOLDER", "_PLACEHOLDER", "_PLACEHOLDER", FALSE, 1, "_PLACEHOLDER"}
+					    }
+					)
+
+	annotation TabularEditor_TableGroup = Other
+
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}

@@ -1,0 +1,169 @@
+/// Azure consumed revenue credited to partners through customer attach — that is, the partner's customers consuming Azure. Grain is (DIM_ConsumptionId × PartnerIdConsumption); a single consumption row can be credited to multiple partners.
+table 'Partner Influenced Revenue'
+
+	measure _MaxMonthId_Revenue_PartnerInfluenced =
+			IF (
+			    ISCROSSFILTERED ( Calendar ),
+			    CALCULATE ( MAX ( Calendar[FiscalMonthId] ),Calendar[Closed Month Flag] = "True"),
+			    CALCULATE ( MAX ( Calendar[FiscalMonthId] ), Calendar[Azure Closed Month Flag] = "True" )
+			)
+		formatString: #,0
+		isHidden
+
+	/// Month-to-date variant of [Partner Influenced Consumed Revenue], scoped to the most recent fiscal month in the data via TOTALMTD. Default: closed-month gating.
+	measure 'Partner Influenced Consumed Revenue (MTD)' =
+			VAR MaxMonthId = [_MaxMonthId_Revenue_PartnerInfluenced]
+			RETURN
+			    CALCULATE(
+			        TOTALMTD( [Partner Influenced Consumed Revenue], Calendar[Calendar Date] ),
+			        Calendar[FiscalMonthId] = MaxMonthId,
+			        'Partner Influenced Revenue'[RevenueAmount] <> 0
+			    )
+		formatString: $ #,##0
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_DefaultFilter = 'Calendar'[Azure Closed Month Flag]=True
+
+	/// Quarter-to-date variant of [Partner Influenced Consumed Revenue], scoped to the current fiscal quarter via TOTALQTD. Default: closed-month gating.
+	measure 'Partner Influenced Consumed Revenue (QTD)' =
+			VAR MaxMonthId = [_MaxMonthId_Revenue_PartnerInfluenced]
+			RETURN
+			    CALCULATE(
+			        TOTALQTD( [Partner Influenced Consumed Revenue], Calendar[Calendar Date] ),
+			        Calendar[FiscalMonthId] = MaxMonthId,
+			        'Partner Influenced Revenue'[RevenueAmount] <> 0
+			    )
+		formatString: $ #,##0
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_DefaultFilter = 'Calendar'[Azure Closed Month Flag]=True
+
+	/// Fiscal-year-to-date variant of [Partner Influenced Consumed Revenue], scoped to the current fiscal year via TOTALYTD with fiscal year-end '06-30'. Default: closed-month gating.
+	measure 'Partner Influenced Consumed Revenue (YTD)' =
+			VAR MaxMonthId = [_MaxMonthId_Revenue_PartnerInfluenced]
+			RETURN
+			    CALCULATE(
+			        TOTALYTD( [Partner Influenced Consumed Revenue], Calendar[Calendar Date], "06-30" ),
+			        Calendar[FiscalMonthId] = MaxMonthId,
+			        'Partner Influenced Revenue'[RevenueAmount] <> 0
+			    )
+		formatString: $ #,##0
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_DefaultFilter = 'Calendar'[Azure Closed Month Flag]=True
+
+	/// Sum of Azure consumed revenue credited to selected partners through customer attach. Deduplicated across the (DIM_ConsumptionId × PartnerIdConsumption) grain so a single consumption row attributed to multiple partners is counted once per partner. Default: closed-month gating ('Calendar'[Azure Closed Month Flag]=True).
+	measure 'Partner Influenced Consumed Revenue' =
+			SUMX(
+			    SUMMARIZE(
+			        'Partner Influenced Revenue',
+			        'Partner Influenced Revenue'[DIM_ConsumptionId],
+			        'Partner Influenced Revenue'[PartnerIdConsumption]
+			    ),
+			    'Partner Influenced Revenue'[PartnerIdConsumption]
+			)
+		formatString: $ #,##0
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_DefaultFilter = 'Calendar'[Azure Closed Month Flag]=True
+
+	column 'Association Type'
+		dataType: string
+		sourceColumn: AssociationType
+
+	/// Revenue amount
+	column RevenueAmount
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: RevenueAmount
+
+	column DIM_ConsumptionId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_ConsumptionId
+
+	column DIM_CalendarKey
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_CalendarKey
+
+	column DIM_PartnerId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_PartnerId
+
+	/// DIM_ProductFamilyId
+	column DIM_ProductFamilyId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_ProductFamilyId
+
+	/// DIM_ProductMasterId
+	column DIM_ProductMasterId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_ProductMasterId
+
+	/// DIM_SubSegmentId
+	column DIM_SubSegmentId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubSegmentId
+
+	/// DIM_SubsidiarySubDistrictId
+	column DIM_SubsidiarySubDistrictId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubsidiarySubDistrictId
+
+	/// DIM_AccountKey
+	column DIM_AccountKey
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_AccountKey
+
+	column PartnerIdConsumption
+		dataType: decimal
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: PartnerIdConsumption
+
+	partition 'Partner Influenced Revenue' = entity
+		mode: directLake
+		source
+			entityName: FACT_Revenue_PartnerInfluenced
+			schemaName: Tabular_PartnerCommunity
+			expressionSource: exp_directlake_restricted
+
+	extendedProperty SourceColumn = Upstream Finance Source
+
+	extendedProperty SourceColumn2 = Azure Data Insights and Analytics
+
+	annotation TabularEditor_TableGroup = Fact-PartnerCommunity
+
+	annotation Copilot_Topic = influenced_revenue
+

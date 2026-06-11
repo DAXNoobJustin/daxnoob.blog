@@ -1,0 +1,54 @@
+source_model: Azure Data Partner & Community
+# Refresh sanity — P&C per-model partner ranker UDF
+# (Local.AskADIA._RankPartners) produces ranked Partner rows for a search
+# term. Validates two things on Main PRs:
+#   1. The ranker UDF still resolves (would fail at deploy time anyway via
+#      generateSearchHelpers.csx, but cheap belt-and-suspenders).
+#   2. After a Full refresh of the DirectLake Partner dim, the ranker
+#      returns at least one row for a known-populated search term — i.e. the
+#      The Partner DirectLake binding has data and the Influenced
+#      Revenue MTD signal aggregates correctly through 'Partner Influenced
+#      Revenue'.
+#
+# "Microsoft" is a permissive search term — substring match returns multiple
+# hits across the partner ecosystem (e.g. partners with "Microsoft" embedded
+# in their Partner Name). Not asserting on row content because the ranker's
+# Membership Level + Status enrichment is newer; brittle assertions
+# would just regenerate snapshots every iteration.
+cases:
+  - id: smoke_rank_partners_returns_rows
+    description: |
+      _RankPartners("Microsoft") returns at least one ranked row after Full
+      refresh. Catches: ranker UDF removed, Partner DirectLake binding
+      empty, Partner Influenced Revenue fact empty, Membership Level/Status
+      enrichment regression that drops all rows.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+        { COUNTROWS(Local.AskADIA._RankPartners("Microsoft")) },
+        [Value] > 0
+      )
+    expected_row_count:
+      exact: 1
+
+  - id: smoke_search_values_pipe_escape
+    description: |
+      SearchValues('Partner'[Partner Name], "fabrikam") returns the
+      "Contoso | A Fabrikam Company" row with its (Partner Id: ...) enrichment
+      intact. Catches regression of the SearchValues dispatcher pipe-escape
+      contract (UNICHAR(57344) PUA sentinel in askadia/udf/common/functions.tmdl):
+      the dispatcher concatenates SearchResult rows with LF then swaps LF for
+      "|" so DAX PATHITEM can re-tokenize. Without escaping pre-existing "|"
+      characters in source data, any Partner name containing "|" (e.g.
+      "Contoso | A Fabrikam Company", Partner Id 5550001) gets fragmented at
+      its embedded pipe, dropping the Id/Revenue/Membership tail. Asserts the
+      contiguous substring "Contoso | A Fabrikam Company (Partner Id:" — only
+      intact when the dispatcher escape is in place.
+    category: structural
+    dax: |
+      EVALUATE Local.AskADIA.SearchValues('Partner'[Partner Name], "fabrikam")
+    expected_row_count:
+      min: 2
+    contains_all:
+      - "Contoso | A Fabrikam Company (Partner Id:"

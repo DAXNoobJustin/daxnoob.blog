@@ -1,0 +1,56 @@
+[project]
+name = "helixutils"
+authors = [{ name = "Microsoft Corporation" }]
+description = "Common utilities for developing in Microsoft Fabric Spark environments"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10,<3.13"
+dynamic = ["version"]
+keywords = ["fabric", "spark", "azure", "data", "analytics", "helix"]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+
+dependencies = [
+    "pydeequ>=1.1.0",
+    "requests>=2.25.0",
+    "typing-extensions>=4.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "delta-spark>=3.3.0",
+    "dummy-notebookutils>=1.5.4",
+    "pandas>=1.5.0",
+    "pyspark>=3.5.4",
+    "python-dateutil>=2.8.0",
+    "pytz>=2023.0",
+    "semantic-link>=0.9.0",
+    "ruff>=0.1.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+dynamic.version = { file = "VERSION" }
+packages.find.where = ["src"]
+packages.find.include = ["helixutils*"]
+
+[tool.setuptools.package-data]
+helixutils = ["py.typed"]
+
+[tool.uv]
+package = true
+python-preference = "only-managed"

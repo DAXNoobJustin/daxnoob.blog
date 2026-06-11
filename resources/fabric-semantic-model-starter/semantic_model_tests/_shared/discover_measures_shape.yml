@@ -1,0 +1,21 @@
+# Framework contract — DiscoverMeasures UDF.
+#
+# Cross-model assertion: the UDF returns a single-row scalar response without
+# erroring. We do NOT assert on the prose content (e.g. "Total measures:")
+# here — that string is part of the UDF's English copy and would couple every
+# model's CI to UDF wording. Per-model catalogs add stronger assertions on
+# specific measure names (e.g. semantic_model_tests/azure_data_insights/unit/discover_measures.yml).
+cases:
+  - id: framework_measures_empty_search_returns_scalar
+    description: DiscoverMeasures("") returns a single-row scalar without erroring.
+    category: structural
+    dax: 'EVALUATE { Local.AskADIA.DiscoverMeasures("") }'
+    expected_row_count:
+      exact: 1
+
+  - id: framework_measures_no_match_returns_scalar
+    description: DiscoverMeasures with nonsense term still returns a single-row scalar (no crash).
+    category: structural
+    dax: 'EVALUATE { Local.AskADIA.DiscoverMeasures("__zzz_no_such_measure__") }'
+    expected_row_count:
+      exact: 1

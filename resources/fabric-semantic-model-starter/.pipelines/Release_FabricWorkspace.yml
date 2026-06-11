@@ -1,0 +1,117 @@
+# Deploy Fabric workspace items with fabric-cicd (standard Azure DevOps pipeline).
+#
+# Branch-based workspace targeting: a push to Develop / Test / Main deploys the
+# semantic models to the matching workspace. The deploy invokes this repo's
+# engine (.deploy/workspace/deploy_workspace.py), which wraps the open-source
+# fabric-cicd library with the pre/post-processing operations described in the
+# talk -- AskADIA framework injection, time-intel variant generation,
+#      branch-aware parameter swap, and a post-deploy Calculate refresh.
+#
+# Setup (one-time):
+#   1. Create an Azure Resource Manager service connection backed by a service
+#      principal, and set `service_connection` below.
+#   2. Add that service principal to each target Fabric workspace as Contributor
+#      (service principals must be enabled for Fabric APIs at the tenant level).
+#   3. Fill in your per-branch workspace IDs in `workspace_ids`.
+#
+# Reference: https://learn.microsoft.com/power-bi/developer/projects/projects-deploy-fabric-cicd
+
+trigger:
+  branches:
+    include: [Develop, Test, Main]
+  batch: true
+  paths:
+    include:
+      - workspace/HelixFabric-Insights
+      # The deploy engine + AskADIA framework content are spliced into the
+      # models at deploy time, so edits to either must redeploy too.
+      - .deploy/workspace
+
+variables:
+  - name: service_connection
+    value: "your-azure-service-connection" # ARM service connection name
+  - name: workspace_directory_name
+    value: "HelixFabric-Insights"
+  - name: item_type_in_scope
+    value: '["SemanticModel"]'
+  # Branch -> target Fabric workspace ID. Replace with your own workspace GUIDs.
+  - name: workspace_ids
+    value: |
+      {
+        "Develop": "<dev-workspace-id>",
+        "Test": "<test-workspace-id>",
+        "Main": "<prod-workspace-id>",
+        "default": "<dev-workspace-id>"
+      }
+  # Branch -> fabric-cicd environment key (matches the keys in parameter.yml).
+  - name: environments
+    value: |
+      {
+        "Develop": "dev",
+        "Test": "test",
+        "Main": "prod",
+        "default": "dev"
+      }
+  # Branch -> release flavor consumed by the deploy engine (test vs prod).
+  - name: release_types
+    value: |
+      {
+        "Develop": "test",
+        "Test": "test",
+        "Main": "prod",
+        "default": "test"
+      }
+
+stages:
+  - stage: Deploy
+    jobs:
+      - job: DeployWorkspace
+        pool:
+          vmImage: windows-latest
+        steps:
+          - checkout: self
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "3.12"
+              addToPath: true
+          - task: AzureCLI@2
+            displayName: "Deploy Fabric workspace with fabric-cicd"
+            inputs:
+              azureSubscription: $(service_connection)
+              scriptType: ps
+              scriptLocation: inlineScript
+              inlineScript: |
+                python -m pip install --upgrade pip
+                python -m pip install fabric-cicd requests
+
+                $branch        = "$(Build.SourceBranchName)"
+                $workspace_ids = '$(workspace_ids)' | ConvertFrom-Json
+                $environments  = '$(environments)'  | ConvertFrom-Json
+                $release_types = '$(release_types)' | ConvertFrom-Json
+
+                function Pick($map, $key) {
+                  if ($map.PSObject.Properties.Name -contains $key) { $map.$key } else { $map.default }
+                }
+                $workspace_id = Pick $workspace_ids $branch
+                $environment  = Pick $environments  $branch
+                $release_type = Pick $release_types $branch
+                $item_type_in_scope = '$(item_type_in_scope)' | ConvertFrom-Json
+
+                python ".deploy/workspace/deploy_workspace.py" `
+                  --workspace_id "$workspace_id" `
+                  --workspace_directory_name "$(workspace_directory_name)" `
+                  --environment "$environment" `
+                  --release_type "$release_type" `
+                  --item_type_in_scope $item_type_in_scope
+
+                if ($LASTEXITCODE -ne 0) {
+                  Write-Error "fabric-cicd deployment failed (exit $LASTEXITCODE)"
+                  exit $LASTEXITCODE
+                }
+          - powershell: |
+              if (Test-Path "fabric_cicd.error.log") {
+                Write-Host "=== fabric_cicd.error.log ==="
+                Get-Content "fabric_cicd.error.log"
+              }
+            displayName: "fabric-cicd error log"
+            condition: always()

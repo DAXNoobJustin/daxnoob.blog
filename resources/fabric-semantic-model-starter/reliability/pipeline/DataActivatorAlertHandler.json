@@ -1,0 +1,696 @@
+{
+  "name": "Semantic Model Alerting System",
+  "objectId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000f1",
+  "properties": {
+    "activities": [
+      {
+        "name": "Check Incident Cooldown",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "source": {
+            "type": "FabricSqlDatabaseSource",
+            "sqlReaderQuery": {
+              "value": "IF '@{trim(pipeline().parameters.AlertType)}' <> 'PerformanceDegradation' EXEC [dbo].[ClaimAlertSlot] @ItemId = '@{trim(pipeline().parameters.ItemId)}', @ItemName = '@{trim(pipeline().parameters.ItemName)}', @AlertType = '@{trim(pipeline().parameters.AlertType)}', @ActionType = 'Incident', @CooldownMinutes = @{json(string(pipeline().parameters.CooldownConfig))[trim(pipeline().parameters.AlertType)]} ELSE SELECT 0 AS Claimed",
+              "type": "Expression"
+            },
+            "queryTimeout": "02:00:00",
+            "partitionOption": "None"
+          },
+          "firstRowOnly": true,
+          "datasetSettings": {
+            "annotations": [],
+            "connectionSettings": {
+              "name": "aaaaaaaa_aaaa_aaaa_aaaa_0000000000c7",
+              "properties": {
+                "annotations": [],
+                "type": "FabricSqlDatabase",
+                "typeProperties": {
+                  "workspaceId": "@pipeline().parameters.AlertingDbWorkspaceId",
+                  "artifactId": "@pipeline().parameters.AlertingDbArtifactId"
+                },
+                "externalReferences": {
+                  "connection": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c4"
+                }
+              }
+            },
+            "type": "FabricSqlDatabaseTable",
+            "schema": []
+          }
+        }
+      },
+      {
+        "name": "Check Refresh Cooldown",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "source": {
+            "type": "FabricSqlDatabaseSource",
+            "sqlReaderQuery": {
+              "value": "IF '@{trim(pipeline().parameters.AlertType)}' IN ('OneLakeSecurityError') EXEC [dbo].[ClaimAlertSlot] @ItemId = '@{trim(pipeline().parameters.ItemId)}', @ItemName = '@{trim(pipeline().parameters.ItemName)}', @AlertType = '@{trim(pipeline().parameters.AlertType)}', @ActionType = 'Refresh', @CooldownMinutes = @{json(string(pipeline().parameters.CooldownConfig))[trim(pipeline().parameters.AlertType)]} ELSE SELECT 0 AS Claimed",
+              "type": "Expression"
+            },
+            "queryTimeout": "02:00:00",
+            "partitionOption": "None"
+          },
+          "firstRowOnly": true,
+          "datasetSettings": {
+            "annotations": [],
+            "connectionSettings": {
+              "name": "aaaaaaaa_aaaa_aaaa_aaaa_0000000000c6",
+              "properties": {
+                "annotations": [],
+                "type": "FabricSqlDatabase",
+                "typeProperties": {
+                  "workspaceId": "@pipeline().parameters.AlertingDbWorkspaceId",
+                  "artifactId": "@pipeline().parameters.AlertingDbArtifactId"
+                },
+                "externalReferences": {
+                  "connection": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c4"
+                }
+              }
+            },
+            "type": "FabricSqlDatabaseTable",
+            "schema": []
+          }
+        }
+      },
+      {
+        "name": "If Incident Not In Cooldown",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Check Incident Cooldown",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@and(equals(activity('Check Incident Cooldown').output.firstRow.Claimed, 1), not(equals(trim(pipeline().parameters.AlertType), 'PerformanceDegradation')))",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [],
+          "ifTrueActivities": [
+            {
+              "name": "Get Function App Key",
+              "type": "WebActivity",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": true,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "method": "GET",
+                "relativeUrl": "secrets/incident-function-key?api-version=7.2"
+              },
+              "externalReferences": {
+                "connection": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c1"
+              }
+            },
+            {
+              "name": "Create Incident",
+              "type": "WebActivity",
+              "dependsOn": [
+                {
+                  "activity": "Get Function App Key",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 2,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "method": "POST",
+                "headers": {
+                  "Content-Type": "application/json"
+                },
+                "relativeUrl": {
+                  "value": "create-incident?code=@{activity('Get Function App Key').output.value}",
+                  "type": "Expression"
+                },
+                "body": {
+                  "value": "{\n    \"title\": \"[AUTOMATED] @{trim(pipeline().parameters.AlertType)} - @{trim(pipeline().parameters.ItemName)}\",\n    \"description\": \"@{base64(pipeline().parameters.IncidentMessage)}\",\n    \"severity\": @{pipeline().parameters.IncidentSeverity},\n    \"symptom\": \"Error\",\n    \"owningTeam\": \"@{pipeline().parameters.IncidentOwningTeam}\"\n}",
+                  "type": "Expression"
+                }
+              },
+              "externalReferences": {
+                "connection": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c2"
+              }
+            },
+            {
+              "name": "Set IncidentLink",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "Create Incident",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "variableName": "IncidentLink",
+                "value": {
+                  "value": "@concat('https://<your-incident-portal>/incident/',activity('Create Incident').output.incidentId,'/summary')",
+                  "type": "Expression"
+                }
+              }
+            },
+            {
+              "name": "Default IncidentLink",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "Set IncidentLink",
+                  "dependencyConditions": [
+                    "Failed",
+                    "Skipped"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "variableName": "IncidentLink",
+                "value": "Function did not return incident"
+              }
+            },
+            {
+              "name": "Log Incident Alert",
+              "type": "SqlServerStoredProcedure",
+              "dependsOn": [
+                {
+                  "activity": "Set IncidentLink",
+                  "dependencyConditions": [
+                    "Succeeded",
+                    "Skipped",
+                    "Failed"
+                  ]
+                },
+                {
+                  "activity": "Default IncidentLink",
+                  "dependencyConditions": [
+                    "Succeeded",
+                    "Skipped"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "storedProcedureName": "[dbo].[UpdateAlertDetails]",
+                "storedProcedureParameters": {
+                  "ItemId": {
+                    "value": {
+                      "value": "@trim(pipeline().parameters.ItemId)",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  },
+                  "AlertType": {
+                    "value": {
+                      "value": "@trim(pipeline().parameters.AlertType)",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  },
+                  "ActionType": {
+                    "value": "Incident",
+                    "type": "String"
+                  },
+                  "IncidentLink": {
+                    "value": {
+                      "value": "@variables('IncidentLink')",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  },
+                  "Details": {
+                    "value": {
+                      "value": "@pipeline().parameters.IncidentMessage",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  }
+                }
+              },
+              "connectionSettings": {
+                "name": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c5",
+                "properties": {
+                  "annotations": [],
+                  "type": "FabricSqlDatabase",
+                  "typeProperties": {
+                    "workspaceId": "@pipeline().parameters.AlertingDbWorkspaceId",
+                    "artifactId": "@pipeline().parameters.AlertingDbArtifactId"
+                  },
+                  "externalReferences": {
+                    "connection": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c4"
+                  }
+                }
+              }
+            },
+            {
+              "name": "Send Teams Message",
+              "type": "MicrosoftTeams",
+              "dependsOn": [
+                {
+                  "activity": "Set IncidentLink",
+                  "dependencyConditions": [
+                    "Succeeded",
+                    "Skipped"
+                  ]
+                },
+                {
+                  "activity": "Default IncidentLink",
+                  "dependencyConditions": [
+                    "Succeeded",
+                    "Skipped"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "operationType": "SendMessageInGroupChat",
+                "content": "<p>@{pipeline().parameters.TeamsMessage}@{if(equals(variables('IncidentLink'), ''), '', concat('<br><br><a href=\"', variables('IncidentLink'), '\">Link to Incident</a>'))}</p>",
+                "chatId": "19:00000000000000000000000000000000@thread.v2"
+              },
+              "externalReferences": {
+                "connection": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c3"
+              }
+            },
+            {
+              "name": "Log Teams Alert",
+              "type": "SqlServerStoredProcedure",
+              "dependsOn": [
+                {
+                  "activity": "Send Teams Message",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "storedProcedureName": "[dbo].[UpdateAlertDetails]",
+                "storedProcedureParameters": {
+                  "ItemId": {
+                    "value": {
+                      "value": "@trim(pipeline().parameters.ItemId)",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  },
+                  "AlertType": {
+                    "value": {
+                      "value": "@trim(pipeline().parameters.AlertType)",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  },
+                  "ActionType": {
+                    "value": "Teams",
+                    "type": "String"
+                  },
+                  "Details": {
+                    "value": {
+                      "value": "@pipeline().parameters.TeamsMessage",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  }
+                }
+              },
+              "connectionSettings": {
+                "name": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c5",
+                "properties": {
+                  "annotations": [],
+                  "type": "FabricSqlDatabase",
+                  "typeProperties": {
+                    "workspaceId": "@pipeline().parameters.AlertingDbWorkspaceId",
+                    "artifactId": "@pipeline().parameters.AlertingDbArtifactId"
+                  },
+                  "externalReferences": {
+                    "connection": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c4"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "Check Teams Cooldown",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 1,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "source": {
+            "type": "FabricSqlDatabaseSource",
+            "sqlReaderQuery": {
+              "value": "IF '@{trim(pipeline().parameters.AlertType)}' = 'PerformanceDegradation' EXEC [dbo].[ClaimAlertSlot] @ItemId = '@{trim(pipeline().parameters.ItemId)}', @ItemName = '@{trim(pipeline().parameters.ItemName)}', @AlertType = '@{trim(pipeline().parameters.AlertType)}', @ActionType = 'Teams', @CooldownMinutes = @{json(string(pipeline().parameters.CooldownConfig))[trim(pipeline().parameters.AlertType)]} ELSE SELECT 0 AS Claimed",
+              "type": "Expression"
+            },
+            "queryTimeout": "02:00:00",
+            "partitionOption": "None"
+          },
+          "firstRowOnly": true,
+          "datasetSettings": {
+            "annotations": [],
+            "connectionSettings": {
+              "name": "aaaaaaaa_aaaa_aaaa_aaaa_0000000000c7",
+              "properties": {
+                "annotations": [],
+                "type": "FabricSqlDatabase",
+                "typeProperties": {
+                  "workspaceId": "@pipeline().parameters.AlertingDbWorkspaceId",
+                  "artifactId": "@pipeline().parameters.AlertingDbArtifactId"
+                },
+                "externalReferences": {
+                  "connection": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c4"
+                }
+              }
+            },
+            "type": "FabricSqlDatabaseTable",
+            "schema": []
+          }
+        }
+      },
+      {
+        "name": "If Teams Not In Cooldown",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Check Teams Cooldown",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@equals(activity('Check Teams Cooldown').output.firstRow.Claimed, 1)",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [],
+          "ifTrueActivities": [
+            {
+              "name": "Send Teams Message - Perf",
+              "type": "MicrosoftTeams",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "operationType": "SendMessageInGroupChat",
+                "content": "<p>@{pipeline().parameters.TeamsMessage}</p>",
+                "chatId": "19:00000000000000000000000000000000@thread.v2"
+              },
+              "externalReferences": {
+                "connection": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c3"
+              }
+            },
+            {
+              "name": "Log Teams Alert - Perf",
+              "type": "SqlServerStoredProcedure",
+              "dependsOn": [
+                {
+                  "activity": "Send Teams Message - Perf",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "storedProcedureName": "[dbo].[UpdateAlertDetails]",
+                "storedProcedureParameters": {
+                  "ItemId": {
+                    "value": {
+                      "value": "@trim(pipeline().parameters.ItemId)",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  },
+                  "AlertType": {
+                    "value": {
+                      "value": "@trim(pipeline().parameters.AlertType)",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  },
+                  "ActionType": {
+                    "value": "Teams",
+                    "type": "String"
+                  },
+                  "Details": {
+                    "value": {
+                      "value": "@pipeline().parameters.TeamsMessage",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  }
+                }
+              },
+              "connectionSettings": {
+                "name": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c5",
+                "properties": {
+                  "annotations": [],
+                  "type": "FabricSqlDatabase",
+                  "typeProperties": {
+                    "workspaceId": "@pipeline().parameters.AlertingDbWorkspaceId",
+                    "artifactId": "@pipeline().parameters.AlertingDbArtifactId"
+                  },
+                  "externalReferences": {
+                    "connection": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c4"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "If Refresh Required",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Check Refresh Cooldown",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@equals(activity('Check Refresh Cooldown').output.firstRow.Claimed, 1)",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [],
+          "ifTrueActivities": [
+            {
+              "name": "Refresh Semantic Model",
+              "type": "TridentNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "notebookId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d2",
+                "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0",
+                "parameters": {
+                  "ItemId": {
+                    "value": {
+                      "value": "@trim(pipeline().parameters.ItemId)",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            {
+              "name": "Log Refresh",
+              "type": "SqlServerStoredProcedure",
+              "dependsOn": [
+                {
+                  "activity": "Refresh Semantic Model",
+                  "dependencyConditions": [
+                    "Succeeded",
+                    "Failed"
+                  ]
+                }
+              ],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 1,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "storedProcedureName": "[dbo].[UpdateAlertDetails]",
+                "storedProcedureParameters": {
+                  "ItemId": {
+                    "value": {
+                      "value": "@trim(pipeline().parameters.ItemId)",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  },
+                  "AlertType": {
+                    "value": {
+                      "value": "@trim(pipeline().parameters.AlertType)",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  },
+                  "ActionType": {
+                    "value": "Refresh",
+                    "type": "String"
+                  },
+                  "Details": {
+                    "value": {
+                      "value": "@concat(if(equals(activity('Refresh Semantic Model').status, 'Succeeded'), 'Model refresh succeeded', 'Model refresh FAILED'), ' | ', trim(pipeline().parameters.ItemName), ' | ItemId: ', trim(pipeline().parameters.ItemId))",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  }
+                }
+              },
+              "connectionSettings": {
+                "name": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c5",
+                "properties": {
+                  "annotations": [],
+                  "type": "FabricSqlDatabase",
+                  "typeProperties": {
+                    "workspaceId": "@pipeline().parameters.AlertingDbWorkspaceId",
+                    "artifactId": "@pipeline().parameters.AlertingDbArtifactId"
+                  },
+                  "externalReferences": {
+                    "connection": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000c4"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "parameters": {
+      "ItemName": {
+        "type": "string"
+      },
+      "ItemId": {
+        "type": "string"
+      },
+      "AlertType": {
+        "type": "string"
+      },
+      "IncidentMessage": {
+        "type": "string"
+      },
+      "TeamsMessage": {
+        "type": "string"
+      },
+      "IncidentSeverity": {
+        "type": "int",
+        "defaultValue": 4
+      },
+      "IncidentOwningTeam": {
+        "type": "string",
+        "defaultValue": "YourTeam/Operations"
+      },
+      "CooldownConfig": {
+        "type": "string",
+        "defaultValue": {
+          "ErrorSpike": 30,
+          "PerformanceDegradation": 30,
+          "OneLakeSecurityError": 15
+        }
+      },
+      "AlertingDbWorkspaceId": {
+        "type": "string",
+        "defaultValue": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0"
+      },
+      "AlertingDbArtifactId": {
+        "type": "string",
+        "defaultValue": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d1"
+      }
+    },
+    "variables": {
+      "IncidentLink": {
+        "type": "String"
+      }
+    },
+    "lastModifiedByObjectId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000f0",
+    "lastPublishTime": "2026-02-26T16:07:47Z"
+  }
+}

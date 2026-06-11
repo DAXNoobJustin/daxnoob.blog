@@ -1,0 +1,21 @@
+source_model: Azure Data Insights
+cases:
+  - id: build_query_invalid_topic
+    description: GenerateQuery with a topic that does not exist — returns error string in GeneratedDAX column.
+    category: snapshot
+    dax: "EVALUATE\nLocal.AskADIA.GenerateQuery(\n  \"__not_a_real_topic__\",\n  BLANK(),\n  BLANK(),\n  BLANK(),\n  BLANK(),\n  BLANK(),\n  BLANK()\n)\n"
+  - id: answer_question_invalid_id
+    description: AnswerQuestion with an invalid questionId — returns error string, does not raise.
+    category: snapshot
+    dax: "EVALUATE\nLocal.AskADIA.AnswerQuestion(\n  \"__not_a_real_question__\",\n  BLANK(),\n  BLANK(),\n  BLANK(),\n  BLANK(),\n  BLANK()\n)\n"
+  - id: build_query_too_few_args
+    description: GenerateQuery called with zero arguments must fail (measureName is the only required parameter; all others are optional).
+    category: negative
+    dax: "EVALUATE { Local.AskADIA.GenerateQuery() }
+
+      "
+    expected_error_regex: (?i)too few arguments|minimum is
+  - id: build_query_invalid_wrapper
+    description: GenerateQuery with daxWrapper missing {query} placeholder must return error.
+    category: snapshot
+    dax: "EVALUATE\n  Local.AskADIA.GenerateQuery(\n    \"MAU\",\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    BLANK(),\n    \"EVALUATE TOPN(3, bad_ref, [MAU], ASC)\"\n  )\n"

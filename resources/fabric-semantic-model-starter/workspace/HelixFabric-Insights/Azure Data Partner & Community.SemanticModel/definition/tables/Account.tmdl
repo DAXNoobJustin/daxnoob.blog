@@ -1,0 +1,191 @@
+/// Customer account dimension containing firmographic attributes, managed account details, and strategic classification flags. Sourced from the Managed Account List (MAL) and enterprise CRM data.
+table Account
+
+	measure 'Account Key Count' = COUNTROWS ( Account )
+		formatString: #,0
+		displayFolder: Account Key Count
+
+	/// Account Name with account key
+	column 'Account Key Text'
+		dataType: string
+		sourceColumn: AccountKeyText
+
+	/// Account Name
+	column Account
+		dataType: string
+		sourceColumn: Account
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_PairWith = 'Account'[AccountKey]
+
+	/// Account is currently Active
+	column 'Active Account Flag'
+		dataType: string
+		sourceColumn: ActiveAccountFlag
+
+	/// All Flag
+	column 'All Flag'
+		dataType: string
+		sourceColumn: AllFlag
+
+	column DIM_AccountKey
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_AccountKey
+
+	/// Fabric Migration Factory
+	column 'Fabric Migration Factory Flag'
+		dataType: string
+		sourceColumn: FabricMigrationFactory
+
+	column 'Fabric Trial Reject Flag'
+		dataType: string
+		displayFolder: -> Custom Attributes
+		sourceColumn: CUSTOM_FabricTrialRejectFlag
+
+	/// First Fabric Purchased Date
+	column 'First Fabric Purchased Date'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: FirstFabricPurchasedDate
+
+	/// Fortune 1,000 company
+	column 'Fortune 1000 Flag'
+		dataType: string
+		sourceColumn: Fortune1000Flag
+
+	/// Fortune 500 company
+	column 'Fortune 500 Flag'
+		dataType: string
+		sourceColumn: Fortune500Flag
+
+	/// Account Industry (i.e. Consumer Goods, Banking,Health Payor, etc.)
+	column Industry
+		dataType: string
+		sourceColumn: Industry
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Account Team Unit
+	column 'MAL ATU'
+		dataType: string
+		sourceColumn: MAL_ATU
+
+	/// Account is Managed. (Managed Account List (MAL) is the master list of the Enterprise accounts which make up our managed business.)
+	column 'MAL Flag'
+		dataType: string
+		sourceColumn: MALFlag
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = false
+
+		annotation Copilot_Enumerable = true
+
+	/// The Microsoft operating unit (geographic or organizational subdivision) associated with the account (e.g., United Kingdom, ANZ, Japan, US-Federal).
+	column 'Operating Unit'
+		dataType: string
+		sourceColumn: OperatingUnit
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+	/// Organization Type (Primary top level classification for all organizations., i.e. Distributor, Reseller, End Customer, etc.)
+	column 'Organization Type'
+		dataType: string
+		sourceColumn: OrganizationType
+
+	column 'Parent Product'
+		dataType: string
+		sourceColumn: ParentProduct
+
+	/// Partner Type (The values describe segmentation of Microsoft partners based on the manner in which Microsoft interacts with the partner, the service(s) the partner provides on Microsoft's behalf, and/or their selling model.)
+	column 'Partner Type'
+		dataType: string
+		sourceColumn: PartnerType
+
+	column 'PBI Backend Usage Account Flag'
+		dataType: string
+		sourceColumn: PBIBackendUsageAccountFlag
+
+	/// Account has Power BI Premium License
+	column 'PBI Premium License Account Flag'
+		dataType: string
+		sourceColumn: PBIPremiumLicenseAccountFlag
+
+	/// Account has Power BI Premium Usage
+	column 'PBI Premium Usage Account Flag'
+		dataType: string
+		sourceColumn: PBIPremiumUsageAccountFlag
+
+	column 'PBI Revenue Account Flag'
+		dataType: string
+		displayFolder: -> Custom Attributes
+		sourceColumn: CUSTOM_PBIRevenueAccountFlag
+
+	column 'Prior Product List'
+		dataType: string
+		sourceColumn: PriorProductList
+
+	column 'Sales Territory'
+		dataType: string
+		sourceColumn: SalesTerritory
+
+	/// Strategic Account (A customer enterprise segment indicating the size and/or strategic importance of the customer organization and used internally to align Microsoft resources to customer potential.)
+	column 'Strategic Account Flag'
+		dataType: string
+		sourceColumn: StrategicAccountFlag
+
+	/// AccountKey Employee Count
+	column 'Account Employee Count'
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: AccountEmployeeCount
+
+	/// account key
+	column AccountKey
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: AccountKey
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = false
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_PairWith = 'Account'[Account]
+
+	partition Account = entity
+		mode: directLake
+		source
+			entityName: DIM_Account
+			schemaName: Tabular_PartnerCommunity
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn = Upstream Finance Source
+
+	annotation TabularEditor_TableGroup = Dim
+

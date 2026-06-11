@@ -1,0 +1,71 @@
+/// Hidden calculated table exposing model relationship metadata via INFO.VIEW.RELATIONSHIPS(). Used by ADIA skills for runtime registry loading.
+table _INFO_RELATIONSHIPS
+	isHidden
+
+	column ID
+		isNameInferred
+		sourceColumn: [ID]
+
+	column Name
+		isNameInferred
+		sourceColumn: [Name]
+
+	column Relationship
+		isNameInferred
+		sourceColumn: [Relationship]
+
+	column Model
+		isNameInferred
+		sourceColumn: [Model]
+
+	column IsActive
+		isNameInferred
+		sourceColumn: [IsActive]
+
+	column CrossFilteringBehavior
+		isNameInferred
+		sourceColumn: [CrossFilteringBehavior]
+
+	column RelyOnReferentialIntegrity
+		isNameInferred
+		sourceColumn: [RelyOnReferentialIntegrity]
+
+	column FromTable
+		isNameInferred
+		sourceColumn: [FromTable]
+
+	column FromColumn
+		isNameInferred
+		sourceColumn: [FromColumn]
+
+	column FromCardinality
+		isNameInferred
+		sourceColumn: [FromCardinality]
+
+	column ToTable
+		isNameInferred
+		sourceColumn: [ToTable]
+
+	column ToColumn
+		isNameInferred
+		sourceColumn: [ToColumn]
+
+	column ToCardinality
+		isNameInferred
+		sourceColumn: [ToCardinality]
+
+	column State
+		isNameInferred
+		sourceColumn: [State]
+
+	column SecurityFilteringBehavior
+		isNameInferred
+		sourceColumn: [SecurityFilteringBehavior]
+
+	partition _INFO_RELATIONSHIPS = calculated
+		mode: import
+		source = INFO.VIEW.RELATIONSHIPS()
+
+	annotation TabularEditor_TableGroup = Other
+
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}

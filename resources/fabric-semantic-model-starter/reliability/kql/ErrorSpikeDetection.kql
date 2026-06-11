@@ -1,0 +1,129 @@
+let _subWindow = 5m;                  // 5-min evaluation windows
+let _now = bin(ago(0m), _subWindow);
+let _subWindowCount = 6;              // 6 × 5m = 30 min lookback
+let _recentLookback = _subWindow * _subWindowCount;
+let _userErrorThreshold = 0.15;       // 15% per-user error rate within a window to be "affected"
+let _minUserQueries = 3;              // min queries per user per window to be evaluated
+let _minEvaluatedUsers = 5;           // window needs ≥5 users with enough queries to be assessed
+let _minAffectedUserRate = 0.30;      // 30% of evaluated users must be affected for window to be "bad"
+let _minTotalErrors = 5;              // minimum absolute error count across lookback
+let _minOverallErrorRate = 0.10;      // 10% overall error rate floor — filters broken-report noise
+let _minBadWindows = 1;               // min bad windows to trigger (1 = instant, 2+ = sustained pattern)
+let _debug = false;                   // set to true to show all models regardless of trigger criteria
+//
+// Report-only OperationIds: QueryBegin events where XmlaProperties contains a non-empty ReportId
+let reportOpIds = SemanticModelLogs
+    | where Timestamp between ((_now - _recentLookback) .. _now)
+    | where OperationName == "QueryBegin"
+    | where isnotempty(ItemId)
+    | where XmlaProperties has "ReportId"
+    | distinct OperationId;
+//
+// Base events filtered to report-only operations
+let reportEvents = SemanticModelLogs
+    | where Timestamp between ((_now - _recentLookback) .. _now)
+    | where OperationName in ("QueryBegin", "Error")
+    | where isnotempty(ItemId)
+    | where not(OperationName == "Error" and EventText has "operation was cancelled by the user")
+    | join kind=leftsemi reportOpIds on OperationId;
+//
+// Per-user error rate evaluated within each window (no cross-window dilution)
+let perUserPerWindow = reportEvents
+    | summarize
+        UserQueries = countif(OperationName == "QueryBegin"),
+        UserErrors  = dcountif(OperationId, OperationName == "Error")
+      by ItemName, ItemId, ExecutingUser, bin(Timestamp, _subWindow)
+    | where UserQueries >= _minUserQueries
+    | extend UserErrorRate = round(todouble(UserErrors) / UserQueries, 4)
+    | extend IsAffected = iff(UserErrorRate >= _userErrorThreshold, 1, 0);
+//
+// Per-window: aggregate user metrics to determine if a window is "bad"
+let windowUserEval = perUserPerWindow
+    | summarize
+        EvaluatedUsers = count(),
+        AffectedUsers  = countif(IsAffected == 1)
+      by ItemName, ItemId, Timestamp
+    | extend AffectedUserRate = iff(EvaluatedUsers > 0, round(todouble(AffectedUsers) / EvaluatedUsers, 4), 0.0)
+    | extend IsWindowBad = iff(EvaluatedUsers >= _minEvaluatedUsers
+                           and AffectedUserRate >= _minAffectedUserRate, 1, 0);
+//
+// Cross-window totals for overall reporting
+let crossWindowTotals = reportEvents
+    | summarize
+        TotalOperations      = countif(OperationName == "QueryBegin"),
+        TotalErrorOperations = dcountif(OperationId, OperationName == "Error"),
+        TotalUsers           = dcountif(ExecutingUser, OperationName == "QueryBegin")
+      by ItemName, ItemId;
+//
+let errorDetails = reportEvents
+    | where OperationName == "Error"
+    | where isnotempty(EventText)
+    | extend TruncatedError = replace_string(replace_string(substring(EventText, 0, 150), "<", "&lt;"), ">", "&gt;")
+    | summarize HitCount = count() by ItemName, ItemId, TruncatedError
+    | order by ItemName, ItemId, HitCount desc
+    | summarize
+        FormattedErrors   = strcat_array(array_slice(make_list(strcat("• [", tostring(HitCount), "x] ", TruncatedError)), 0, 4), "\n")
+      by ItemName, ItemId;
+//
+let result = windowUserEval
+    | summarize
+        BadWindowCount      = sum(IsWindowBad),
+        TotalWindows        = count(),
+        PeakAffectedUsers   = max(AffectedUsers),
+        PeakEvaluatedUsers  = max(EvaluatedUsers)
+      by ItemName, ItemId
+    | join kind=leftouter crossWindowTotals on ItemName, ItemId
+    | join kind=leftouter errorDetails on ItemName, ItemId
+    | extend TotalErrorOperations = coalesce(TotalErrorOperations, 0)
+    | extend AvgErrorRate = iff(TotalOperations > 0, round(todouble(TotalErrorOperations) / TotalOperations, 4), 0.0)
+    | extend Triggered = iff(BadWindowCount >= _minBadWindows
+                         and TotalErrorOperations >= _minTotalErrors
+                         and AvgErrorRate >= _minOverallErrorRate, 1, 0)
+    | where _debug or Triggered == 1
+    | extend FormattedErrorsHtml = replace_string(coalesce(FormattedErrors, ""), "\n", "<br>")
+    | project
+        Timestamp    = _now,
+        ItemName,
+        ItemId,
+        Triggered,
+        BadWindowCount,
+        TotalWindows,
+        PeakAffectedUsers,
+        PeakEvaluatedUsers,
+        AlertType    = "ErrorSpike",
+        IncidentMessage   = iff(Triggered == 1 or _debug,
+            strcat(
+                "Semantic Model Error Spike Alert<br><br>",
+                "Model '", ItemName, "' is returning an elevated rate of errors. ",
+                "In the last ", tostring(_subWindowCount * toint(_subWindow / 1m)), " minutes, ",
+                tostring(BadWindowCount), " of ", tostring(TotalWindows),
+                " evaluation windows had ≥", tostring(round(_minAffectedUserRate * 100, 0)),
+                "% of users experiencing error rates above ", tostring(_userErrorThreshold * 100), "%.<br><br>",
+                "<b>Metrics:</b><br>",
+                "Overall Error Rate: ", tostring(round(AvgErrorRate * 100, 2)), "%<br>",
+                "Total Queries: ", tostring(TotalOperations), "<br>",
+                "Total Errors: ", tostring(TotalErrorOperations), "<br>",
+                "Peak Affected Users: ", tostring(PeakAffectedUsers), " of ", tostring(PeakEvaluatedUsers),
+                " evaluated users (worst window)<br><br>",
+                "<b>Top Errors:</b><br>",
+                FormattedErrorsHtml, "<br><br>",
+                "<b>Investigation Steps:</b><br>",
+                "1. Open your monitoring dashboard and validate whether errors are still occurring.<br>",
+                "2. Check the Capacity Metrics App for throttling or capacity pressure that may cause timeouts.<br>",
+                "3. In Workspace Monitoring, identify the specific Report ID (from XmlaProperties) or query/table (from EventText) producing errors.<br>",
+                "4. If root cause is unclear, escalate to your platform / Analysis Services support contact."
+            ), ""),
+        TeamsMessage = iff(Triggered == 1 or _debug,
+            strcat(
+                "🚨 <b>Error Spike — ", ItemName, "</b><br><br>",
+                "Error rate: ", tostring(round(AvgErrorRate * 100, 1)), "% (",
+                tostring(TotalErrorOperations), " errors out of ", tostring(TotalOperations), " queries)<br>",
+                "Peak: ", tostring(PeakAffectedUsers), " of ", tostring(PeakEvaluatedUsers),
+                " users affected (worst window)<br>",
+                tostring(BadWindowCount), " window(s) triggered in last ",
+                tostring(_subWindowCount * toint(_subWindow / 1m)), " min<br><br>",
+                "<b>Top Errors:</b><br>",
+                coalesce(FormattedErrorsHtml, "")
+            ), "")
+    | order by Triggered desc, BadWindowCount desc;
+result

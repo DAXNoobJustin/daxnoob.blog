@@ -1,0 +1,47 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/variables/1.0.0/schema.json",
+  "variables": [
+    {
+      "name": "core_default",
+      "note": "",
+      "type": "String",
+      "value": "abfss://helixfabric-dev-storage@onelake.dfs.fabric.microsoft.com/Unified.Lakehouse/Tables/Dataprod_Core/"
+    },
+    {
+      "name": "restricted_core_default",
+      "note": "",
+      "type": "String",
+      "value": "abfss://helixfabric-dev-storage@onelake.dfs.fabric.microsoft.com/Unified_Restricted.Lakehouse/Tables/Dataprod_Core/"
+    },
+    {
+      "name": "tabular_default",
+      "note": "",
+      "type": "String",
+      "value": "abfss://helixfabric-dev-storage@onelake.dfs.fabric.microsoft.com/Unified.Lakehouse/Tables/Tabular/"
+    },
+    {
+      "name": "restricted_tabular_default",
+      "note": "",
+      "type": "String",
+      "value": "abfss://helixfabric-dev-storage@onelake.dfs.fabric.microsoft.com/Unified_Restricted.Lakehouse/Tables/Tabular/"
+    },
+    {
+      "name": "staging_default",
+      "note": "",
+      "type": "String",
+      "value": "abfss://helixfabric-dev-storage@onelake.dfs.fabric.microsoft.com/Unified.Lakehouse/Files/Staging/"
+    },
+    {
+      "name": "source_lakehouse",
+      "note": "",
+      "type": "String",
+      "value": "abfss://helixfabric-dev-storage@onelake.dfs.fabric.microsoft.com/Source.Lakehouse/Files/"
+    },
+    {
+      "name": "temp_default",
+      "note": "",
+      "type": "String",
+      "value": "abfss://helixfabric-dev-storage@onelake.dfs.fabric.microsoft.com/Unified.Lakehouse/Files/Temp/"
+    }
+  ]
+}

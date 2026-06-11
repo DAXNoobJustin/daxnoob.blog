@@ -1,0 +1,47 @@
+{
+  "slug": "azure-data-partner-community",
+  "source": "Azure Data Partner & Community.SemanticModel",
+  "title": "Azure Data Partner & Community",
+  "rows": [
+    {
+      "anchor": "model-reference",
+      "route": null,
+      "topic": "Azure Data Partner & Community Model Reference",
+      "whenToUse": "Triggers: model context, calendar, fiscal year, account, AccountKey, Partner, Partner Id, Partner Name, product master, geography, subsidiary, hierarchies, model gotchas. Examples: which column filters a partner, how do I filter a country. Intent: preserve the PC model reference source file.",
+      "routerHint": "Calendar, Account/AccountKey, Partner, Product Master, Geography, hierarchies, model-wide gotchas."
+    },
+    {
+      "anchor": "specialization",
+      "topic": "Specialization Topic",
+      "route": {
+        "name": "Specialization",
+        "triggers": "Partner specialization status, partners one requirement away"
+      },
+      "whenToUse": "Triggers: specialization, partner specialization, one req remaining, certifications, partner global id, program requirement. Intent: preserve the PC specialization topic source file.",
+      "routerHint": "Partner specialization status, partners one requirement away."
+    },
+    {
+      "anchor": "out-of-scope",
+      "route": null,
+      "topic": "Out-of-scope Routing",
+      "whenToUse": "Triggers: out of scope, not supported, deny, partner influenced usage, raw fact-table exploration, list distinct values, ad-hoc DAX, untrained topic, usage, revenue, budget, headcount, customer 360. Intent: deny questions outside the trained Partner & Community topics and route sibling-model topics to the right model.",
+      "routerHint": "Sibling-model routing, untrained partner topics, raw fact-table exploration."
+    }
+  ],
+  "workedExamples": [
+    {
+      "ask": "Which partners are one requirement away from a specialization?",
+      "rows": [
+        "workflow",
+        "udf-reference",
+        "output-formatting",
+        "model-reference",
+        "specialization"
+      ]
+    }
+  ],
+  "golden": {
+    "definition/tables/_COPILOT_INSTRUCTIONS.tmdl": "fb1ba435a6047844ab6aebab63c81b3d2caf426f3b7a9f7453f41d1849cbcebd",
+    "Copilot/Instructions/instructions.md": "5a0362dda3bba715595543b80b9ec546542991a56d5da05050da7a0aff401f56"
+  }
+}

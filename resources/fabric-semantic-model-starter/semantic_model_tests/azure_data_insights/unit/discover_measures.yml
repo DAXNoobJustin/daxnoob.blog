@@ -1,0 +1,63 @@
+source_model: Azure Data Insights
+# Insights-specific DiscoverMeasures search-term tests. Scope + generic
+# contract: see semantic_model_tests/README.md → "Test catalog organization".
+cases:
+  - id: list_measures_revenue
+    description: DiscoverMeasures('revenue') includes revenue-related measures (Insights has revenue measures).
+    category: structural
+    dax: EVALUATE { Local.AskADIA.DiscoverMeasures("revenue") }
+    contains_all:
+      - Revenue
+      - "**Fact:"
+  - id: discover_measures_all_snapshot
+    description: DiscoverMeasures("") full-body baseline. Vocab will change in a later revision; review diff.
+    category: structural
+    dax: 'EVALUATE { Local.AskADIA.DiscoverMeasures("") }
+
+      '
+    expected_row_count:
+      exact: 1
+    contains_all:
+      - "Total measures:"
+      - "Topics in scope:"
+      - "**Fact: Usage Fabric**"
+      - "**Fact: Usage Summary**"
+      - "**Fact: Revenue**"
+      - "**Fact: Fabric Capacity Units**"
+      - "[MAU]"
+      - "[Fabric MAU]"
+      - "[CU Hours]"
+      - "[Consumed + Adjusted Revenue (MTD)]"
+  - id: discover_measures_mau_snapshot
+    description: DiscoverMeasures("MAU") full-body baseline. Diff-on-refactor.
+    category: structural
+    dax: 'EVALUATE { Local.AskADIA.DiscoverMeasures("MAU") }
+
+      '
+    expected_row_count:
+      exact: 1
+    contains_all:
+      - "Total measures:"
+      - "**Fact: Usage Fabric**"
+      - "**Fact: Usage Summary**"
+      - "[MAU]"
+      - "[Fabric MAU]"
+  - id: discover_measures_consumption_snapshot
+    description: DiscoverMeasures("CU Hours") full-body baseline — exercises HardcodedGroupBy emission.
+    category: structural
+    dax: 'EVALUATE { Local.AskADIA.DiscoverMeasures("CU Hours") }
+
+      '
+    expected_row_count:
+      exact: 1
+    contains_all:
+      - "Total measures:"
+      - "**Fact: Fabric Capacity Units**"
+      - "[CU Hours]"
+      - "[CU Hours (28d)]"
+  - id: discover_measures_no_match_snapshot
+    description: DiscoverMeasures with nonsense term — canonical "no measures matched" message.
+    category: snapshot
+    dax: 'EVALUATE { Local.AskADIA.DiscoverMeasures("__zzz_no_such_measure__") }
+
+      '

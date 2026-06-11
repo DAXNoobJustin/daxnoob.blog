@@ -1,0 +1,199 @@
+let _nowRaw = now();
+let _lookback = 30m;
+let _now = bin(_nowRaw, 1m);
+let _baselineWindow = 3h;              // 3h baseline: smooths spikes via bucketed median
+let _baselineBucket = 20m;             // sub-bucket size within baseline window
+let _degradationThreshold = 3.0;
+let _minDegradedQueryRate = 0.20;
+let _minDegradedUserRate = 0.30;
+let _minDegradedUserCount = 4;        // minimum degraded users (absolute count to avoid false positives with small samples)
+let _minSampleCount = 25;
+let _minUserCount = 3;                 // minimum distinct users to evaluate (avoids noisy off-peak alerts)
+let _minUserQueries = 3;              // minimum queries per user to compute a reliable per-user P90
+let _minBaselineBuckets = 2;           // require at least 2 qualifying buckets for a reliable baseline
+let _minDegradedP90Ms = 10000;         // minimum recent P90 (ms) to trigger — avoids alerts on fast queries
+let _cooldownPeriod = 120s;
+let _warmingCooldown = 60s;              // exclude queries within 60s before/after warming queries
+let _minRefreshRows = 3;
+let _percentile = 90;                  // P90: more stable than P95 on small samples
+let _perfOperations = dynamic(["QueryEnd"]);
+let _debug = false; // set to true to show all models regardless of trigger criteria
+//
+// Report-only OperationIds: QueryBegin events where XmlaProperties contains a non-empty ReportId
+let reportOpIds = SemanticModelLogs
+    | where Timestamp between ((_now - _baselineWindow - _lookback) .. _now)
+    | where OperationName == "QueryBegin"
+    | where isnotempty(ItemId)
+    | where XmlaProperties has "ReportId"
+    | distinct OperationId;
+//
+// Bucketed baseline: compute P90 per 20-min bucket, then take the median across buckets
+// This smooths out individual spike windows (e.g. [5K, 6K, 140K, 8K] → median = 7K)
+let baselineBuckets = SemanticModelLogs
+    | where Timestamp between ((_now - _baselineWindow - _lookback) .. (_now - _lookback))
+    | where OperationName in (_perfOperations)
+    | where isnotempty(ItemId)
+    | join kind=leftsemi reportOpIds on OperationId
+    | summarize
+        BucketPercentile = todouble(percentile(DurationMs, _percentile)),
+        BucketCount      = count()
+      by ItemName, ItemId, bin(Timestamp, _baselineBucket)
+    | where BucketCount >= 5;          // require minimum queries per bucket for reliable percentile
+let baseline = baselineBuckets
+    | summarize
+        BaselineP90        = todouble(percentile(BucketPercentile, 50)), // median of bucket P90s
+        BaselineBucketCount = count()
+      by ItemName, ItemId
+    | where BaselineBucketCount >= _minBaselineBuckets;
+//
+let refreshCooldowns = SemanticModelLogs
+    | where Timestamp between ((_now - _lookback - _cooldownPeriod) .. _now)
+    | where OperationName == "CommandEnd" and OperationDetailName == "Batch"
+    | where isnotempty(ItemId)
+    | where countof(EventText, "<row xmlns=") >= _minRefreshRows
+    | project ItemId, CooldownStart = Timestamp, CooldownEnd = Timestamp + _cooldownPeriod;
+//
+// Warming query cooldowns: notebook-driven warming queries (Util_RefreshSemanticModel)
+// Exclude any queries within ±60s of each warming query, since users hit a cold model
+// during this period and latency is not representative of steady-state performance.
+// Multiple warming queries often fire in quick succession, so we merge overlapping
+// windows to avoid a join explosion (N warming events × M queries per model).
+let warmingRaw = SemanticModelLogs
+    | where Timestamp between ((_now - _lookback - _warmingCooldown) .. (_now + _warmingCooldown))
+    | where OperationName == "QueryEnd"
+    | where isnotempty(ItemId)
+    | where EventText has "Util_RefreshSemanticModel"
+    | project ItemId, CooldownStart = Timestamp - _warmingCooldown, CooldownEnd = Timestamp + _warmingCooldown;
+let warmingCooldowns = warmingRaw
+    | order by ItemId asc, CooldownStart asc
+    | extend IsNewGroup = iff(ItemId != prev(ItemId) or CooldownStart > prev(CooldownEnd), 1, 0)
+    | extend GroupId = row_cumsum(IsNewGroup)
+    | summarize CooldownStart = min(CooldownStart), CooldownEnd = max(CooldownEnd) by ItemId, GroupId
+    | project ItemId, CooldownStart, CooldownEnd;
+//
+let recentQueries = SemanticModelLogs
+    | where Timestamp between ((_now - _lookback) .. _now)
+    | where OperationName in (_perfOperations)
+    | where isnotempty(ItemId)
+    | join kind=leftsemi reportOpIds on OperationId;
+//
+let queriesInRefreshCooldown = recentQueries
+    | join kind=inner refreshCooldowns on ItemId
+    | where Timestamp between (CooldownStart .. CooldownEnd)
+    | distinct OperationId, ItemId;
+//
+let queriesInWarmingCooldown = recentQueries
+    | join kind=inner warmingCooldowns on ItemId
+    | where Timestamp between (CooldownStart .. CooldownEnd)
+    | distinct OperationId, ItemId;
+//
+let queriesInCooldown = union queriesInRefreshCooldown, queriesInWarmingCooldown
+    | distinct OperationId, ItemId;
+//
+let recentClean = recentQueries
+    | join kind=leftanti queriesInCooldown on OperationId, ItemId
+    | join kind=leftouter baseline on ItemName, ItemId
+    | extend BaselineP90 = coalesce(BaselineP90, 0.0);
+//
+// Per-user P90: compute each user's personal P90, then compare to model baseline
+// Only include users with enough queries for a meaningful percentile
+let perUserP90 = recentClean
+    | summarize
+        UserP90    = todouble(percentile(DurationMs, _percentile)),
+        UserQueryCount = count()
+      by ItemName, ItemId, ExecutingUser, BaselineP90
+    | where UserQueryCount >= _minUserQueries
+    | extend IsUserDegraded = iff(BaselineP90 > 0 and UserP90 >= BaselineP90 * _degradationThreshold, 1, 0);
+//
+// Aggregate per-user results back to model level
+let userMetrics = perUserP90
+    | summarize
+        QualifiedUserCount = count(),                     // users with enough queries to evaluate
+        DegradedUserCount  = countif(IsUserDegraded == 1) // users whose personal P90 is degraded
+      by ItemName, ItemId;
+//
+// Model-level query metrics (unchanged — still useful for overall signal)
+let queryMetrics = recentClean
+    | extend IsDegradedQuery = iff(BaselineP90 > 0 and todouble(DurationMs) >= BaselineP90 * _degradationThreshold, 1, 0)
+    | summarize
+        RecentP90          = todouble(percentile(DurationMs, _percentile)),
+        TotalQueryCount    = count(),
+        DegradedQueryCount = countif(IsDegradedQuery == 1),
+        TotalDistinctUsers = dcount(ExecutingUser)
+      by ItemName, ItemId;
+//
+// Include both recent and baseline models so debug mode shows data even when recent window is sparse
+let allModels = union
+    (recentQueries | project ItemName, ItemId),
+    (baseline | project ItemName, ItemId)
+    | distinct ItemName, ItemId;
+//
+let result = allModels
+    | join kind=leftouter baseline on ItemName, ItemId
+    | join kind=leftouter queryMetrics on ItemName, ItemId
+    | join kind=leftouter userMetrics on ItemName, ItemId
+    | extend
+        RecentP90_ms       = round(coalesce(RecentP90, 0.0), 0),
+        BaselineP90_ms     = round(coalesce(BaselineP90, 0.0), 0),
+        TotalQueryCount    = coalesce(TotalQueryCount, tolong(0)),
+        DegradedQueryCount = coalesce(DegradedQueryCount, tolong(0)),
+        TotalDistinctUsers = coalesce(TotalDistinctUsers, tolong(0)),
+        QualifiedUserCount = coalesce(QualifiedUserCount, tolong(0)),
+        DegradedUserCount  = coalesce(DegradedUserCount, tolong(0))
+    | extend DegradedQueryRate = iff(TotalQueryCount > 0,
+                                     round(todouble(DegradedQueryCount) / todouble(TotalQueryCount), 4), 0.0)
+    | extend DegradedUserRate  = iff(QualifiedUserCount > 0,
+                                     round(todouble(DegradedUserCount) / todouble(QualifiedUserCount), 4), 0.0)
+    | extend DegradationRatio  = iff(RecentP90_ms > 0.0 and BaselineP90_ms > 0.0,
+                                     round(RecentP90_ms / BaselineP90_ms, 2), 0.0)
+    | extend Triggered = iff(TotalDistinctUsers >= _minUserCount
+                         and TotalQueryCount >= _minSampleCount
+                         and DegradedQueryRate >= _minDegradedQueryRate
+                         and DegradedUserRate >= _minDegradedUserRate
+                         and DegradedUserCount >= _minDegradedUserCount
+                         and DegradationRatio >= _degradationThreshold
+                         and RecentP90_ms >= _minDegradedP90Ms, 1, 0)
+    | where _debug or Triggered == 1
+    | project
+        Timestamp    = _now,
+        ItemName,
+        ItemId,
+        Triggered,
+        DegradationRatio,
+        AlertType    = "PerformanceDegradation",
+        IncidentMessage   = iff(Triggered == 1 or _debug,
+            strcat(
+                "Semantic Model Performance Degradation Alert<br><br>",
+                "Model '", ItemName, "' is showing elevated query latency. ",
+                "The recent P90 response time is ", tostring(DegradationRatio), "x the 3-hour baseline, ",
+                "and ", tostring(round(DegradedQueryRate * 100, 1)), "% of queries (",
+                tostring(DegradedQueryCount), "/", tostring(TotalQueryCount), ") exceeded the threshold, ",
+                "affecting ", tostring(DegradedUserCount), " of ", tostring(QualifiedUserCount), " users (",
+                tostring(round(DegradedUserRate * 100, 1)), "%).<br><br>",
+                "<b>Metrics:</b><br>",
+                "Recent P90: ", tostring(RecentP90_ms), " ms<br>",
+                "Baseline P90: ", tostring(BaselineP90_ms), " ms<br>",
+                "Degradation: ", tostring(DegradationRatio), "x<br>",
+                "Slow Queries: ", tostring(DegradedQueryCount), " / ", tostring(TotalQueryCount),
+                " (", tostring(round(DegradedQueryRate * 100, 1)), "%)<br>",
+                "Affected Users: ", tostring(DegradedUserCount), " / ", tostring(QualifiedUserCount),
+                " (", tostring(round(DegradedUserRate * 100, 1)), "%)<br>",
+                "Total Users: ", tostring(TotalDistinctUsers),
+                " (", tostring(QualifiedUserCount), " with ≥", tostring(_minUserQueries), " queries evaluated)<br><br>",
+                "<b>Investigation Steps:</b><br>",
+                "1. Open your monitoring dashboard and validate whether the slowdown is ongoing.<br>",
+                "2. Check the Capacity Metrics App for throttling or overload on the capacity.<br>",
+                "3. In Workspace Monitoring, identify the specific Report ID (from XmlaProperties) or table/query (from EventText) causing the slowdown.<br>",
+                "4. If root cause is unclear, escalate to your platform / Analysis Services support contact."
+            ), ""),
+        TeamsMessage = iff(Triggered == 1 or _debug,
+            strcat(
+                "⚠️ <b>Performance Degradation — ", ItemName, "</b><br><br>",
+                "Query response times are ", tostring(DegradationRatio), "x slower than normal.<br>",
+                "Recent P90: ", tostring(RecentP90_ms), " ms (baseline: ", tostring(BaselineP90_ms), " ms)<br><br>",
+                tostring(DegradedUserCount), " of ", tostring(QualifiedUserCount), " users experiencing degraded P90<br>",
+                tostring(DegradedQueryCount), " of ", tostring(TotalQueryCount), " queries impacted (",
+                tostring(round(DegradedQueryRate * 100, 1)), "%)"
+            ), "")
+    | order by Triggered desc, DegradationRatio desc;
+result

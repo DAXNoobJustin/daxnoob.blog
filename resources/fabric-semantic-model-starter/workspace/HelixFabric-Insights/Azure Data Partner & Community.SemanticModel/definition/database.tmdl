@@ -1,0 +1,4 @@
+database 'Azure Data Partner & Community'
+	compatibilityLevel: 1703
+	compatibilityMode: powerBI
+

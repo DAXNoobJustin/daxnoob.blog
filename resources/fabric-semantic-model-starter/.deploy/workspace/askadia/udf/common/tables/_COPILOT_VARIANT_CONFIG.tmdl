@@ -1,0 +1,26 @@
+/// Measure variant registry. Contains framework-configured measure suffixes that AskADIA can auto-include and accept as sort aliases when matching variant measures already exist in the model. Populated at deploy by generateVariantConfig.csx from .deploy/workspace/askadia/udf/common/askadia_config.json.
+table _COPILOT_VARIANT_CONFIG
+	isHidden
+
+	column Suffix
+		isNameInferred
+		sourceColumn: [Suffix]
+
+	column EmitOrder
+		isNameInferred
+		sourceColumn: [EmitOrder]
+
+	partition _COPILOT_VARIANT_CONFIG = calculated
+		mode: import
+		source =
+					DATATABLE(
+					    "Suffix", STRING,
+					    "EmitOrder", INTEGER,
+					    {
+					        {"_PLACEHOLDER", 1}
+					    }
+					)
+
+	annotation TabularEditor_TableGroup = Other
+
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}

@@ -1,0 +1,27 @@
+relationship 3acf4725-ba33-45d5-b561-037a3b8d7b87
+	fromColumn: 'Partner Influenced Revenue'.DIM_CalendarKey
+	toColumn: Calendar.DIM_CalendarKey
+
+relationship 42dd5ab3-61ec-4b4e-81f1-40a74e58043a
+	fromColumn: 'Partner Influenced Revenue'.DIM_PartnerId
+	toColumn: Partner.DIM_PartnerId
+
+relationship ddebb15e-57a5-4c33-be8d-13b0e1e7a880
+	fromColumn: 'Partner Influenced Revenue'.DIM_ProductFamilyId
+	toColumn: 'Revenue Product'.DIM_ProductFamilyId
+
+relationship 98eacfb1-89a8-4ad3-9163-771337477cfc
+	fromColumn: 'Partner Influenced Revenue'.DIM_ProductMasterId
+	toColumn: 'Product Master'.DIM_ProductMasterId
+
+relationship 0397e6af-019d-4cd5-a2e4-4cd4c41b66f1
+	fromColumn: 'Partner Influenced Revenue'.DIM_SubSegmentId
+	toColumn: Segment.DIM_SubSegmentId
+
+relationship 42553053-18cd-4ee6-a76a-a10d3abb4447
+	fromColumn: 'Partner Influenced Revenue'.DIM_SubsidiarySubDistrictId
+	toColumn: Geography.DIM_SubsidiarySubDistrictId
+
+relationship 7ad7793d-d77b-4a0b-b924-835930e31cbe
+	fromColumn: 'Partner Influenced Revenue'.DIM_AccountKey
+	toColumn: Account.DIM_AccountKey

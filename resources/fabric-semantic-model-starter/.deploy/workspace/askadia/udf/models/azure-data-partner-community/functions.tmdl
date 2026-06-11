@@ -1,0 +1,47 @@
+/// Per-model ranker for 'Partner'[Partner Name] search. Returns the top 20 partners whose name or Partner Id contains searchTerm, ranked descending by [Partner Influenced Consumed Revenue (MTD)]. The MTD measure is self-scoping via Calendar[FiscalMonthId] = MaxMonthId so no calendar filter is required. Embeds Partner Id, Membership Level, and Membership Status in the SearchResult string for disambiguation between partners with similar names (e.g., "Fabrikam Systems" vs "Fabrikam Ireland"). Called via _SearchAllValues; the codegen dispatches to this UDF directly inside a scalar-IF branch matched by targetCol = "'Partner'[Partner Name]". Returns TABLE(SearchResult, Rank) per the AskADIA Copilot_SearchRanker contract.
+function 'Local.AskADIA._RankPartners' =
+		(searchTerm: SCALAR STRING VAL) =>
+		// Perf: numeric-term optimization — Partner Id is
+		// int64; numeric equality pushes to SE.
+		VAR _IsNumericTerm = NOT ISERROR(VALUE(searchTerm))
+		VAR _NumericTerm = IF(_IsNumericTerm, VALUE(searchTerm), 0)
+		VAR _Matches =
+		    FILTER(
+		        SUMMARIZE(
+		            'Partner',
+		            'Partner'[Partner Id],
+		            'Partner'[Partner Name],
+		            'Partner'[Membership Level],
+		            'Partner'[Membership Status]
+		        ),
+		        CONTAINSSTRING('Partner'[Partner Name], searchTerm)
+		            || (_IsNumericTerm && 'Partner'[Partner Id] = _NumericTerm)
+		    )
+		VAR _WithRevenue =
+		    FILTER(
+		        ADDCOLUMNS(
+		            _Matches,
+		            "_Revenue",
+		                CALCULATE([Partner Influenced Consumed Revenue (MTD)])
+		        ),
+		        NOT ISBLANK([_Revenue]) && [_Revenue] > 0
+		    )
+		VAR _Top = TOPN(20, _WithRevenue, [_Revenue], DESC)
+		VAR _Ranked =
+		    ADDCOLUMNS(
+		        _Top,
+		        "_Rank", COUNTROWS(FILTER(_Top, [_Revenue] > EARLIER([_Revenue]))) + 1
+		    )
+		RETURN
+		    SELECTCOLUMNS(
+		        _Ranked,
+		        "SearchResult",
+		            'Partner'[Partner Name] & " (Partner Id: " & FORMAT('Partner'[Partner Id], "0")
+		            & ", Influenced Revenue MTD: " & FORMAT([_Revenue], "$#,0")
+		            & ", Membership: " & 'Partner'[Membership Level]
+		            & " " & 'Partner'[Membership Status] & ")",
+		        "Rank", [_Rank]
+		    )
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin

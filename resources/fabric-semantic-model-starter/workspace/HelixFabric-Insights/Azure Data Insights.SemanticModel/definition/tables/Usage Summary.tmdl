@@ -1,0 +1,119 @@
+/// Usage metrics across Microsoft data products. Tracks daily, weekly, and monthly active users (DAU, WAU, MAU) by product, account, segment, and geography.
+table 'Usage Summary'
+
+	/// Measures the unique number of users who have used the product on a given day.
+	measure DAU = Local.UsageSummary.PeriodActiveUsers ( 'Usage Summary'[DailyActiveUsage] )
+		formatString: #,0
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Alias = DAU
+
+		annotation Copilot_Synonyms = Daily Active Users
+
+		annotation Copilot_DefaultFilter = 'Product Master'[Product]=Fabric Core
+
+		annotation TimeIntel_Anchor = Local.UsageSummary.MaxDate
+
+	/// Measures the unique number of users who have used the product in the last 28 days.
+	measure MAU = Local.UsageSummary.PeriodActiveUsers ( 'Usage Summary'[MonthlyActiveUsage] )
+		formatString: #,0
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Active Users, Monthly Active Users, Fabric MAU, Fabric Developer MAU
+
+		annotation Copilot_Alias = MAU
+
+		annotation Copilot_DefaultFilter = 'Product Master'[Product]=Fabric Core
+
+		annotation TimeIntel_Anchor = Local.UsageSummary.MaxDate
+
+	/// Measures the unique number of users who have used the product in the last 7 days.
+	measure WAU = Local.UsageSummary.PeriodActiveUsers ( 'Usage Summary'[WeeklyActiveUsage] )
+		formatString: #,0
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Alias = WAU
+
+		annotation Copilot_Synonyms = Weekly Active Users
+
+		annotation Copilot_DefaultFilter = 'Product Master'[Product]=Fabric Core
+
+		annotation TimeIntel_Anchor = Local.UsageSummary.MaxDate
+
+	/// Count of distinct users who performed at least one product activity on the given calendar day.
+	column DailyActiveUsage
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		sourceColumn: DAU
+
+	/// Foreign key to the Product Master dimension.
+	column DIM_ProductMasterId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_ProductMasterId
+
+	/// Foreign key to the Segment dimension.
+	column DIM_SubSegmentId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubSegmentId
+
+	/// Foreign key to the Geography dimension.
+	column DIM_SubsidiarySubDistrictId
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubsidiarySubDistrictId
+
+	/// Foreign key to the Account dimension (AccountKey).
+	column DIM_AccountKey
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_AccountKey
+
+	/// Count of distinct users who performed at least one product activity in the rolling 28-day window.
+	column MonthlyActiveUsage
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		sourceColumn: MAU
+
+	/// Count of distinct users who performed at least one product activity in the rolling 7-day window.
+	column WeeklyActiveUsage
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		sourceColumn: WAU
+
+	/// Foreign key to the Calendar dimension.
+	column DIM_CalendarKey
+		dataType: dateTime
+		isHidden
+		formatString: yyyy-mm-dd
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_CalendarKey
+
+	partition 'Usage Summary' = entity
+		mode: directLake
+		source
+			entityName: FACT_Usage_Summary
+			schemaName: Tabular_AzureDataInsights
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn = Multiple
+
+	annotation TabularEditor_TableGroup = Fact
+
+	annotation Copilot_Topic = usage

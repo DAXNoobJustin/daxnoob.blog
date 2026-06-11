@@ -1,0 +1,41 @@
+/// Framework-level annotation registry. Drives the DiscoverColumns Tags + Behavior output columns: one row per (AnnotationKey, ObjectType, Surface) declares the string to render when a column carries that annotation. Populated at deploy by generateAnnotationConfig.csx from .deploy/workspace/askadia/udf/common/askadia_config.json. Scope is intentionally narrow — this registry only covers "annotation-key -> display-string" projections for DiscoverColumns metadata columns; emit-functions whose data sources are pre-computed (_FormatAutoApplied / _FormatFactBody / _FormatTopicFactBody) are not registry-driven because their column shapes aren't generic. To add a new tag or behavior: add one JSON entry, redeploy.
+table _COPILOT_ANNOTATIONS_REGISTRY
+	isHidden
+
+	column AnnotationKey
+		isNameInferred
+		sourceColumn: [AnnotationKey]
+
+	column ObjectType
+		isNameInferred
+		sourceColumn: [ObjectType]
+
+	column Surface
+		isNameInferred
+		sourceColumn: [Surface]
+
+	column EmitOrder
+		isNameInferred
+		sourceColumn: [EmitOrder]
+
+	column RenderedValue
+		isNameInferred
+		sourceColumn: [RenderedValue]
+
+	partition _COPILOT_ANNOTATIONS_REGISTRY = calculated
+		mode: import
+		source =
+				DATATABLE(
+				    "AnnotationKey", STRING,
+				    "ObjectType", STRING,
+				    "Surface", STRING,
+				    "EmitOrder", INTEGER,
+				    "RenderedValue", STRING,
+				    {
+				        {"_PLACEHOLDER", "_PLACEHOLDER", "_PLACEHOLDER", 1, "_PLACEHOLDER"}
+				    }
+				)
+
+	annotation TabularEditor_TableGroup = Other
+
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}

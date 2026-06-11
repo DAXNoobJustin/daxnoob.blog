@@ -1,0 +1,62 @@
+/// Per-model ranker for 'Account'[Account] search. Returns the top 20 accounts whose name or AccountKey contains searchTerm, ranked descending by MAU. MAU is calculated within the 'Power BI Backend' product. Embeds Industry (from 'Account'), Area (from 'Geography'), and Segment (from 'Segment') in the SearchResult string for richer disambiguation. Called via _SearchAllValues; the codegen dispatches to this UDF directly inside a scalar-IF branch matched by targetCol = "'Account'[Account]". Returns TABLE(SearchResult, Rank) per the AskADIA Copilot_SearchRanker contract.
+function 'Local.AskADIA._RankAccounts' =
+		(searchTerm: SCALAR STRING VAL) =>
+		// Perf: detect numeric searchTerm once outside the FILTER and use numeric
+		// equality on 'Account'[AccountKey]. The previous CONTAINSSTRING(FORMAT(AccountKey,"0"),...)
+		// forced a per-row formula-engine callback (no SE pushdown), making the FILTER
+		// O(rows) in callback cost. Numeric equality runs entirely in the storage
+		// engine. Same anti-pattern should be avoided in any other model's ranker.
+		VAR _IsNumericTerm = NOT ISERROR(VALUE(searchTerm))
+		VAR _NumericTerm = IF(_IsNumericTerm, VALUE(searchTerm), 0)
+		VAR _Matches =
+		    FILTER(
+		        SUMMARIZE('Account', 'Account'[AccountKey], 'Account'[Account], 'Account'[Industry]),
+		        CONTAINSSTRING('Account'[Account], searchTerm)
+		            || (_IsNumericTerm && 'Account'[AccountKey] = _NumericTerm)
+		    )
+		VAR _WithMAU =
+		    FILTER(
+		        ADDCOLUMNS(
+		            _Matches,
+		            "_MAU",
+		                CALCULATE(
+		                    [MAU],
+		                    TREATAS({"Power BI Backend"}, 'Product Master'[Product])
+		                )
+		        ),
+		        NOT ISBLANK([_MAU]) && [_MAU] > 0
+		    )
+		VAR _Top = TOPN(20, _WithMAU, [_MAU], DESC)
+		// Enrich top 20 with Area + Segment via context-transition CALCULATE.
+		// Area lives on 'Geography' and Segment on 'Segment'; both reach 'Account'
+		// only through 'Usage Summary' fact relationships. Per-AccountKey cardinality
+		// is 1:1 in 'Usage Summary', so MAXX returns the
+		// single value. Done after TOPN so the fact-table touches are bounded
+		// to 20 row contexts regardless of search breadth.
+		VAR _Enriched =
+		    ADDCOLUMNS(
+		        _Top,
+		        "_Area",
+		            CALCULATE(MAXX(SUMMARIZE('Usage Summary', 'Geography'[Area]), 'Geography'[Area])),
+		        "_Segment",
+		            CALCULATE(MAXX(SUMMARIZE('Usage Summary', 'Segment'[Segment]), 'Segment'[Segment]))
+		    )
+		VAR _Ranked =
+		    ADDCOLUMNS(
+		        _Enriched,
+		        "_Rank", COUNTROWS(FILTER(_Enriched, [_MAU] > EARLIER([_MAU]))) + 1
+		    )
+		RETURN
+		    SELECTCOLUMNS(
+		        _Ranked,
+		        "SearchResult",
+		            'Account'[Account] & " (AccountKey: " & FORMAT('Account'[AccountKey], "0")
+		            & ", MAU: " & FORMAT([_MAU], "#,0")
+		            & ", Area: " & [_Area]
+		            & ", Segment: " & [_Segment]
+		            & ", Industry: " & 'Account'[Industry] & ")",
+		        "Rank", [_Rank]
+		    )
+	isHidden
+
+	annotation TE_Group = Local.AskADIA.Admin

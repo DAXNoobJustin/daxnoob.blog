@@ -1,0 +1,22 @@
+core:
+  workspace: "HelixFabric-Engineering"
+  repository_directory: "."
+
+orchestration:
+  default:
+    Notebook:
+      pre_process:
+        - operation: validate_item
+          failure_mode: abort
+    DataPipeline:
+      pre_process:
+        - operation: validate_item
+          failure_mode: abort
+    Environment:
+      pre_process:
+        - operation: validate_item
+          failure_mode: abort
+    VariableLibrary:
+      pre_process:
+        - operation: validate_item
+          failure_mode: abort

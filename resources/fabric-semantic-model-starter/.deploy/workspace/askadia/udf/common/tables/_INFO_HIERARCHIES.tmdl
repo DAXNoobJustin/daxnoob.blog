@@ -1,0 +1,41 @@
+/// Hidden calculated table exposing user-hierarchy structure (hierarchy/level/column). Generated at deploy time by generateInfoHierarchies.csx. Joined by GenerateQuery to auto-inject parent levels when slicing by a child column of a hierarchy annotated Copilot_AutoIncludeParents=true.
+table _INFO_HIERARCHIES
+	isHidden
+
+	column TableName
+		isNameInferred
+		sourceColumn: [TableName]
+
+	column HierarchyName
+		isNameInferred
+		sourceColumn: [HierarchyName]
+
+	column LevelOrdinal
+		isNameInferred
+		sourceColumn: [LevelOrdinal]
+
+	column LevelName
+		isNameInferred
+		sourceColumn: [LevelName]
+
+	column ColumnName
+		isNameInferred
+		sourceColumn: [ColumnName]
+
+	partition _INFO_HIERARCHIES = calculated
+		mode: import
+		source =
+				DATATABLE(
+				    "TableName", STRING,
+				    "HierarchyName", STRING,
+				    "LevelOrdinal", INTEGER,
+				    "LevelName", STRING,
+				    "ColumnName", STRING,
+				    {
+				        {"_PLACEHOLDER", "_PLACEHOLDER", 0, "_PLACEHOLDER", "_PLACEHOLDER"}
+				    }
+				)
+
+	annotation TabularEditor_TableGroup = Other
+
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}

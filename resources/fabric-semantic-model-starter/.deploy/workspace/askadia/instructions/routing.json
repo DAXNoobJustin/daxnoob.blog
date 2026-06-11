@@ -1,0 +1,10 @@
+{
+  "_comment": "Global routing/description config. Per-model topic ownership (title + user-facing topic name/triggers) lives in each models/<slug>/model.json (top-level `title` + per-row `route:{name,triggers}`); this file keeps only the cross-model order (`modelOrder`) and the shared description config. The cross-model reroute section, the generated thin router, and the model description are all derived from the model.json route blocks in row order. GUIDs are resolved per-environment at emit time (config/model_guids.yml), never stored here.",
+  "descriptionTemplate": "The definitive source of {scope} for the following topics: {topics}.",
+  "descriptionTopicsSuffix": "Trained topics: {topics}.",
+  "descriptionScope": "Azure data analytics",
+  "modelOrder": [
+    "azure-data-insights",
+    "azure-data-partner-community"
+  ]
+}

@@ -1,0 +1,28 @@
+trigger: none
+
+jobs:
+  - job: Job
+    displayName: Job
+    pool:
+      vmImage: windows-latest
+    steps:
+      - checkout: none
+      - task: PowerShell@2
+        displayName: Pull Request Naming
+        inputs:
+          targetType: "inline"
+          script: |
+            $header = @{ Authorization = "Bearer $(System.AccessToken)" }
+            $projectUrl = "$(System.CollectionUri)$(System.TeamProject)/_apis/git/pullrequests/$(System.PullRequest.PullRequestId)?api-version=5.1"
+            $content = Invoke-RestMethod -Uri $projectUrl -Method GET -contentType "application/json" -Headers $header
+
+            $pullRequestName = $content | Select-Object -expand title
+            $targetBranch = $content | Select-Object -expand targetRefName
+            $targetBranch = $targetBranch -replace "refs\/heads\/", ""
+
+            if($pullRequestName -notmatch "^$($targetBranch)_.+_.+$") {
+                $errorMessage = "Invalid Pull Request Name. Format must follow Environment_Description_Iteration"
+                Write-Host "##vso[task.logissue type=error] $errorMessage"
+                Write-Host  "##vso[task.complete result=Failed;]Make step fail"
+                exit 0
+            }

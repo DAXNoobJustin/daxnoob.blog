@@ -1,0 +1,28 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "Run OneLake Security Probe",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d3",
+          "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-0000000000d0",
+          "parameters": {
+            "_inlineInstallationEnabled": {
+              "value": "True",
+              "type": "bool"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

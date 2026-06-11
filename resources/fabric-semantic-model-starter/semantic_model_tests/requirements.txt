@@ -1,0 +1,4 @@
+fabric-cicd>=0.1.20
+azure-identity>=1.17.0
+requests>=2.32.0
+PyYAML>=6.0

@@ -1,0 +1,32 @@
+[
+  {
+    "QuestionId": "specialization_status_for_partner",
+    "Question": "Show all specialization programs and their status for partner X",
+    "Description": "Specialization program detail per Partner Global Id under the named Partner. Returns each Partner Specialization plus its requirement detail (Performance, Skilling, Customer Success, etc.). Group output by Partner Global Id and summarize requirements met vs. not met. Use 'Partner'[Partner Name] for the filter (a Partner can have multiple Partner Global Ids).",
+    "Measures": "[Partner Specialization PartnerGlobal Count]",
+    "HardcodedGroupBy": "'Partner Specialization Program Requirement'[DIM_PartnerGlobalId]|'Partner'[Partner Name]|'Partner Specialization Program Requirement'[Partner Specialization]|'Partner Specialization Program Requirement'[Partner Specialization Requirement Detail]",
+    "DefaultFilters": "",
+    "HardcodedFilters": "",
+    "HardcodedNotInFilters": "",
+    "RequiredFilters": "'Partner'[Partner Name]",
+    "DaxWrapper": "EVALUATE {query} ORDER BY 'Partner Specialization Program Requirement'[Partner Specialization] ASC",
+    "IsOrchestrator": false,
+    "SectionIndex": 1,
+    "SectionLabel": ""
+  },
+  {
+    "QuestionId": "partners_one_req_remaining_for_specialization",
+    "Question": "Which partners have one requirement remaining for specialization X?",
+    "Description": "Partners (by Partner Global Id and Partner Name) that are one requirement away from completing the specified specialization. The [Partner Specialization PartnerGlobal Count - One Req Remaining] measure encodes the 'one req remaining' status; non-blank rows are the partners that qualify. Filter by 'Partner Specialization Program Requirement'[Partner Specialization].",
+    "Measures": "[Partner Specialization PartnerGlobal Count - One Req Remaining]",
+    "HardcodedGroupBy": "'Partner Specialization Program Requirement'[DIM_PartnerGlobalId]|'Partner'[Partner Name]",
+    "DefaultFilters": "",
+    "HardcodedFilters": "",
+    "HardcodedNotInFilters": "",
+    "RequiredFilters": "'Partner Specialization Program Requirement'[Partner Specialization]",
+    "DaxWrapper": "EVALUATE FILTER({query}, NOT ISBLANK([Partner Specialization PartnerGlobal Count - One Req Remaining])) ORDER BY 'Partner'[Partner Name] ASC",
+    "IsOrchestrator": false,
+    "SectionIndex": 1,
+    "SectionLabel": ""
+  }
+]

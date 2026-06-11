@@ -1,0 +1,210 @@
+trigger: none
+
+# PR validation pipeline for AskADIA-enabled semantic models.
+#
+# One job per registered model in `parameters.models`. Each job deploys a
+# throwaway DEBUG_UnitTest_<ENV>_<id> model from the model's source TMDL, refreshes
+# it, then runs the merged catalog of:
+#
+#   - semantic_model_tests/_shared/                        (framework UDF contract — every model)
+#   - semantic_model_tests/<model.slug>/unit/              (model-specific structurals/snapshots)
+#   - semantic_model_tests/<model.slug>/smoke/             (Main PRs only — data-freshness smoke)
+#
+# Refresh policy switches on PR target branch: Full on Main (smoke catalog
+# needs populated partitions); Calculate on Develop/Test (fast, structure-only).
+# Single Python invocation per model = one deployment + one refresh + all
+# relevant catalogs run sequentially against the same throwaway.
+#
+# Adding a new model: see semantic_model_tests/README.md → "Adding a new model".
+#
+# IMPORTANT: this YAML is the source of truth for the pipeline definition,
+# but the ADO Pipelines UI registration is separate. Renaming the YAML file
+# requires a one-time manual update of the registered pipeline's "YAML file
+# path" in ADO Pipelines → Pipeline → Settings.
+pr:
+  branches:
+    include:
+      - Develop
+      - Test
+      - Main
+  paths:
+    include:
+      # Test framework + catalogs
+      - semantic_model_tests/**
+      # Dev-loop deploy infrastructure (entry point + lib + scaffold)
+      - .deploy/workspace/debug_deploy.py
+      - .deploy/workspace/lib/**
+      - .deploy/workspace/askadia/**
+      # Generic deploy engine + orchestrator (imported by run_tests.py and debug_deploy.py)
+      - .deploy/workspace/process_orchestrator.py
+      # All Python ops invoked via the YAML config (validate_item, merge_shared_scaffold,
+      # generate_copilot_*, refresh_model_rest, run_tabular_editor, tabular_editor_utils).
+      # Glob over individual list to future-proof.
+      - .deploy/workspace/operations/**
+      # CSX scripts run by the preprocess chain (incl. refreshModel.csx
+      # used by REST/XMLA refresh)
+      - .deploy/workspace/tabular_scripts/**
+      # Per-model deploy config (op chain)
+      - .deploy/workspace/configs/HelixFabric-Insights.yml
+      - .deploy/workspace/configs/shared.yml
+      # Env-mapped connection IDs (used by run_tests.py + debug_deploy.py to bind)
+      - .deploy/workspace/configs/env_connection_ids.json
+      # Any semantic model definition + its env replacement file
+      - workspace/**/*.SemanticModel/**
+      - workspace/**/parameter.yml
+      # The pipeline itself
+      - .pipelines/Validate_SemanticModelTests.yml
+
+parameters:
+  - name: models
+    type: object
+    default:
+      - slug: azure_data_insights
+        source_model: "Azure Data Insights"
+        # Workspace folder under workspace/ that holds <semantic_model_name>.
+        workspace_dir_name: "HelixFabric-Insights"
+        semantic_model_name: "Azure Data Insights.SemanticModel"
+
+      - slug: azure_data_partner_community
+        source_model: "Azure Data Partner & Community"
+        workspace_dir_name: "HelixFabric-Insights"
+        semantic_model_name: "Azure Data Partner & Community.SemanticModel"
+
+variables:
+  service_connection: "your-azure-service-connection"
+  # Dev workspace where throwaway DEBUG_UnitTest_<id> models are published + torn down.
+  dev_workspace_id: "<dev-workspace-id>"
+
+jobs:
+  # Offline guardrail for the AskADIA instruction framework: the emitter unit
+  # tests + the committed thin-router artifact drift check. Pure Python (PyYAML
+  # only — no Fabric/Azure/private feed), model-agnostic, and needs no workspace
+  # deploy, so it runs ONCE here instead of redundantly inside each per-model job.
+  # Catches a stale model.json golden, an unresolved/malformed {{token}}, or a
+  # drifted generated/adia-router.SKILL.md before the slow, auth'd deploy jobs.
+  - job: AskADIA_InstructionChecks
+    displayName: "AskADIA: instruction tests + router drift"
+    pool:
+      vmImage: windows-latest
+    timeoutInMinutes: 10
+    steps:
+      - checkout: self
+
+      - task: UsePythonVersion@0
+        displayName: "Use Python 3.12"
+        inputs:
+          versionSpec: "3.12"
+
+      - task: PowerShell@2
+        displayName: "Instruction tests + emit_router --check"
+        inputs:
+          targetType: inline
+          script: |
+            python -m pip install --quiet --upgrade pip
+            python -m pip install --quiet "PyYAML>=6.0"
+            $inst = ".deploy/workspace/askadia/instructions"
+            python "$inst/test_roundtrip.py"
+            if ($LASTEXITCODE -ne 0) { Write-Error "Instruction tests failed"; exit 1 }
+            python "$inst/emit_router.py" --check
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Router artifact stale — run 'python emit_router.py --update-golden'"
+              exit 1
+            }
+
+  - ${{ each model in parameters.models }}:
+      - job: Test_${{ model.slug }}
+        displayName: "Tests: ${{ model.source_model }}"
+        pool:
+          vmImage: windows-latest
+        timeoutInMinutes: 30
+        variables:
+          model_workspace_dir: "workspace/${{ model.workspace_dir_name }}/${{ model.semantic_model_name }}"
+          model_unit_dir: "semantic_model_tests/${{ model.slug }}/unit"
+          model_smoke_dir: "semantic_model_tests/${{ model.slug }}/smoke"
+          shared_catalog_dir: "semantic_model_tests/_shared"
+        steps:
+          - checkout: self
+
+          - task: UsePythonVersion@0
+            displayName: "Use Python 3.12"
+            inputs:
+              versionSpec: "3.12"
+
+          - task: PowerShell@2
+            displayName: "Install Python deps"
+            inputs:
+              targetType: inline
+              # Single source of truth lives in semantic_model_tests/requirements.txt.
+              # Local dev (`pip install -r ...`) and CI install the same set.
+              script: |
+                python -m pip install --quiet --upgrade pip
+                python -m pip install --quiet -r semantic_model_tests/requirements.txt
+
+          - task: PowerShell@2
+            displayName: "Lib import smoke"
+            inputs:
+              targetType: inline
+              # Localizes import errors (typo in __init__.py, circular
+              # import after refactor, missing dep) to this 1-second step
+              # instead of failing 30s into the deploy with an opaque trace.
+              # Adds .deploy/workspace/ to PYTHONPATH so `lib` resolves the
+              # same way it does in the runner.
+              script: |
+                $env:PYTHONPATH = ".deploy/workspace"
+                python -c "from lib import auth, branch_env, staging, connections, refresh, fabric_api"
+
+          - task: AzureCLI@2
+            displayName: "Deploy + refresh + run tests"
+            inputs:
+              azureSubscription: $(service_connection)
+              scriptType: "ps"
+              scriptLocation: "inlineScript"
+              # Single Python invocation per job. make_test_model_name mints
+              # a fresh UUID per process; splitting deploy and test into
+              # separate AzureCLI steps would deploy two throwaways and the
+              # second would silently query an empty model.
+              inlineScript: |
+                # Tests always publish a throwaway DEBUG_UnitTest_<ENV>_<id>
+                # model to the dev workspace and tear it down. The --environment
+                # arg below drives parameter.yml find/replace + which env's
+                # connection IDs get bound.
+                $workspaceId = "$(dev_workspace_id)"
+
+                # Branch-aware policy:
+                #   Main    -> env=prod, Full refresh, include smoke catalog
+                #              (staged TMDL gets prod storage GUIDs via parameter.yml;
+                #               prod connection IDs bound; refresh reads real prod data
+                #               via the prod connection's identity)
+                #   Test    -> env=test, Calculate refresh (structure only)
+                #   Develop -> env=dev,  Calculate refresh (structure only)
+                $target = "$(System.PullRequest.TargetBranchName)"
+                $catalogs = @("$(shared_catalog_dir)", "$(model_unit_dir)")
+                switch ($target) {
+                  "Main" {
+                    $envArg = "prod"
+                    $refreshType = "Full"
+                    $catalogs += "$(model_smoke_dir)"
+                  }
+                  "Test"    { $envArg = "test"; $refreshType = "Calculate" }
+                  "Develop" { $envArg = "dev";  $refreshType = "Calculate" }
+                  default   { $envArg = "dev";  $refreshType = "Calculate" }
+                }
+                Write-Host "==> PR target:    $target"
+                Write-Host "==> Environment:  $envArg"
+                Write-Host "==> Workspace:    $workspaceId (${{ model.workspace_dir_name }}.Dev, sandbox)"
+                Write-Host "==> Refresh:      $refreshType"
+                Write-Host "==> Catalogs:     $($catalogs -join ', ')"
+
+                python semantic_model_tests/run_tests.py `
+                  --workspace-id "$workspaceId" `
+                  --workspace-dir-name "${{ model.workspace_dir_name }}" `
+                  --source-model "${{ model.source_model }}" `
+                  --workspace-dir "$(model_workspace_dir)" `
+                  --catalog-dir @catalogs `
+                  --environment $envArg `
+                  --refresh-type $refreshType
+
+                if ($LASTEXITCODE -ne 0) {
+                  Write-Error "Tests failed"
+                  exit 1
+                }

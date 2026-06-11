@@ -1,0 +1,56 @@
+{
+  "_comment": "Single source of truth for the model instruction content store. Renders to each model's _COPILOT_INSTRUCTIONS table + always-on router via emit_model.py. Shared blocks live under blocks/; per-model blocks under models/<slug>/. Cross-references use {{ref:anchor}} (rendered to the row's backtick'd key); model artifact ids use {{model-guid:slug}}.",
+  "model": {
+    "sharedRows": [
+      {
+        "anchor": "workflow",
+        "topic": "Data Explore Workflow and Critical Rules",
+        "whenToUse": "Triggers: workflow, critical rules, execute dont ask, default value, definition mode, Discover, generated DAX, AutoApplied, no fabrication, no hand-written DAX. Examples: how should I answer a metric question, should I use GenerateQuery, when should I ask clarification. Intent: preserve the original data-explore execution contract.",
+        "routerHint": "Overall data-explore workflow, no-fabrication rules, discovery/generate/execute contract.",
+        "blocks": [
+          "workflow",
+          "critical-rules"
+        ]
+      },
+      {
+        "anchor": "udf-reference",
+        "topic": "UDF Reference",
+        "whenToUse": "Triggers: DiscoverQuestions, DiscoverMeasures, DiscoverColumns, SearchValues, SearchHierarchy, GenerateQuery, AnswerQuestion, AutoApplied, filter syntax, slice columns, rowLimit, sortMeasure, daxWrapper. Examples: how do I call Local.AskADIA.GenerateQuery, how do filters work. Intent: preserve the exact AskADIA UDF API guidance.",
+        "routerHint": "`DiscoverQuestions`, `DiscoverMeasures`, `DiscoverColumns`, `SearchValues`, `SearchHierarchy`, `GenerateQuery`, `AnswerQuestion`, `AutoApplied`, filter syntax.",
+        "blocks": [
+          "udf-reference"
+        ]
+      },
+      {
+        "anchor": "output-formatting",
+        "topic": "Output, Formatting, Error Handling, Escape Hatch",
+        "whenToUse": "Triggers: output format, formatting, numbers, dates, rows, empty results, errors, invalid filter, not sliceable, custom DAX, escape hatch. Examples: how should I present results, what if ExecuteQuery fails, can I write custom DAX. Intent: preserve answer-format and recovery guidance.",
+        "routerHint": "Result formatting, number/date rules, row presentation, error recovery, custom-DAX last resort.",
+        "blocks": [
+          "output-format",
+          "formatting-rules",
+          "error-handling",
+          "escape-hatch"
+        ]
+      },
+      {
+        "anchor": "examples-part-1",
+        "topic": "Examples by Technique Part 1",
+        "whenToUse": "Triggers: examples, discover and pick, curated question, GenerateQuery, SearchValues, SearchHierarchy, time-window override, sorting, hierarchy walk, daxWrapper. Intent: preserve the first half of data-explore examples.md.",
+        "routerHint": "Discovery, curated question, `GenerateQuery`, value resolution, time windows, sorting, hierarchy, `daxWrapper`.",
+        "blocks": [
+          "examples-part-1"
+        ]
+      },
+      {
+        "anchor": "examples-part-2",
+        "topic": "Examples by Technique Part 2",
+        "whenToUse": "Triggers: examples, end-to-end scenarios, include filter, NOT-IN, recovery, cross-workload substitution. Intent: preserve the second half of data-explore examples.md.",
+        "routerHint": "End-to-end examples, include/NOT-IN filters, recovery, cross-workload substitution.",
+        "blocks": [
+          "examples-part-2"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,46 @@
+source_model: Azure Data Insights
+# Refresh sanity — exercise the AskADIA UDF chain end-to-end against
+# freshly-refreshed data. Distinct from the unit-test catalog (which validates
+# DAX *structure* via snapshot match): these cases run the generated DAX and
+# assert at least one row of *actual data* comes back. Catches silent refresh
+# failures (e.g. partition refreshed but yielded zero rows due to upstream
+# data outage) that wouldn't surface on a Calculate-only refresh.
+#
+# Pattern: wrap COUNTROWS(<UDF>) in a FILTER that keeps the row only if the
+# count is > 0. This gives a deterministic, single-cell result (no TOPN-
+# without-ORDER-BY non-determinism if anyone later asserts on row content)
+# AND a clear failure mode (0 rows back = UDF returned no data).
+cases:
+  - id: smoke_answer_question_usage_mau_by_workload_returns_data
+    description: AnswerQuestion('usage_mau_by_workload') with no filters returns at least one row of data.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+        { COUNTROWS(
+            Local.AskADIA.AnswerQuestion(
+              "usage_mau_by_workload",
+              BLANK(), BLANK(), BLANK(), BLANK(), BLANK()
+            )
+        ) },
+        [Value] > 0
+      )
+    expected_row_count:
+      exact: 1
+
+  - id: smoke_answer_question_revenue_returns_data
+    description: AnswerQuestion('revenue') (defaults baked in) returns at least one row of data.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+        { COUNTROWS(
+            Local.AskADIA.AnswerQuestion(
+              "revenue",
+              BLANK(), BLANK(), BLANK(), BLANK(), BLANK()
+            )
+        ) },
+        [Value] > 0
+      )
+    expected_row_count:
+      exact: 1

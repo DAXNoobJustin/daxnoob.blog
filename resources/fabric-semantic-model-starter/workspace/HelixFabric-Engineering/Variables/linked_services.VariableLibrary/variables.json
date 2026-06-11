@@ -1,0 +1,17 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/variableLibrary/definition/variables/1.0.0/schema.json",
+  "variables": [
+    {
+      "name": "example_sql_source",
+      "note": "",
+      "type": "String",
+      "value": "your-sql-server-dev.database.windows.net;ExampleDatabase"
+    },
+    {
+      "name": "example_kusto_source",
+      "note": "",
+      "type": "String",
+      "value": "https://your-cluster-dev.kusto.windows.net;ExampleKustoDb"
+    }
+  ]
+}

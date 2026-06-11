@@ -1,0 +1,68 @@
+## Ignore Fabric Items
+/**/*.Lakehouse/*
+
+## Tabular Editor (auto-downloaded by UDF test runner)
+TabularEditor.exe
+TabularEditor.exe.config
+TabularEditor-license.rtf
+license-ELA*.txt
+license-FastWildcardMatching.txt
+license-TabularEditor.txt
+license-TreeViewAdv.txt
+
+## AskADIA shared scaffold — codegen artifacts copied into per-model definition/tables/
+## by .deploy/workspace/askadia/deploy/merge_shared_scaffold.py --in-place. Source of truth
+## lives in .deploy/workspace/askadia/udf/common/tables/. Each per-model copy is created
+## fresh by merge_shared_scaffold (placeholder partition), then the partition body is
+## overwritten in-place by the matching csx script during deploy preprocess. Per-model
+## functions.tmdl is also mutated by --in-place merge + csx — use `git restore` after
+## local preprocess runs.
+/workspace/**/definition/tables/_COPILOT_MEASURE_COLUMNS.tmdl
+/workspace/**/definition/tables/_COPILOT_QUESTIONS.tmdl
+/workspace/**/definition/tables/_INFO_ANNOTATIONS.tmdl
+/workspace/**/definition/tables/_INFO_COLUMNS.tmdl
+/workspace/**/definition/tables/_INFO_HIERARCHIES.tmdl
+/workspace/**/definition/tables/_INFO_MEASURES.tmdl
+/workspace/**/definition/tables/_INFO_RELATIONSHIPS.tmdl
+
+## AskADIA — Copilot/schema.json is regenerated from model annotations by
+## .deploy/workspace/operations/generate_copilot_schema.py at deploy. Source of truth
+## is the model's Copilot_* annotations, not the json on disk.
+/workspace/**/Copilot/schema.json
+
+## AskADIA — _COPILOT_INSTRUCTIONS.tmdl (table) and Copilot/Instructions/instructions.md
+## (always-on router) are generated from .deploy/workspace/askadia/instructions/ and
+## injected by generate_copilot_instructions.py at deploy. Source of truth is that
+## store, not the files on disk; a local debug-deploy regenerates them.
+/workspace/**/definition/tables/_COPILOT_INSTRUCTIONS.tmdl
+/workspace/**/Copilot/Instructions/instructions.md
+
+# Editor / IDE
+.vs/
+.idea/
+*.user
+*.suo
+*.tmuo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+dist/
+build/
+/*.spec
+
+# Fabric / Tabular / deploy artifacts
+*.script.cs
+fabric-cicd-github
+*.log
+
+# Spark custom libraries (JARs) + built wheels are environment artifacts, not committed
+*.jar
+**/CustomLibraries/*.whl

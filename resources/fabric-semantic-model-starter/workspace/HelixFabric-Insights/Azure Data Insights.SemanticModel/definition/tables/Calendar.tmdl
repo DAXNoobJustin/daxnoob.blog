@@ -1,0 +1,142 @@
+/// Shared date dimension for all time-based analysis. Contains calendar and Microsoft fiscal (Jul-Jun) hierarchies, relative period offsets, and time reference flags for filtering to complete periods.
+table Calendar
+	dataCategory: Time
+
+	/// Indicates whether the fiscal month is closed for Azure revenue reporting. 'True' means the month's Azure revenue data is finalized.
+	column 'Azure Closed Month Flag'
+		dataType: string
+		sourceColumn: AzureClosedMonthFlag
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = false
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Full calendar date (yyyy-mm-dd). Primary date key for the Calendar dimension and the model's mark-as-date-table column.
+	column 'Calendar Date'
+		dataType: dateTime
+		isUnique
+		isKey
+		formatString: yyyy-mm-dd
+		sourceColumn: CalendarDate
+
+		annotation TabularEditor_MarkAsDateKey = 1
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = false
+
+		annotation Copilot_Synonyms
+
+	/// Indicates whether the fiscal month has ended. True for all past fiscal months; False for the current and future fiscal months.
+	column 'Closed Month Flag'
+		dataType: string
+		sourceColumn: ClosedMonthFlag
+
+	/// Numeric day within the month (1-31).
+	column 'Day Of Month'
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: DayOfMonth
+
+		annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["MEASURE_REFERENCED_COLUMN_NOT_HIDDEN"]}
+
+	/// Surrogate date key used to join fact tables to the Calendar dimension. Same value as Calendar Date.
+	column DIM_CalendarKey
+		dataType: dateTime
+		isHidden
+		isUnique
+		formatString: yyyy-mm-dd
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_CalendarKey
+
+	/// Calendar month and year label (e.g., 'July, 2017'), spanning the Microsoft fiscal year (July through June). Sorted by FiscalMonthId.
+	column 'Fiscal Month'
+		dataType: string
+		sourceColumn: FiscalMonth
+		sortByColumn: FiscalMonthId
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Microsoft fiscal quarter label (e.g., 'FY25-Q4'). Fiscal quarters: Q1=Jul-Sep, Q2=Oct-Dec, Q3=Jan-Mar, Q4=Apr-Jun.
+	column 'Fiscal Quarter'
+		dataType: string
+		sourceColumn: FiscalQuarter
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Microsoft fiscal year label (e.g., 'FY26'). Fiscal year runs from July 1 through June 30.
+	column 'Fiscal Year'
+		dataType: string
+		sourceColumn: FiscalYear
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms = FY25=FY2025, FY26=FY2026
+
+		annotation Copilot_ValueSynonyms = FY25=FY2025|FY26=FY2026
+
+	/// Numeric fiscal month identifier for sorting and comparison. Sequential integer where higher values are more recent months.
+	column FiscalMonthId
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: FiscalMonthId
+
+	/// Last calendar date of the fiscal month.
+	column 'FM End Date'
+		dataType: dateTime
+		formatString: yyyy-mm-dd
+		sourceColumn: FMEndDate
+
+	/// Fiscal Month Offset (0 = Current)
+	column RelativeMonthNumber
+		dataType: int64
+		isHidden
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: RelativeMonthNumber
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = false
+
+		annotation Copilot_Enumerable = false
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_AutoFilterWhenSliced = trigger:'Calendar'[Fiscal Month],'Calendar'[Calendar Date]|TREATAS({-12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1, 0}, 'Calendar'[RelativeMonthNumber])
+
+	partition Calendar = entity
+		mode: directLake
+		source
+			entityName: DIM_Calendar
+			schemaName: Tabular_AzureDataInsights
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn = Upstream Finance Source
+
+	annotation TabularEditor_TableGroup = Dim
+

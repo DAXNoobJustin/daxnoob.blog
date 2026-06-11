@@ -1,0 +1,36 @@
+/// Pre-parsed Copilot_ValueSynonyms registry. One row per (TableName, ColumnName, Canonical, Synonym) tuple discovered across the model's column annotations. Replaces what used to be inlined per-column DATATABLE codegen inside _SearchAllLadderColumns. Read by the helper UDF Local.AskADIA._GetColumnSynonymMatches, which is in turn called from _SearchAllLadderColumns and SearchValues._ConcatGeneric so synonym lookup logic has a single source of truth across all branches. Partition expression is rewritten per-deploy by .deploy/workspace/askadia/deploy/tabular_scripts/generateSearchHelpers.csx — DO NOT hand-edit.
+table _COPILOT_VALUE_SYNONYMS
+	isHidden
+
+	column TableName
+		isNameInferred
+		sourceColumn: [TableName]
+
+	column ColumnName
+		isNameInferred
+		sourceColumn: [ColumnName]
+
+	column Canonical
+		isNameInferred
+		sourceColumn: [Canonical]
+
+	column Synonym
+		isNameInferred
+		sourceColumn: [Synonym]
+
+	partition _COPILOT_VALUE_SYNONYMS = calculated
+		mode: import
+		source =
+				DATATABLE(
+				    "TableName", STRING,
+				    "ColumnName", STRING,
+				    "Canonical", STRING,
+				    "Synonym", STRING,
+				    {
+				        {"_PLACEHOLDER", "_PLACEHOLDER", "_PLACEHOLDER", "_PLACEHOLDER"}
+				    }
+				)
+
+	annotation TabularEditor_TableGroup = Other
+
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}

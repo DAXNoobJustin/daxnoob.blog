@@ -1,0 +1,13 @@
+environment_configuration:
+  DEFAULT_API_ROOT_URL:
+    dev: "https://api.fabric.microsoft.com/"
+    test: "https://api.fabric.microsoft.com/"
+    prod: "https://api.fabric.microsoft.com/"
+  XMLA_ENDPOINT:
+    dev: "api.powerbi.com"
+    test: "api.powerbi.com"
+    prod: "api.powerbi.com"
+
+# NOTE: per-model Copilot dataset GUIDs (`copilot_model_guids`) moved into the
+# self-contained AskADIA framework package at
+# askadia/config/model_guids.yml (read via the framework's guids.py).

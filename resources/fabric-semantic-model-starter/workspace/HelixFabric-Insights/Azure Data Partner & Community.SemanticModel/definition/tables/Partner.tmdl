@@ -1,0 +1,193 @@
+/// Microsoft partner dimension containing partner profile attributes, certifications, and program participation flags from the Partner program.
+table Partner
+
+	/// Hidden marker measure. Row count of 'Partner'. Exists so SUMMARIZECOLUMNS in partner_360_overview Section 1 (Partner attributes) has a non-blank measure expression for partners with sparse profile fields.
+	measure 'Partner Record Count' = COUNTROWS('Partner')
+		formatString: #,0
+		isHidden
+
+		annotation Description = "Hidden marker measure used by partner_360_overview Section 1 (Partner attributes) so SUMMARIZECOLUMNS has a measure expression. Returns the row count for the filtered Partner (always 1 when filtered to a single Partner Id). Suppress in skill output templates."
+
+		annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["UNNECESSARY_MEASURES", "NUMERIC_FORMATTING"]}
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms
+
+	column 'Analytics Profile Flag'
+		dataType: string
+		sourceColumn: AnalyticsProfileFlag
+
+	column 'Area Managed Count'
+		dataType: int64
+		formatString: #,##0
+		summarizeBy: none
+		sourceColumn: AreaManagedCount
+
+	column 'Azure Expert MSP Flag'
+		dataType: string
+		sourceColumn: AzureExpertMSPFlag
+
+	column 'Big Data Profile Flag'
+		dataType: string
+		sourceColumn: BigDataProfileFlag
+
+	column 'CoSell Status'
+		dataType: string
+		sourceColumn: CoSellStatus
+
+	column 'CSP Flag'
+		dataType: string
+		sourceColumn: CSPFlag
+
+	column 'CSP Partner Flag'
+		dataType: string
+		sourceColumn: CSPPartnerFlag
+
+	column 'Data Warehouse Profile Flag'
+		dataType: string
+		sourceColumn: DataWarehouseProfileFlag
+
+	column DIM_PartnerId
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_PartnerId
+
+	column 'Fabricon Partner Flag'
+		dataType: string
+		sourceColumn: FabriconPartnerFlag
+
+	column 'FDBFP Flag'
+		dataType: string
+		sourceColumn: FDBFPFlag
+
+	column FFPFlag
+		dataType: string
+		sourceColumn: FFPFlag
+
+	column 'Global Channel Flag'
+		dataType: string
+		sourceColumn: GlobalChannelFlag
+
+	column 'Global ISV Flag'
+		dataType: string
+		sourceColumn: GlobalISVFlag
+
+	column 'Globally Managed Flag'
+		dataType: string
+		sourceColumn: GloballyManagedFlag
+
+	column 'GSI Flag'
+		dataType: string
+		sourceColumn: GSIFlag
+
+	column 'ISV Partner Flag'
+		dataType: string
+		sourceColumn: ISVPartnerFlag
+
+	column 'Managed Flag'
+		dataType: string
+		sourceColumn: ManagedFlag
+
+	/// Partner network membership tier the partner currently holds. Values: Solutions Partner, Specialization Partner, Program Member, Legacy Competency Partner, Unknown.
+	column 'Membership Level'
+		dataType: string
+		sourceColumn: MembershipLevel
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Partner's network membership status. Values: Active, Qualified, Initialized, PendingQualification, Denied, Unknown (plus a blank-string value for legacy records).
+	column 'Membership Status'
+		dataType: string
+		sourceColumn: MembershipStatus
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Unique identifier for the partner in the Partner system.
+	column 'Partner Id'
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: PartnerId
+
+		annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["MEASURE_REFERENCED_COLUMN_NOT_HIDDEN"]}
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = false
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_PairWith = 'Partner'[Partner Name]
+
+	/// Official registered business name of the partner in the Partner program.
+	column 'Partner Name'
+		dataType: string
+		sourceColumn: PartnerName
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_PairWith = 'Partner'[Partner Id]
+
+		annotation Copilot_SearchRanker = Local.AskADIA._RankPartners
+
+	column 'PartnerId Name'
+		dataType: string
+		sourceColumn: PartnerIdName
+
+	column 'Power BI Profile Flag'
+		dataType: string
+		sourceColumn: PowerBIProfileFlag
+
+	column 'Profile Count'
+		dataType: int64
+		formatString: #,##0
+		summarizeBy: none
+		sourceColumn: ProfileCount
+
+	column 'RTIFP Flag'
+		dataType: string
+		sourceColumn: RTIFPFlag
+
+	column 'SI Partner Flag'
+		dataType: string
+		sourceColumn: SIPartnerFlag
+
+	column 'SQL Profile Flag'
+		dataType: string
+		sourceColumn: SQLProfileFlag
+
+	partition Partner = entity
+		mode: directLake
+		source
+			entityName: DIM_Partner
+			schemaName: Tabular_PartnerCommunity
+			expressionSource: exp_directlake
+
+	annotation TabularEditor_TableGroup = Dim-PartnerCommunity
+
+	annotation Copilot_Topic = partner-community
+

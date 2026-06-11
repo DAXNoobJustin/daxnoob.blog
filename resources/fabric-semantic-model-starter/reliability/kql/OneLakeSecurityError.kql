@@ -1,0 +1,44 @@
+let _now = bin(now(), 1m);
+let _lookback = 10m;
+let _debug = false; // set true to emit a row even with no errors (wiring test)
+let _modelIds = dynamic([
+    "aaaaaaaa-aaaa-aaaa-aaaa-0000000000a1", // Azure Data Insights
+    "aaaaaaaa-aaaa-aaaa-aaaa-0000000000a2"  // Azure Data Partner & Community
+]);
+//
+// Count OneLake security errors across the monitored models in the lookback window.
+let errorCount = SemanticModelLogs
+    | where Timestamp between ((_now - _lookback) .. _now)
+    | where OperationName == "Error"
+    | where ItemId in (_modelIds)
+    | where EventText has "permissions defined in OneLake"
+    | count;
+//
+let result = errorCount
+    | extend Triggered = iff(Count > 0, 1, 0)
+    | where _debug or Triggered == 1
+    | project
+        Timestamp       = _now,
+        ItemName        = "Monitored Semantic Models",
+        ItemId          = "OneLakeSecurityError-Group",
+        Triggered,
+        AlertType       = "OneLakeSecurityError",
+        IncidentMessage      = iff(Triggered == 1 or _debug,
+            strcat(
+                "OneLake Security Error Alert<br><br>",
+                "Monitored semantic models are returning OneLake security errors. ",
+                "Users are being blocked by security configuration sync failures or transient permission issues.<br><br>",
+                "A semantic model refresh has been triggered automatically for all affected models to re-sync the security configuration.<br><br>",
+                "<b>Investigation Steps:</b><br>",
+                "1. Monitor the models after the refresh completes to confirm errors have cleared.<br>",
+                "2. If errors persist, verify recent OneLake security changes (workspace roles, item permissions, sharing).<br>",
+                "3. If the refresh does not resolve the issue, escalate to your platform / Analysis Services support contact."
+            ), ""),
+        TeamsMessage    = iff(Triggered == 1 or _debug,
+            strcat(
+                "🔒 <b>OneLake Security Error — Monitored Semantic Models</b><br><br>",
+                "OneLake security errors detected in the last 10 minutes.<br>",
+                "Users are being blocked by OneLake security sync failures.<br><br>",
+                "A refresh has been triggered automatically for all models."
+            ), "");
+result

@@ -1,0 +1,40 @@
+{
+    "editor.trimAutoWhitespace": false,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "diffEditor.ignoreTrimWhitespace": false,
+    "files.trimTrailingWhitespace": false,
+    "files.trimTrailingWhitespaceInRegexAndStrings": false,
+    "files.insertFinalNewline": true,
+    "files.autoSave": "off",
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[yaml]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit"
+        }
+    },
+    "[powershell]": {
+        "editor.defaultFormatter": "ms-vscode.powershell"
+    },
+    "[toml]": {
+        "editor.defaultFormatter": "tamasfe.even-better-toml"
+    },
+    "git": {
+        "enableSmartCommit": true,
+        "confirmSync": false,
+        "autofetch": true
+    },
+    "ruff": {
+        "organizeImports": true,
+        "fixAll": true
+    }
+}

@@ -1,0 +1,94 @@
+source_model: Azure Data Insights
+# Refresh sanity — exercise the most important cross-table relationships to
+# confirm joins resolve and key relationships are intact after a Full refresh.
+# Each case uses SUMMARIZECOLUMNS over a measure or count that *requires* a
+# working join: if the relationship is broken the result row count drops to 0
+# and the structural assertion fails.
+#
+# Core DirectLake dim coverage: Account, Capacity. Each gets at least one anchor case here so
+# a broken DirectLake binding (typo'd entityName / schemaName, missing
+# expressionSource) surfaces as an empty-result failure on Main PRs.
+cases:
+  - id: smoke_revenue_by_product_master
+    description: Product Master <-> Revenue join resolves and returns at least one product with non-blank revenue.
+    category: structural
+    dax: |
+      EVALUATE
+      TOPN(
+        5,
+        FILTER(
+          SUMMARIZECOLUMNS(
+            'Product Master'[Product],
+            "RevYTD", [Consumed + Adjusted Revenue (YTD)]
+          ),
+          NOT ISBLANK([RevYTD])
+        )
+      )
+    expected_columns:
+      - "Product Master[Product]"
+      - "[RevYTD]"
+    expected_row_count:
+      min: 1
+
+  - id: smoke_mau_by_calendar_month
+    description: Calendar <-> Usage join resolves; MAU aggregates over Fiscal Month and returns data.
+    category: structural
+    dax: |
+      EVALUATE
+      TOPN(
+        3,
+        FILTER(
+          SUMMARIZECOLUMNS(
+            'Calendar'[Fiscal Month],
+            "MAU", [MAU]
+          ),
+          NOT ISBLANK([MAU])
+        )
+      )
+    expected_columns:
+      - "Calendar[Fiscal Month]"
+      - "[MAU]"
+    expected_row_count:
+      min: 1
+
+  - id: smoke_capacity_dim_visible
+    description: DirectLake dim (Capacity) participates in join and returns at least one row with a measure.
+    category: structural
+    dax: |
+      EVALUATE
+      TOPN(
+        3,
+        FILTER(
+          SUMMARIZECOLUMNS(
+            'Capacity'[Capacity SKU],
+            "Cnt", COUNTROWS('Fabric Capacity Units')
+          ),
+          NOT ISBLANK([Cnt])
+        )
+      )
+    expected_row_count:
+      min: 1
+
+  - id: smoke_account_dim_visible
+    description: |
+      DirectLake dim (Account) participates in a measure-anchored
+      join and returns at least one row. Catches a broken Account DirectLake
+      binding (typo'd entityName/schemaName, dropped expressionSource).
+    category: structural
+    dax: |
+      EVALUATE
+      TOPN(
+        3,
+        FILTER(
+          SUMMARIZECOLUMNS(
+            'Account'[Account],
+            "RevYTD", [Consumed + Adjusted Revenue (YTD)]
+          ),
+          NOT ISBLANK([RevYTD])
+        )
+      )
+    expected_columns:
+      - "Account[Account]"
+      - "[RevYTD]"
+    expected_row_count:
+      min: 1

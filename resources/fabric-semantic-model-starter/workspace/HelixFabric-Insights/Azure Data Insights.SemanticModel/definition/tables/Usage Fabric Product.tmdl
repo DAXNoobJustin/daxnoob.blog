@@ -1,0 +1,86 @@
+/// Fabric product hierarchy dimension. Organizes Fabric workloads into Product > Feature > Activity levels.
+table 'Usage Fabric Product'
+
+	/// Surrogate primary key for the Usage Fabric Product dimension.
+	column DIM_Usage_FabricProductId
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_Usage_FabricProductId
+
+	/// Specific user activity within a Fabric feature (e.g., 'committogit', 'createartifact', 'Run Query'). Lowest level in the Fabric product hierarchy.
+	column 'Fabric Activity'
+		dataType: string
+		sourceColumn: FabricActivity
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Feature within a Fabric product (e.g., 'datawarehouse', 'synapsenotebook', 'mountedwarehouse', 'eventhouse'). Mid-level in the Fabric product hierarchy.
+	column 'Fabric Feature'
+		dataType: string
+		sourceColumn: FabricFeature
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Top-level Fabric workload name (e.g., 'Data Warehousing Core', 'Data Engineering', 'Data Science', 'Data Integration', 'Kusto'). Includes an 'All' rollup row.
+	column 'Fabric Product'
+		dataType: string
+		sourceColumn: FabricProduct
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_ValueSynonyms = DE and DS=Data Engineering;Data Science|Data Warehousing Core=Data Warehouse;Warehouse;DWH|CosmosDB=Cosmos DB|SQL DB=SQL Database;SQLDb|One Lake=OneLake;Lakehouse|App Development=AppDev;App Dev|VariableLibraries=Variable Libraries|CICD=CI/CD;CI CD
+
+	/// Product > Feature > Activity drill-down hierarchy for Fabric workloads.
+	hierarchy 'Fabric Hierarchy'
+
+		level 'Fabric Product'
+			column: 'Fabric Product'
+
+		level 'Fabric Feature'
+			column: 'Fabric Feature'
+
+		level 'Fabric Activity'
+			column: 'Fabric Activity'
+
+			annotation Copilot_Visibility = Hidden
+
+			annotation Copilot_Synonyms
+
+		annotation Copilot_AutoIncludeParents = true
+
+		annotation Copilot_SearchLadder = true
+
+	partition 'Usage Fabric Product' = entity
+		mode: directLake
+		source
+			entityName: DIM_Usage_FabricProduct
+			schemaName: Tabular_AzureDataInsights
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn
+		type: string
+
+	annotation TabularEditor_TableGroup = Dim
+

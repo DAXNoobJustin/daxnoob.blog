@@ -1,0 +1,88 @@
+table 'Revenue Product'
+
+	/// Groups or departments that are subdivisions of a larger organization. (i.e. Power BI Premium, Power Apps, Azure AI and Analytics)
+	column 'Business Unit'
+		dataType: string
+		sourceColumn: BusinessUnit
+
+	/// DIM_ProductFamilyId
+	column DIM_ProductFamilyId
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_ProductFamilyId
+
+	/// Power BI Flag
+	column 'PBI Flag'
+		dataType: string
+		sourceColumn: PBIFlag
+
+	/// Power BI Premium Flag
+	column 'PBI Premium Flag'
+		dataType: string
+		sourceColumn: PBIPremiumFlag
+
+	/// Power BI Premium Per User Flag
+	column 'PBI Premium Per User Flag'
+		dataType: string
+		sourceColumn: PBIPremiumPerUserFlag
+
+	/// Product Division (i.e. Dynamics 365, Power BI - M365, SQL Server, etc.)
+	column 'Product Division'
+		dataType: string
+		sourceColumn: ProductDivision
+
+	/// A term used to describe a grouping of related Microsoft products.
+	column 'Product Family'
+		dataType: string
+		sourceColumn: ProductFamily
+
+	/// Groups responsible for the design and development of particular products.
+	column 'Product Unit'
+		dataType: string
+		sourceColumn: ProductUnit
+
+	/// Reporting Rev Sum Division
+	column 'Reporting Rev Sum Division'
+		dataType: string
+		sourceColumn: ReportingRevSumDivision
+
+	/// Reporting Summary Rev Sum Division
+	column 'Reporting Summary Rev Sum Division'
+		dataType: string
+		sourceColumn: ReportingSummaryRevSumDivision
+
+	/// Revenue Summary Category (i.e. MS Dynamics 365 Capacity and Storage, IOM, Viva Sales, etc.)
+	column 'Rev Sum Category'
+		dataType: string
+		sourceColumn: RevSumCategory
+
+	/// Revenue Summary Division (i.e. Power BI Premium, Power BI Pro, Dynamics 365 Service.)
+	column 'Rev Sum Division'
+		dataType: string
+		sourceColumn: RevSumDivision
+
+	/// SQL Flag
+	column 'SQL Flag'
+		dataType: string
+		sourceColumn: SQLFlag
+
+	/// Azure Standalone, Dynamics 365, Power BI - M365, Power BI - Non M365, SQL Server
+	column 'Super Rev Sum Division'
+		dataType: string
+		sourceColumn: SuperRevSumDivision
+
+	partition 'Revenue Product' = entity
+		mode: directLake
+		source
+			entityName: DIM_ProductFamily
+			schemaName: Tabular_PartnerCommunity
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn = Upstream Finance Source
+
+	annotation TabularEditor_TableGroup = Dim
+

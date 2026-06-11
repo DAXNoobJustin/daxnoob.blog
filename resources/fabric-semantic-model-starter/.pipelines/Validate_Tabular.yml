@@ -1,0 +1,78 @@
+trigger: none
+
+jobs:
+  - job: Job
+    displayName: Job
+    pool:
+      vmImage: windows-latest
+    steps:
+      - checkout: self
+      - task: PowerShell@2
+        displayName: "Download Tabular Editor"
+        inputs:
+          targetType: "inline"
+          script: |
+            $TabularEditorUrl = "https://github.com/TabularEditor/TabularEditor/releases/download/2.27.2/TabularEditor.Portable.zip" 
+            $DownloadDestination = "TabularEditor.zip"
+            Invoke-WebRequest -Uri $TabularEditorUrl -OutFile $DownloadDestination
+            Expand-Archive -Path $DownloadDestination -DestinationPath (get-location).Path
+
+      - task: PowerShell@2
+        displayName: "Run BPA on all models"
+        inputs:
+          targetType: "inline"
+          script: |
+            $TabularEditorPath = Join-Path (Get-Location).Path "TabularEditor.exe"
+            if (-not (Test-Path $TabularEditorPath)) {
+                Write-Error "Tabular Editor not found at $TabularEditorPath"
+                exit 1
+            }
+
+            # Define the source directories
+            $SourceDirectories = @(
+                Join-Path "$(Build.SourcesDirectory)" "workspace\HelixFabric-Insights"
+            )
+
+            $models = @()
+            foreach ($dir in $SourceDirectories) {
+                if (Test-Path $dir) {
+                    Write-Host "Searching for models in $dir"
+                    $models += Get-ChildItem -Path $dir -Recurse -Filter "database.tmdl"
+                } else {
+                    Write-Warning "Directory not found: $dir"
+                }
+            }
+
+            if ($models.Count -eq 0) {
+                Write-Warning "No models found in any source directory"
+            }
+
+            $hasErrors = $false
+
+            foreach ($model in $models) {
+                Write-Host "----------------------------------------"
+                Write-Host "Validating model: $($model.FullName)"
+                
+                $outFile = [System.IO.Path]::GetTempFileName()
+                $errFile = [System.IO.Path]::GetTempFileName()
+                
+                # Run Tabular Editor with file redirection to ensure capture
+                # This method is robust across different PowerShell versions
+                $process = Start-Process -FilePath $TabularEditorPath -ArgumentList "`"$($model.FullName)`" -A -V" -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+                
+                # Output content
+                if (Test-Path $outFile) { Get-Content $outFile | Write-Host }
+                if (Test-Path $errFile) { Get-Content $errFile | Write-Host }
+                
+                if ($process.ExitCode -ne 0) {
+                    Write-Host "##[error]Validation failed for $($model.FullName) with exit code $($process.ExitCode)"
+                    $hasErrors = $true
+                }
+                
+                Remove-Item $outFile -ErrorAction SilentlyContinue
+                Remove-Item $errFile -ErrorAction SilentlyContinue
+            }
+
+            if ($hasErrors) {
+                exit 1
+            }

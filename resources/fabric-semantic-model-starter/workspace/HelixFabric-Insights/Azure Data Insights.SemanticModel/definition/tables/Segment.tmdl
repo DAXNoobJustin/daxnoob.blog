@@ -1,0 +1,50 @@
+/// Microsoft sales channel and customer segment dimension containing the segment hierarchy (Segment Group > Segment > Sub Segment). Includes alternative segment classifications for CE (Commercial Enterprise), STB (Sales Territories & Business), Standard Reporting, and summary-level rollups.
+table Segment
+
+	/// Surrogate key for this table. Unique per Sub Segment; one row per distinct Sub Segment value.
+	column DIM_SubSegmentId
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubSegmentId
+
+	/// Top-level grouping in the segment hierarchy (e.g., Enterprise, SME&C Corporate, Consumer).
+	column 'Segment Group'
+		dataType: string
+		sourceColumn: SegmentGroup
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Microsoft channel and customer segment (e.g., Strategic Commercial, SME&C - SMB Commercial, Retail, Distributor, OEM). Second level in the segment hierarchy, below Segment Group.
+	column Segment
+		dataType: string
+		sourceColumn: Segment
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	partition Segment = entity
+		mode: directLake
+		source
+			entityName: DIM_Segment
+			schemaName: Tabular_AzureDataInsights
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn = Upstream Finance Source
+
+	annotation TabularEditor_TableGroup = Dim
+

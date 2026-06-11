@@ -1,0 +1,25 @@
+enable_native_execution_engine: false
+instance_pool_id: aaaaaaaa-aaaa-aaaa-aaaa-000000000056
+driver_cores: 16
+driver_memory: 112g
+executor_cores: 16
+executor_memory: 112g
+dynamic_executor_allocation:
+  enabled: false
+  min_executors: 63
+  max_executors: 63
+spark_conf:
+  spark.databricks.delta.optimizeWrite.enabled: true
+  spark.microsoft.delta.targetFileSize.adaptive.enabled: true
+  spark.sql.adaptive.enabled: true
+  spark.sql.adaptive.coalescePartitions.enabled: true
+  spark.sql.parquet.vorder.default: false
+  spark.sql.parquet.filter.columnindex.enabled: false
+  spark.network.timeout: 600s
+  spark.shuffle.io.maxRetries: 5
+  spark.shuffle.io.retryWait: 15s
+  spark.shuffle.io.numConnectionsPerPeer: 3
+  spark.databricks.delta.optimize.repartition.enabled: false
+  spark.databricks.delta.optimize.maxThreads: 4
+  spark.databricks.delta.optimize.maxFileSize: 268435456
+runtime_version: 1.3

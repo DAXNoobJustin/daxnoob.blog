@@ -1,0 +1,137 @@
+source_model: Azure Data Insights
+# Tests for the Search* UDF annotation/codegen wiring.
+#
+# CONSTRAINT — directLakeBehavior=directLakeOnly: the validate pipeline runs
+# `refresh_type: calculate`, which populates calc tables but does NOT load base
+# table column dictionaries. ANY query that calls VALUES / DISTINCT / etc. on a
+# base column will fail with a "we cannot process the request because table ..."
+# error — including dictionary-only paths inside _SearchAllValues /
+# _SearchAllLadderColumns. So tests in this file MUST stay on metadata-only
+# surfaces:
+#   - Calc tables (_INFO_*, _COPILOT_*)
+#   - String-returning UDFs (DiscoverColumns/Measures/Questions, AnswerQuestion,
+#     BuildQuery, GenerateQuery — these return DAX strings, not data)
+# DO NOT add tests that call SearchValues / SearchHierarchy / _SearchAllValues /
+# _SearchAllLadderColumns directly — they look "dictionary-only" but still
+# trigger base-column dictionary loads. End-to-end execution is validated
+# manually against the live model and via the deploy pipeline (invalid DAX from
+# the codegen would fail the deploy). Stub-shipping regression is caught by the
+# in-script self-check in generateSearchHelpers.csx (throws at deploy time).
+cases:
+  # --- Copilot_SearchRanker annotation discovery ------------------------------
+  - id: ranker_annotation_picked_up
+    description: >
+      generateInfoAnnotations.csx must surface Copilot_SearchRanker on
+      'Account'[Account] with value Local.AskADIA._RankAccounts (the per-model
+      ranker UDF FQN). The annotation value was repurposed from the dead
+      mini-DSL; if the annotation reverts or the value drifts, the codegen will
+      stop generating the ranker block in _SearchAllValues.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+          _INFO_ANNOTATIONS,
+          _INFO_ANNOTATIONS[AnnotationName] = "Copilot_SearchRanker"
+              && _INFO_ANNOTATIONS[ObjectType] = "Column"
+      )
+    expected_row_count: { exact: 1 }
+    contains_all:
+      - "Account"
+      - "Local.AskADIA._RankAccounts"
+
+  # --- Copilot_SearchLadder hierarchy discovery -------------------------------
+  - id: ladder_hierarchies_picked_up
+    description: >
+      All hierarchies annotated Copilot_SearchLadder=true must surface on
+      _INFO_ANNOTATIONS. Codegen iterates this set to emit one block per ladder
+      in _SearchAllValues + _SearchAllLadderColumns. Includes Fabric Capacity
+      Units (Workload Hierarchy) — regression guard against the latent bug
+      where the hand-coded body silently omitted this ladder.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+          _INFO_ANNOTATIONS,
+          _INFO_ANNOTATIONS[AnnotationName] = "Copilot_SearchLadder"
+              && _INFO_ANNOTATIONS[AnnotationValue] = "true"
+              && _INFO_ANNOTATIONS[ObjectType] = "Hierarchy"
+      )
+    expected_row_count: { exact: 3 }
+    contains_all:
+      - "Product Master"
+      - "Usage Fabric Product"
+      - "Fabric Capacity Units"
+
+  # --- Hierarchy-to-column mapping (used by codegen for ladder bodies) --------
+  - id: workload_hierarchy_levels_present
+    description: >
+      _INFO_HIERARCHIES exposes the level columns of each user hierarchy in
+      ordinal order. Codegen relies on this to enumerate ladder columns and
+      assign Position. Verifies the Workload Hierarchy on Fabric Capacity Units
+      surfaces all 4 expected levels (Workload Type, Workload Kind, Artifact
+      Kind, Operation Name) — used by the regression-fix codegen block.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+          _INFO_HIERARCHIES,
+          _INFO_HIERARCHIES[TableName] = "Fabric Capacity Units"
+              && _INFO_HIERARCHIES[HierarchyName] = "Workload Hierarchy"
+      )
+    expected_row_count: { exact: 4 }
+    contains_all:
+      - "Workload Type"
+      - "Workload Kind"
+      - "Artifact Kind"
+      - "Operation Name"
+
+  - id: product_hierarchy_levels_present
+    description: >
+      Product Hierarchy levels (Product Group, Product Mid Group, Product) in
+      ordinal-ASC order. Codegen uses ordinal ordering to emit top-down ladder
+      tuples, which is a behavior change from the previous hand-coded leaf-first
+      ordering for this ladder.
+    category: structural
+    dax: |
+      EVALUATE
+      FILTER(
+          _INFO_HIERARCHIES,
+          _INFO_HIERARCHIES[TableName] = "Product Master"
+              && _INFO_HIERARCHIES[HierarchyName] = "Product Hierarchy"
+      )
+    expected_row_count: { exact: 3 }
+    contains_all:
+      - "Product Group"
+      - "Product Mid Group"
+      - "Product"
+
+  # --- DiscoverColumns surfaces ladder + ranker context -----------------------
+  - id: discover_columns_account_has_ranker_context
+    description: >
+      DiscoverColumns enriches column metadata with annotation-derived tags.
+      Searching for "Account" must surface 'Account'[Account] with the
+      "searchable" tag (the ranker counts as searchable) so consumers can find
+      it as a ranking-eligible column.
+    category: structural
+    dax: 'EVALUATE Local.AskADIA.DiscoverColumns("Account")'
+    contains_all:
+      - "'Account'[Account]"
+
+  - id: discover_columns_workload_type_has_hierarchy_tag
+    description: >
+      Workload Type is a level in the Workload Hierarchy (Copilot_SearchLadder).
+      DiscoverColumns must tag it as "hierarchy" so consumers know to use
+      SearchHierarchy / SearchValues. Regression guard for the codegen ladder
+      enumeration logic.
+    category: structural
+    dax: 'EVALUATE Local.AskADIA.DiscoverColumns("Workload Type")'
+    contains_all:
+      - "'Fabric Capacity Units'[Workload Type]"
+      - "hierarchy"
+
+  # NOTE: empty-stub regression (codegen skipped at deploy time) is detected by
+  # the in-script self-check in generateSearchHelpers.csx, which throws an
+  # InvalidOperationException if the staged body is the sentinel stub. We do
+  # NOT add a runtime DAX sentinel here because every safe shape we tried
+  # (TOPN/FILTER over _SearchAllLadderColumns) still triggers a base-column
+  # dictionary load and fails the directLakeOnly Calculate-only refresh.

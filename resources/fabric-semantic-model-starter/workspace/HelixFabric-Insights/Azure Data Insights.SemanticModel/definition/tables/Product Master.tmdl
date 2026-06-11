@@ -1,0 +1,111 @@
+/// Product dimension organizing Microsoft data platform products. Contains five columns (Organization > Pillar > Product Group > Product Mid Group > Product); the Copilot-exposed Product Hierarchy uses the bottom three levels (Product Group > Product Mid Group > Product).
+table 'Product Master'
+
+	/// Surrogate key for the Product Master dimension. Unique per row. Since the same Product name can appear under multiple Product Groups (e.g., 'Data Integration' exists under both the 'Data Integration' and 'Fabric' groups), DIM_ProductMasterId identifies each unique Product + Product Group combination.
+	column DIM_ProductMasterId
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_ProductMasterId
+
+	/// Top level of the product hierarchy representing the Microsoft business division (e.g., Azure Data, Azure, Modern Workplace, Competitor).
+	column Organization
+		dataType: string
+		sourceColumn: Organization
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+	/// Second level of the product hierarchy grouping products by technical capability area (e.g., Intelligence Platform, Database Platform, Governance Platform).
+	column Pillar
+		dataType: string
+		sourceColumn: Pillar
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+	/// Third level of the product hierarchy grouping related products (e.g., Fabric, Database Platform, Business Intelligence, Analytics, Data Integration).
+	column 'Product Group'
+		dataType: string
+		sourceColumn: ProductGroup
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Fourth level of the product hierarchy grouping closely related products within a Product Group (e.g., Power BI, Fabric, Synapse, Data Factory, Real Time Analytics).
+	column 'Product Mid Group'
+		dataType: string
+		sourceColumn: ProductMidGroup
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms = Fabric Revenue=Fabric, PBI=Power BI, Power BI Revenue=Power BI
+
+		annotation Copilot_ValueSynonyms = Fabric=Fabric Revenue|Power BI=PBI;Power BI Revenue|PGSQL=PostgreSQL;Postgres|AS on Azure=Analysis Services;Azure Analysis Services|RS on Azure=Reporting Services;Azure Reporting Services|HD Insight=HDInsight;Hadoop
+
+	/// Lowest level of the product hierarchy identifying individual products (e.g., Power BI Pro, Power BI Embedded, Fabric, Data Engineering, Cognitive Search).
+	column Product
+		dataType: string
+		sourceColumn: Product
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms = Fabric=Fabric Core, Fabric MAU=Fabric Core, PBI=Power BI Backend, Power BI=Power BI Backend, Power BI MAU=Power BI Backend
+
+		annotation Copilot_ValueSynonyms = Fabric Core=Fabric;Fabric MAU|Power BI Backend=PBI;Power BI;Power BI MAU
+
+	/// Three-level product hierarchy: Product Group > Product Mid Group > Product. Organization and Pillar columns remain on the table but are excluded from the Copilot hierarchy (too coarse for typical Copilot queries).
+	hierarchy 'Product Hierarchy'
+
+		level 'Product Group'
+			column: 'Product Group'
+
+		level 'Product Mid Group'
+			column: 'Product Mid Group'
+
+		level Product
+			column: Product
+
+			annotation Copilot_Visibility = Hidden
+
+			annotation Copilot_Synonyms
+
+		annotation Copilot_SearchLadder = true
+
+	partition 'Product Master' = entity
+		mode: directLake
+		source
+			entityName: DIM_ProductMaster
+			schemaName: Tabular_AzureDataInsights
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn = Azure Data Insights and Analytics
+
+	annotation TabularEditor_TableGroup = Dim
+

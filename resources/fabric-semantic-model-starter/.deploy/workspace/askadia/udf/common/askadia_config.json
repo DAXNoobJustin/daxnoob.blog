@@ -1,0 +1,82 @@
+{
+  "annotationRegistry": [
+    {
+      "AnnotationKey": "Copilot_Enumerable",
+      "ObjectType": "Column",
+      "Surface": "DiscoverColumnsTags",
+      "EmitOrder": 1,
+      "RenderedValue": "searchable",
+      "Description": "Column flagged as searchable (values can be enumerated via SearchValues). Rendered as a tag in DiscoverColumns Tags output column. EmitOrder=1 places this first to match canonical output 'searchable, sliceable'."
+    },
+    {
+      "AnnotationKey": "Copilot_Sliceable",
+      "ObjectType": "Column",
+      "Surface": "DiscoverColumnsTags",
+      "EmitOrder": 2,
+      "RenderedValue": "sliceable",
+      "Description": "Column flagged as sliceable (valid in group-by clauses). Rendered as a tag in DiscoverColumns Tags output column."
+    },
+    {
+      "AnnotationKey": "Copilot_AutoIncludeParents",
+      "ObjectType": "Hierarchy",
+      "Surface": "DiscoverColumnsBehavior",
+      "EmitOrder": 1,
+      "RenderedValue": "AutoIncludeParents",
+      "Description": "Hierarchy flagged for parent-level auto-injection. Rendered in the Phase 4 DiscoverColumns Behavior output column so callers can see which columns participate in auto-expansion."
+    },
+    {
+      "AnnotationKey": "Copilot_PairWith",
+      "ObjectType": "Column",
+      "Surface": "DiscoverColumnsBehavior",
+      "EmitOrder": 2,
+      "RenderedValue": "PairWith",
+      "Description": "Column paired with another for symmetric auto-injection. Rendered in the Phase 4 DiscoverColumns Behavior output column."
+    },
+    {
+      "AnnotationKey": "Copilot_AutoFilterWhenSliced",
+      "ObjectType": "Column",
+      "Surface": "DiscoverColumnsBehavior",
+      "EmitOrder": 3,
+      "RenderedValue": "AutoFilterWhenSliced",
+      "Description": "Column triggers sticky-default filter injection. Rendered in the Phase 4 DiscoverColumns Behavior output column."
+    }
+  ],
+  "measureVariants": [
+    {
+      "Suffix": "MoM %",
+      "EmitOrder": 1
+    },
+    {
+      "Suffix": "YoY %",
+      "EmitOrder": 2
+    },
+    {
+      "Suffix": "WoW %",
+      "EmitOrder": 3
+    },
+    {
+      "Suffix": "PM",
+      "EmitOrder": 4
+    },
+    {
+      "Suffix": "PY",
+      "EmitOrder": 5
+    },
+    {
+      "Suffix": "PW",
+      "EmitOrder": 6
+    },
+    {
+      "Suffix": "MoM",
+      "EmitOrder": 7
+    },
+    {
+      "Suffix": "YoY",
+      "EmitOrder": 8
+    },
+    {
+      "Suffix": "WoW",
+      "EmitOrder": 9
+    }
+  ]
+}

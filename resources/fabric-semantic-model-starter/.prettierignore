@@ -1,0 +1,6 @@
+# Ignore workspace directory (Fabric artifacts)
+workspace/
+
+# Ignore build/output directories
+node_modules/
+.git/

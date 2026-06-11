@@ -1,0 +1,101 @@
+/// Geographic dimension representing the Microsoft subsidiary hierarchy (Big Area > Area > Region > Sub Region > Subsidiary > Subsidiary Region > Subsidiary District > Subsidiary Sub District). One row per Subsidiary Sub District.
+table Geography
+
+	/// Area Normal
+	column 'Area Normal'
+		dataType: string
+		sourceColumn: AreaNormal
+
+	/// Second level in the geographic hierarchy, below Big Area (e.g., North Europe, South Europe, ASEAN, Greater China, Latam).
+	column Area
+		dataType: string
+		sourceColumn: Area
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Top-level geographic grouping (e.g., Americas, Asia, EMEA, CorpHQ).
+	column 'Big Area'
+		dataType: string
+		sourceColumn: BigArea
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+	/// DIM_SubsidiarySubDistrictId
+	column DIM_SubsidiarySubDistrictId
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_SubsidiarySubDistrictId
+
+	/// Third level in the geographic hierarchy, below Big Area and Area (e.g., Belgium, North MCC, GCR excl China, United States).
+	column Region
+		dataType: string
+		sourceColumn: Region
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+	/// Fourth level in the geographic hierarchy, below Region (e.g., Canada, Indonesia, CCA, Belgium).
+	column 'Sub Region'
+		dataType: string
+		sourceColumn: SubRegion
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+	/// Subsidiary District
+	column 'Subsidiary District'
+		dataType: string
+		sourceColumn: SubsidiaryDistrict
+
+	/// Subsidiary Region
+	column 'Subsidiary Region'
+		dataType: string
+		sourceColumn: SubsidiaryRegion
+
+	/// Subsidiary Sub District
+	column 'Subsidiary Sub District'
+		dataType: string
+		sourceColumn: SubsidiarySubDistrict
+
+	/// Microsoft subsidiary representing the local Microsoft office responsible for a geography. May cover a single country or a multi-country cluster.
+	column Subsidiary
+		dataType: string
+		sourceColumn: Subsidiary
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+	partition Geography = entity
+		mode: directLake
+		source
+			entityName: DIM_Geography
+			schemaName: Tabular_PartnerCommunity
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn = Upstream Finance Source
+
+	annotation TabularEditor_TableGroup = Dim
+

@@ -1,0 +1,46 @@
+{
+    "_comment": [
+        "Source-controlled connection IDs for binding test/debug semantic models.",
+        "",
+        "Schema:",
+        "  _connections  -> { aliasName: { Dev|Test|Prod: connectionId } }",
+        "  <workspace>   -> { <source model display name>: { uses: [aliasName, ...] } }",
+        "",
+        "Add a model that shares an existing source: drop in a new entry with 'uses'.",
+        "Add a new shared source: register an alias under _connections.",
+        "",
+        "Used by .deploy/workspace/debug_deploy.py and semantic_model_tests/run_tests.py.",
+        "When a model is deployed as a throwaway (DEBUG_UnitTest_<ENV>_*) or persistent debug",
+        "(DEBUG_<ENV>_*) copy, we bind the env-appropriate connection IDs explicitly",
+        "instead of doing a cross-workspace lookup against the upstream env's source model.",
+        "",
+        "Why explicit IDs (not lookup): the PR-validation service principal",
+        "has 'Use' permission on prod connections (so it can bind them and refresh through them)",
+        "but does NOT have read access to the prod Insights workspace (so it cannot list the",
+        "prod model's connections). Hardcoding the IDs sidesteps this entirely.",
+        "",
+        "When connection IDs change (rare): regenerate by listing connections from any",
+        "workspace where you have read access:",
+        "  GET /v1/workspaces/{insights-workspace-id}/items/{model-id}/connections"
+    ],
+    "_connections": {
+        "DirectLakeInsights": {
+            "Dev": "aaaaaaaa-aaaa-aaaa-aaaa-000000000050",
+            "Test": "aaaaaaaa-aaaa-aaaa-aaaa-000000000046",
+            "Prod": "aaaaaaaa-aaaa-aaaa-aaaa-000000000010"
+        },
+        "DirectLakeInsightsRestricted": {
+            "Dev": "aaaaaaaa-aaaa-aaaa-aaaa-000000000076",
+            "Test": "aaaaaaaa-aaaa-aaaa-aaaa-000000000102",
+            "Prod": "aaaaaaaa-aaaa-aaaa-aaaa-000000000091"
+        }
+    },
+    "HelixFabric-Insights": {
+        "Azure Data Insights": {
+            "uses": ["DirectLakeInsights", "DirectLakeInsightsRestricted"]
+        },
+        "Azure Data Partner & Community": {
+            "uses": ["DirectLakeInsights", "DirectLakeInsightsRestricted"]
+        }
+    }
+}

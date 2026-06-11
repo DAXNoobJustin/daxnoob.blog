@@ -1,0 +1,109 @@
+/// Customer account dimension containing firmographic attributes, managed account details, and strategic classification flags. Sourced from the Managed Account List (MAL) and enterprise CRM data.
+table Account
+
+	/// Internal helper that counts Account dimension rows in the current filter context (COUNTROWS over the dim). Exists purely as an aggregation anchor so Copilot can roll a count up over Account attributes — e.g. accounts by industry, segment, geography, or assigned seller. Not a precise distinct-entity count. Hidden from report authors; surfaced only to Copilot.
+	measure _RecordCountAccount = COUNTROWS ( 'Account' )
+		formatString: #,0
+		isHidden
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Synonyms = Number of Accounts, Account Count, Account Key Count
+
+		annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["UNNECESSARY_MEASURES"]}
+
+	/// Display name of the customer organization.
+	column Account
+		dataType: string
+		sourceColumn: Account
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_PairWith = 'Account'[AccountKey]
+
+		annotation Copilot_SearchRanker = Local.AskADIA._RankAccounts
+
+	/// Primary key for the Account dimension, equal to the account key value. Includes special values: -1 (N/A placeholder) and -100 (All accounts rollup).
+	column DIM_AccountKey
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		isAvailableInMdx: false
+		summarizeBy: none
+		sourceColumn: DIM_AccountKey
+
+	/// Industry classification of the account (e.g., Consumer Goods, Banking, Health Payor, IT Services & Business Advisory).
+	column Industry
+		dataType: string
+		sourceColumn: Industry
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// Indicates whether the account appears on the Managed Account List (MAL), Microsoft's master list of managed enterprise accounts.
+	column 'MAL Flag'
+		dataType: string
+		sourceColumn: MALFlag
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = false
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// The Microsoft operating unit (geographic or organizational subdivision) associated with the account (e.g., United Kingdom, ANZ, Japan, US-Federal).
+	column 'Operating Unit'
+		dataType: string
+		sourceColumn: OperatingUnit
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Enumerable = true
+
+		annotation Copilot_Synonyms
+
+	/// The customer's account key.
+	column AccountKey
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: AccountKey
+
+		annotation Copilot_Sliceable = true
+
+		annotation Copilot_Visibility = Visible
+
+		annotation Copilot_Enumerable = false
+
+		annotation Copilot_Synonyms
+
+		annotation Copilot_PairWith = 'Account'[Account]
+
+	partition Account = entity
+		mode: directLake
+		source
+			entityName: DIM_Account
+			schemaName: Tabular_AzureDataInsights
+			expressionSource: exp_directlake
+
+	extendedProperty SourceColumn = Upstream Finance Source
+
+	annotation TabularEditor_TableGroup = Dim
+
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["STAR_SCHEMA"]}
+

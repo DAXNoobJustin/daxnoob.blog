@@ -1,0 +1,187 @@
+table _COPILOT_MEASURE_COLUMNS
+	isHidden
+
+	column MeasureName
+		isNameInferred
+		sourceColumn: [MeasureName]
+
+	column MeasureTable
+		isNameInferred
+		sourceColumn: [MeasureTable]
+
+	column ColumnTable
+		isNameInferred
+		sourceColumn: [ColumnTable]
+
+	column ColumnName
+		isNameInferred
+		sourceColumn: [ColumnName]
+
+	column DataType
+		isNameInferred
+		sourceColumn: [DataType]
+
+	column IsEnumerable
+		isNameInferred
+		sourceColumn: [IsEnumerable]
+
+	column MeasureDescription
+		isNameInferred
+		sourceColumn: [MeasureDescription]
+
+	column Alias
+		isNameInferred
+		sourceColumn: [Alias]
+
+	column Synonyms
+		isNameInferred
+		sourceColumn: [Synonyms]
+
+	column FullColumnRef
+		isNameInferred
+		sourceColumn: [FullColumnRef]
+
+	column IsSliceable
+		isNameInferred
+		sourceColumn: [IsSliceable]
+
+	column IsHierarchy
+		isNameInferred
+		sourceColumn: [IsHierarchy]
+
+	column FactDescription
+		isNameInferred
+		sourceColumn: [FactDescription]
+
+	column DefaultFilter
+		isNameInferred
+		sourceColumn: [DefaultFilter]
+
+	column ColumnTagsRendered
+		isNameInferred
+		sourceColumn: [ColumnTagsRendered]
+
+	column Variants
+		isNameInferred
+		sourceColumn: [Variants]
+
+	column HardcodedFilter
+		isNameInferred
+		sourceColumn: [HardcodedFilter]
+
+	column Topic
+		isNameInferred
+		sourceColumn: [Topic]
+
+	partition _COPILOT_MEASURE_COLUMNS = calculated
+		mode: import
+		source =
+				VAR _AllAnnotations = _INFO_ANNOTATIONS
+				VAR _VisibleMeasures = SELECTCOLUMNS(
+				    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_Visibility" && _INFO_ANNOTATIONS[AnnotationValue] = "Visible" && _INFO_ANNOTATIONS[ObjectType] = "Measure"),
+				    "MeasureName", _INFO_ANNOTATIONS[ObjectName], "MeasureTable", _INFO_ANNOTATIONS[TableName])
+				VAR _VisibleCols = SELECTCOLUMNS(
+				    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_Visibility" && _INFO_ANNOTATIONS[AnnotationValue] = "Visible" && _INFO_ANNOTATIONS[ObjectType] = "Column"),
+				    "VisTable", _INFO_ANNOTATIONS[TableName], "VisCol", _INFO_ANNOTATIONS[ObjectName])
+				VAR _SliceableCols = SELECTCOLUMNS(
+				    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_Sliceable" && _INFO_ANNOTATIONS[AnnotationValue] = "true"),
+				    "SliceTable", _INFO_ANNOTATIONS[TableName], "SliceCol", _INFO_ANNOTATIONS[ObjectName])
+				VAR _EnumerableCols = SELECTCOLUMNS(
+				    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_Enumerable" && _INFO_ANNOTATIONS[AnnotationValue] = "true"),
+				    "EnumTable", _INFO_ANNOTATIONS[TableName], "EnumCol", _INFO_ANNOTATIONS[ObjectName])
+				VAR _LadderHiers = SELECTCOLUMNS(
+				    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_SearchLadder" && _INFO_ANNOTATIONS[AnnotationValue] = "true" && _INFO_ANNOTATIONS[ObjectType] = "Hierarchy"),
+				    "LHTable", _INFO_ANNOTATIONS[TableName], "LHName", _INFO_ANNOTATIONS[ObjectName])
+				VAR _HierCols = SELECTCOLUMNS(
+				    FILTER(_INFO_HIERARCHIES, NOT ISEMPTY(FILTER(_LadderHiers, [LHTable] = _INFO_HIERARCHIES[TableName] && [LHName] = _INFO_HIERARCHIES[HierarchyName]))),
+				    "HCTable", _INFO_HIERARCHIES[TableName], "HCCol", _INFO_HIERARCHIES[ColumnName])
+				VAR _Aliases = SELECTCOLUMNS(
+				    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_Alias" && _INFO_ANNOTATIONS[ObjectType] = "Measure"),
+				    "AliasTable", _INFO_ANNOTATIONS[TableName], "AliasName", _INFO_ANNOTATIONS[ObjectName], "AliasVal", _INFO_ANNOTATIONS[AnnotationValue])
+				VAR _Synonyms = SELECTCOLUMNS(
+				    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_Synonyms" && _INFO_ANNOTATIONS[ObjectType] = "Measure" && LEN(_INFO_ANNOTATIONS[AnnotationValue]) > 0),
+				    "SynTable", _INFO_ANNOTATIONS[TableName], "SynName", _INFO_ANNOTATIONS[ObjectName], "SynVal", _INFO_ANNOTATIONS[AnnotationValue])
+				VAR _DefaultFilters = SELECTCOLUMNS(
+				    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_DefaultFilter" && _INFO_ANNOTATIONS[ObjectType] = "Measure"),
+				    "DFTable", _INFO_ANNOTATIONS[TableName], "DFName", _INFO_ANNOTATIONS[ObjectName], "DFVal", _INFO_ANNOTATIONS[AnnotationValue])
+				VAR _HardcodedFilters = SELECTCOLUMNS(
+				    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_HardcodedFilter" && _INFO_ANNOTATIONS[ObjectType] = "Measure"),
+				    "HFTable", _INFO_ANNOTATIONS[TableName], "HFName", _INFO_ANNOTATIONS[ObjectName], "HFVal", _INFO_ANNOTATIONS[AnnotationValue])
+				VAR _FactTopics = SELECTCOLUMNS(
+				    FILTER(_AllAnnotations, _INFO_ANNOTATIONS[AnnotationName] = "Copilot_Topic" && _INFO_ANNOTATIONS[ObjectType] = "Table"),
+				    "FTTable", _INFO_ANNOTATIONS[TableName], "FTVal", _INFO_ANNOTATIONS[AnnotationValue])
+				VAR _AllMeasureNames = SELECTCOLUMNS(_INFO_MEASURES, "AMN", _INFO_MEASURES[Name])
+				// Directed filter-propagation edges (Src filters Dst). For every active relationship the
+				// filter flows from the To side to the From side (the standard cross-filter direction, which
+				// holds for both M2O and single-direction M2M); BothDirections relationships add the reverse
+				// edge too. Reachability is therefore defined by filter PROPAGATION, not by cardinality.
+				VAR _ActiveRels = FILTER(_INFO_RELATIONSHIPS, _INFO_RELATIONSHIPS[IsActive] = TRUE())
+				VAR _FlowEdges = DISTINCT(
+				    UNION(
+				        SELECTCOLUMNS(_ActiveRels, "Src", _INFO_RELATIONSHIPS[ToTable], "Dst", _INFO_RELATIONSHIPS[FromTable]),
+				        SELECTCOLUMNS(
+				            FILTER(_ActiveRels, _INFO_RELATIONSHIPS[CrossFilteringBehavior] = "BothDirections"),
+				            "Src", _INFO_RELATIONSHIPS[FromTable], "Dst", _INFO_RELATIONSHIPS[ToTable])
+				    )
+				)
+				VAR _ColTypes = SELECTCOLUMNS(_INFO_COLUMNS, "CTT", _INFO_COLUMNS[Table], "CTC", _INFO_COLUMNS[Name], "CTD", _INFO_COLUMNS[DataType])
+				VAR _MeasureInfo = SELECTCOLUMNS(_INFO_MEASURES, "MIName", _INFO_MEASURES[Name], "MITable", _INFO_MEASURES[Table], "MIDesc", _INFO_MEASURES[Description])
+				VAR _FactDescriptions = SELECTCOLUMNS(INFO.VIEW.TABLES(), "FDName", [Name], "FDDesc", [Description])
+				VAR _Result = GENERATE(
+				    _VisibleMeasures,
+				    VAR _Fact = [MeasureTable]
+				    VAR _CM = [MeasureName]
+				    // Reverse filter-propagation closure from the measure home table: every table whose filter
+				    // can ultimately reach _Fact along the flow graph (i.e. everything that can filter the measure).
+				    // Bounded to 5 expansion rounds as a guardrail — deeper than any chain in the model, and it
+				    // guarantees termination even with bidirectional edges/cycles. Home table is always included.
+				    VAR _Reach0 = ROW("RT", _Fact)
+				    VAR _Reach1 = DISTINCT(UNION(_Reach0, SELECTCOLUMNS(FILTER(_FlowEdges, NOT ISEMPTY(FILTER(_Reach0, [RT] = [Dst]))), "RT", [Src])))
+				    VAR _Reach2 = DISTINCT(UNION(_Reach1, SELECTCOLUMNS(FILTER(_FlowEdges, NOT ISEMPTY(FILTER(_Reach1, [RT] = [Dst]))), "RT", [Src])))
+				    VAR _Reach3 = DISTINCT(UNION(_Reach2, SELECTCOLUMNS(FILTER(_FlowEdges, NOT ISEMPTY(FILTER(_Reach2, [RT] = [Dst]))), "RT", [Src])))
+				    VAR _Reach4 = DISTINCT(UNION(_Reach3, SELECTCOLUMNS(FILTER(_FlowEdges, NOT ISEMPTY(FILTER(_Reach3, [RT] = [Dst]))), "RT", [Src])))
+				    VAR _AllTables = DISTINCT(UNION(_Reach4, SELECTCOLUMNS(FILTER(_FlowEdges, NOT ISEMPTY(FILTER(_Reach4, [RT] = [Dst]))), "RT", [Src])))
+				    VAR _HF = COALESCE(MAXX(FILTER(_HardcodedFilters, [HFTable] = _Fact && [HFName] = _CM), [HFVal]), "")
+				    VAR _ValidCols = FILTER(_VisibleCols, NOT ISEMPTY(FILTER(_AllTables, [RT] = [VisTable])))
+				    VAR _Desc = MAXX(FILTER(_MeasureInfo, [MIName] = _CM && [MITable] = _Fact), [MIDesc])
+				    VAR _Alias = MAXX(FILTER(_Aliases, [AliasTable] = _Fact && [AliasName] = _CM), [AliasVal])
+				    VAR _Syn = MAXX(FILTER(_Synonyms, [SynTable] = _Fact && [SynName] = _CM), [SynVal])
+				    VAR _DF = COALESCE(MAXX(FILTER(_DefaultFilters, [DFTable] = _Fact && [DFName] = _CM), [DFVal]), "")
+				    VAR _FactDesc = COALESCE(MAXX(FILTER(_FactDescriptions, [FDName] = _Fact), [FDDesc]), "")
+				    VAR _Topic = COALESCE(MAXX(FILTER(_FactTopics, [FTTable] = _Fact), [FTVal]), "")
+				    VAR _VariantRows =
+				        FILTER(
+				            _COPILOT_VARIANT_CONFIG,
+				            COUNTROWS(FILTER(_AllMeasureNames, [AMN] = _CM & " " & _COPILOT_VARIANT_CONFIG[Suffix])) > 0
+				        )
+				    VAR _Variants = CONCATENATEX(_VariantRows, _COPILOT_VARIANT_CONFIG[Suffix], "|", _COPILOT_VARIANT_CONFIG[EmitOrder], ASC)
+				    RETURN ADDCOLUMNS(
+				        SELECTCOLUMNS(_ValidCols, "ColumnTable", [VisTable], "ColumnName", [VisCol]),
+				        "FullColumnRef", [ColumnTable] & "[" & [ColumnName] & "]",
+				        "DataType", MAXX(FILTER(_ColTypes, [CTT] = [ColumnTable] && [CTC] = [ColumnName]), [CTD]),
+				        "IsEnumerable", IF(NOT ISEMPTY(FILTER(_EnumerableCols, [EnumTable] = [ColumnTable] && [EnumCol] = [ColumnName])), TRUE(), FALSE()),
+				        "IsSliceable", IF(NOT ISEMPTY(FILTER(_SliceableCols, [SliceTable] = [ColumnTable] && [SliceCol] = [ColumnName])), TRUE(), FALSE()),
+				        "IsHierarchy", IF(NOT ISEMPTY(FILTER(_HierCols, [HCTable] = [ColumnTable] && [HCCol] = [ColumnName])), TRUE(), FALSE()),
+				        "MeasureDescription", _Desc,
+				        "Alias", _Alias,
+				        "Synonyms", _Syn,
+				        "DefaultFilter", _DF,
+				        "HardcodedFilter", _HF,
+				        "Variants", _Variants,
+				        "FactDescription", _FactDesc,
+				        "Topic", _Topic
+				    )
+				)
+				VAR _WithTags = ADDCOLUMNS(
+				    _Result,
+				    "ColumnTagsRendered",
+				        [FullColumnRef] & " (" & [DataType]
+				        & IF([IsEnumerable], ", searchable", "")
+				        & IF([IsSliceable], ", sliceable", "")
+				        & IF([IsHierarchy], ", hierarchy", "") & ")"
+				)
+				RETURN _WithTags
+
+	annotation TabularEditor_TableGroup = Other
+
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}

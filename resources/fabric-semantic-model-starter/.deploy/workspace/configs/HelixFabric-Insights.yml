@@ -1,0 +1,43 @@
+core:
+  workspace: "HelixFabric-Insights"
+  repository_directory: "."
+
+orchestration:
+  # Default operations (used if no environment-specific override exists).
+  # Models bootstrapped onto the AskADIA UDF framework are inferred by the
+  # presence of `.deploy/workspace/askadia/udf/models/<slug>/README.md`
+  # — `setup_askadia_framework` skips silently for any model without one. A
+  #   bootstrapped model (overlay present) must also have a canonical instruction
+  #   set (`instructions/models/<slug>/model.json`) or the op fails loud.
+  # See `.deploy/workspace/askadia/README.md` for bootstrap steps.
+  default:
+    SemanticModel:
+      pre_process:
+        - operation: validate_item
+          failure_mode: abort
+        # Auto-generates the standard time-intelligence variant family for any
+        # base measure tagged with `TimeIntel_Anchor`. Self-gates: skips silently
+        # when no measure opts in. Must run BEFORE setup_askadia_framework so the
+        # framework's variant discovery sees the generated PM/PY/MoM/etc.
+        - operation: run_model_script
+          script_path: .deploy/workspace/tabular_scripts/generateTimeIntelMeasures.csx
+          failure_mode: abort
+        # Adds metric-specific description notes for measures that self-scope to
+        # latest available data. Must run after TI variants exist and before
+        # AskADIA _INFO_MEASURES discovery is generated.
+        - operation: run_model_script
+          script_path: .deploy/workspace/tabular_scripts/augmentMeasureDescriptions.csx
+          failure_mode: abort
+        - operation: setup_askadia_framework
+          failure_mode: abort
+        # PBI-native Copilot schema (separate from AskADIA framework). Self-gates
+        # on `Copilot/settings.json` (the committed opt-in marker) and only runs
+        # when `indexingEnabled` is true. Regenerates `Copilot/schema.json` fresh
+        # from the model's Copilot_* annotations on every deploy (schema.json is
+        # .gitignored, so it must NOT be the gate).
+        - operation: generate_copilot_schema
+          failure_mode: abort
+      post_process:
+        - operation: refresh_model_rest
+          refresh_type: calculate
+          failure_mode: continue

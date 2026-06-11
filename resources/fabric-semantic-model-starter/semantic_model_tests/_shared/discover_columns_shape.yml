@@ -1,0 +1,46 @@
+# Framework contract — DiscoverColumns UDF.
+#
+# These tests exercise the AskADIA UDF's *contract* (output schema, behavior
+# on empty / no-match search) and run against every model that consumes the
+# .deploy/workspace/askadia/ framework. A break here points at the
+# framework itself, not any one model.
+#
+# Model-specific search terms (e.g. "tenant", "revenue") live in the
+# per-model catalog under semantic_model_tests/<model_slug>/unit/discover_columns.yml.
+cases:
+  - id: framework_columns_returns_canonical_schema
+    description: DiscoverColumns("") returns the canonical 8-column projection with at least one row. Behaviors column added when _COPILOT_ANNOTATIONS_REGISTRY gained DiscoverColumnsBehavior surface consumer.
+    category: structural
+    dax: 'EVALUATE Local.AskADIA.DiscoverColumns("")
+
+      '
+    expected_columns:
+      - "[TableName]"
+      - "[ColumnName]"
+      - "[ColumnRef]"
+      - "[Description]"
+      - "[DataType]"
+      - "[Synonyms]"
+      - "[Tags]"
+      - "[Behaviors]"
+    expected_row_count:
+      min: 1
+
+  - id: framework_columns_no_match_returns_zero
+    description: DiscoverColumns with nonsense term returns zero rows but preserves the schema.
+    category: structural
+    dax: 'EVALUATE Local.AskADIA.DiscoverColumns("__zzz_no_such_column__")
+
+      '
+    expected_columns:
+      - "[TableName]"
+      - "[ColumnName]"
+      - "[ColumnRef]"
+      - "[Description]"
+      - "[DataType]"
+      - "[Synonyms]"
+      - "[Tags]"
+      - "[Behaviors]"
+    expected_row_count:
+      min: 0
+      max: 0

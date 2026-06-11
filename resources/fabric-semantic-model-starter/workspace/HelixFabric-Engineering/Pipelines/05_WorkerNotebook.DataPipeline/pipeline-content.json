@@ -1,0 +1,372 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "Set OrchestrationDB",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "variableName": "OrchestrationDB",
+          "value": {
+            "value": "@if(equals(pipeline().parameters.OrchestrationEnvironment,'dev')\n        ,'Orchestration-aaaaaaaa-aaaa-aaaa-aaaa-000000000057'\n        ,if(equals(pipeline().parameters.OrchestrationEnvironment, 'test')\n        ,'Orchestration-aaaaaaaa-aaaa-aaaa-aaaa-000000000096'\n        ,if(equals(pipeline().parameters.OrchestrationEnvironment, 'prod') \n        ,'Orchestration-aaaaaaaa-aaaa-aaaa-aaaa-000000000074', '')))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Set OrchestrationServer",
+        "description": " ",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "variableName": "OrchestrationServer",
+          "value": {
+            "value": "@if(equals(pipeline().parameters.OrchestrationEnvironment,'dev')\n        ,'your-orchestration-sql-dev.database.fabric.microsoft.com'\n        ,if(equals(pipeline().parameters.OrchestrationEnvironment, 'test')\n        ,'your-orchestration-sql-test.database.fabric.microsoft.com'\n        ,if(equals(pipeline().parameters.OrchestrationEnvironment, 'prod') \n        ,'your-orchestration-sql-prod.database.fabric.microsoft.com', '')))",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Until Resubmit False",
+        "type": "Until",
+        "dependsOn": [
+          {
+            "activity": "Set OrchestrationDB",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "Set OrchestrationServer",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@equals(variables('Resubmit'), false)",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "name": "Execute Notebook",
+              "type": "TridentNotebook",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "notebookId": {
+                  "value": "@pipeline().parameters.ItemId",
+                  "type": "Expression"
+                },
+                "workspaceId": {
+                  "value": "@pipeline().DataFactory",
+                  "type": "Expression"
+                },
+                "parameters": {
+                  "paramRunType": {
+                    "value": "orchestrated",
+                    "type": "string"
+                  },
+                  "paramExecutionId": {
+                    "value": {
+                      "value": "@pipeline().parameters.BatchRunId",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "notebookParameters": {
+                    "value": {
+                      "value": "@pipeline().parameters.notebookParameters",
+                      "type": "Expression"
+                    },
+                    "type": "string"
+                  },
+                  "_inlineInstallationEnabled": {
+                    "value": "True",
+                    "type": "bool"
+                  }
+                }
+              }
+            },
+            {
+              "name": "Resubmit False",
+              "type": "SetVariable",
+              "dependsOn": [
+                {
+                  "activity": "Execute Notebook",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "policy": {
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "variableName": "Resubmit",
+                "value": false
+              }
+            },
+            {
+              "name": "On Skip Wait 1 Second",
+              "type": "Wait",
+              "dependsOn": [
+                {
+                  "activity": "Resubmit False",
+                  "dependencyConditions": [
+                    "Skipped"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "waitTimeInSeconds": 1
+              }
+            },
+            {
+              "name": "If Queued",
+              "type": "IfCondition",
+              "dependsOn": [
+                {
+                  "activity": "Execute Notebook",
+                  "dependencyConditions": [
+                    "Failed"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "expression": {
+                  "value": "@or(startswith(activity('Execute Notebook').output.result.error.evalue, 'Failed to create Livy session for executing notebook. Error: [TooManyRequestsForCapacity]'),contains(activity('Execute Notebook').output.result.error.traceback[1],'Encountered an unexpected session state Dead while waiting for session to become Idle'))",
+                  "type": "Expression"
+                },
+                "ifFalseActivities": [
+                  {
+                    "name": "Fail",
+                    "type": "Fail",
+                    "dependsOn": [
+                      {
+                        "activity": "Fail Resubmit False",
+                        "dependencyConditions": [
+                          "Succeeded"
+                        ]
+                      }
+                    ],
+                    "typeProperties": {
+                      "message": {
+                        "value": "@activity('Execute Notebook').output.result.error.evalue",
+                        "type": "Expression"
+                      },
+                      "errorCode": "100"
+                    }
+                  },
+                  {
+                    "name": "Fail Resubmit False",
+                    "type": "SetVariable",
+                    "dependsOn": [],
+                    "policy": {
+                      "secureOutput": false,
+                      "secureInput": false
+                    },
+                    "typeProperties": {
+                      "variableName": "Resubmit",
+                      "value": false
+                    }
+                  }
+                ],
+                "ifTrueActivities": [
+                  {
+                    "name": "Wait1",
+                    "type": "Wait",
+                    "dependsOn": [],
+                    "typeProperties": {
+                      "waitTimeInSeconds": 120
+                    }
+                  },
+                  {
+                    "name": "Set variable1",
+                    "type": "SetVariable",
+                    "dependsOn": [
+                      {
+                        "activity": "Wait1",
+                        "dependencyConditions": [
+                          "Succeeded"
+                        ]
+                      }
+                    ],
+                    "policy": {
+                      "secureOutput": false,
+                      "secureInput": false
+                    },
+                    "typeProperties": {
+                      "variableName": "Resubmit",
+                      "value": true
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "timeout": "0.12:00:00"
+        }
+      },
+      {
+        "name": "Fail and Return Notebook Error Message",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Until Resubmit False",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": {
+            "value": "@concat(activity('Execute Notebook').output.result.error.evalue, concat(' <br><br> NotebookActivityId: ', activity('Execute Notebook').output.result.runId))",
+            "type": "Expression"
+          },
+          "errorCode": "100"
+        }
+      },
+      {
+        "name": "Mark Success",
+        "type": "Wait",
+        "dependsOn": [
+          {
+            "activity": "Until Resubmit False",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "If Prod",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "waitTimeInSeconds": 1
+        }
+      },
+      {
+        "name": "If Prod",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "Until Resubmit False",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@equals(pipeline().parameters.OrchestrationEnvironment, 'prod')",
+            "type": "Expression"
+          },
+          "ifFalseActivities": [],
+          "ifTrueActivities": [
+            {
+              "name": "Get Spark Details (Prod)",
+              "type": "InvokePipeline",
+              "dependsOn": [],
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureOutput": false,
+                "secureInput": false
+              },
+              "typeProperties": {
+                "waitOnCompletion": true,
+                "operationType": "InvokeFabricPipeline",
+                "pipelineId": "aaaaaaaa-aaaa-aaaa-aaaa-000000000034",
+                "workspaceId": "aaaaaaaa-aaaa-aaaa-aaaa-000000000025",
+                "parameters": {
+                  "sparkMonitoringUrl": {
+                    "value": "@activity('Execute Notebook').output.sparkMonitoringUrl",
+                    "type": "Expression"
+                  },
+                  "sessionId": {
+                    "value": "@activity('Execute Notebook').output.result.sessionId",
+                    "type": "Expression"
+                  },
+                  "PipelineId": {
+                    "value": "@pipeline().RunId",
+                    "type": "Expression"
+                  },
+                  "status": {
+                    "value": "@activity('Execute Notebook').output.status",
+                    "type": "Expression"
+                  },
+                  "notebookErrorMessage": {
+                    "value": "@If(equals(activity('Execute Notebook').output.status, 'Failed'),activity('Execute Notebook').output.result.error.evalue,'NA')",
+                    "type": "Expression"
+                  },
+                  "BatchRunId": {
+                    "value": "@pipeline().parameters.BatchRunId",
+                    "type": "Expression"
+                  },
+                  "OrchestrationServer": {
+                    "value": "@variables('OrchestrationServer')",
+                    "type": "Expression"
+                  },
+                  "OrchestrationDB": {
+                    "value": "@variables('OrchestrationDB')",
+                    "type": "Expression"
+                  }
+                }
+              },
+              "externalReferences": {
+                "connection": "aaaaaaaa-aaaa-aaaa-aaaa-000000000023"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "parameters": {
+      "notebookParameters": {
+        "type": "string"
+      },
+      "BatchRunId": {
+        "type": "string"
+      },
+      "OrchestrationEnvironment": {
+        "type": "string",
+        "defaultValue": "dev"
+      },
+      "ItemId": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "Resubmit": {
+        "type": "Boolean",
+        "defaultValue": false
+      },
+      "OrchestrationServer": {
+        "type": "String"
+      },
+      "OrchestrationDB": {
+        "type": "String"
+      }
+    }
+  }
+}

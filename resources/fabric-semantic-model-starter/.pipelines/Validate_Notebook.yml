@@ -1,0 +1,129 @@
+trigger: none
+
+jobs:
+  - job: Job
+    displayName: Job
+    pool:
+      vmImage: windows-latest
+    steps:
+      - checkout: self
+        fetchDepth: 0
+        persistCredentials: true
+      - task: UsePythonVersion@0
+        displayName: Use Python 3.12
+        inputs:
+          versionSpec: "3.12"
+      - task: PowerShell@2
+        displayName: Notebook Lint Check
+        inputs:
+          targetType: "inline"
+          script: |
+            $ErrorActionPreference = 'Continue'
+            Write-Host "Linting notebook files..."
+
+            $result = python -m linter lint ./workspace/HelixFabric-Engineering/ 2>&1
+            $exitCode = $LASTEXITCODE
+
+            if ($exitCode -ne 0) {
+                $output = $result -join "`n"
+                Write-Host "##vso[task.logissue type=error]Notebook linting failed:%0A%0A$($output -replace "`n", '%0A')"
+                exit 1
+            }
+
+            Write-Host "All notebook files pass linting!"
+      - task: PowerShell@2
+        displayName: Validate helixutils Version Bump
+        inputs:
+          targetType: "inline"
+          script: |
+            $ErrorActionPreference = 'Stop'
+            Write-Host "Checking if helixutils source changes include a VERSION bump..."
+
+            $targetBranch = "$(System.PullRequest.TargetBranchName)"
+            if (-not $targetBranch) { $targetBranch = "Main" }
+
+            git fetch origin $targetBranch --quiet 2>&1 | Out-Null
+
+            $changedFiles = git diff --name-only "origin/$targetBranch...HEAD" -- helixutils/ 2>&1
+            if (-not $changedFiles) {
+                Write-Host "No helixutils changes detected. Skipping version check."
+                exit 0
+            }
+
+            $sourceChanges = $changedFiles | Where-Object { $_ -notmatch "^helixutils/(VERSION|dist/|build/|scripts/)" }
+            if (-not $sourceChanges) {
+                Write-Host "Only VERSION/build artifacts changed. Skipping."
+                exit 0
+            }
+
+            Write-Host "helixutils source files changed:"
+            $sourceChanges | ForEach-Object { Write-Host "  $_" }
+
+            $versionChanged = $changedFiles | Where-Object { $_ -eq "helixutils/VERSION" }
+            if (-not $versionChanged) {
+                Write-Host "##vso[task.logissue type=error]helixutils source was modified but VERSION was not bumped. Update helixutils/VERSION and rebuild wheels."
+                exit 1
+            }
+
+            Write-Host "VERSION file was updated. Version bump check passed!"
+      - task: PowerShell@2
+        displayName: Validate Notebook Metadata
+        inputs:
+          targetType: "inline"
+          script: |
+            $workspacePath = "$(Build.SourcesDirectory)/"
+            $notebookFolders = Get-ChildItem -Path $workspacePath -Directory -Recurse | Where-Object { $_.Name -like "*.Notebook" }
+            $errors = @()
+
+            foreach ($folder in $notebookFolders) {
+                $expectedDisplayName = $folder.Name -replace "\.Notebook$", ""
+
+                ##### Check Notebook file name matches displayName in platform file #####
+                $platformFilePath = Join-Path -Path $folder.FullName -ChildPath ".platform"
+                if (Test-Path $platformFilePath) {
+                    $jsonContent = Get-Content -Path $platformFilePath -Raw | ConvertFrom-Json
+                    $actualDisplayName = $jsonContent.metadata.displayName
+                    
+                    if ($actualDisplayName -ne $expectedDisplayName) {
+                        $errorMessage = "Violation found for $expectedDisplayName. Mismatch between notebook name and displayname : (Expected: $expectedDisplayName, Found: $actualDisplayName)"
+                        $errors += $errorMessage
+                    }
+                } else {
+                    Write-Output "No .platform file found in $folder.Name"
+                }
+                
+                $notebookFiles = Get-ChildItem -Path $folder.FullName -Recurse -File
+                foreach ($file in $notebookFiles) {
+                    $lines = Get-Content -Path $file.FullName
+                    foreach ($line in $lines) {
+                        ##### Check reads don’t use /*/ which can obscure data lineage #####
+                        if ($line -match "\.read" -and $line -match "\/\*\/" -and $line -match '\["core_default"\]|\["tabular_default"\]') {
+                            $errorMessage = "Violation found for $expectedDisplayName on line: $line. Notebooks should not use /*/ wildcards in their data-path reads/writes"
+                            $errors += $errorMessage
+                        }
+                        ##### Check reads/writes don’t use abfss paths which can obscure data lineage #####
+                        if (($line -match "\.read" -or $line -match "\.write") -and $line -match "abfss") {
+                            $errorMessage = "Violation found for $expectedDisplayName on line: $line. Notebooks should not use abfss in their reads/writes. Utilize connections from util notebook."
+                            $errors += $errorMessage
+                        }
+                        ##### Check notebooks arent attached to Lakehouse #####
+                        if ( $line -match '# META\s*"\s*default_lakehouse_name\s*"\s*:\s*".+?"') {
+                            $errorMessage = "Violation found for $expectedDisplayName on line: $line. Notebooks should not be attached to Lakehouses"
+                            $errors += $errorMessage
+                        }
+                        ##### Check read/writes dont use anything other than _default for HelixData paths #####
+                        if ( $line -match 'connection\["[A-Za-z0-9_]+_(dev|test|prod)"\]') {
+                            $errorMessage = "Violation found for $expectedDisplayName on line: $line. Notebook connections should use the _default (environment-relative) suffix, not a hardcoded _dev/_test/_prod connection"
+                            $errors += $errorMessage
+                        }
+                    }
+                }
+            }
+
+            if ($errors.Count -gt 0) {
+                foreach ($err in $errors) {
+                    Write-Host "##vso[task.logissue type=error] $err"
+                }
+                Write-Host "##vso[task.complete result=Failed;]Make step fail"
+                exit 0
+            }
