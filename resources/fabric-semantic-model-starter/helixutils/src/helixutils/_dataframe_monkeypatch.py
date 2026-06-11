@@ -59,7 +59,7 @@ def _write_delta(
 
     try:
         if tabular:
-            from helixutils.helix_tabular import process_tabular
+            from helixutils.helix_tabular import _determine_partitions, process_tabular
 
             self = process_tabular(self, path)
         # Persist if checks will be run or downstream tabular operations require it
@@ -77,18 +77,11 @@ def _write_delta(
         logger.info(f">>> {elapsed()} Writing to Delta ({mode})...")
         writer = self.write.mode(mode).format("delta")
 
-        if tabular:
-            tabular_partition_threshold = int(str(spark.conf.get("helixutils.tabular.partition_threshold", "10000000")))
-
-            if (
-                "partitionBy" not in options
-                and row_count > tabular_partition_threshold
-                and "DIM_CalendarKey" in self.columns
-            ):
-                writer = writer.partitionBy("DIM_CalendarKey")
-                logger.info(
-                    f">>> {elapsed()} Tabular write >{tabular_partition_threshold:,} rows with DIM_CalendarKey; auto-partitioning by DIM_CalendarKey"
-                )
+        if tabular and "partitionBy" not in options:
+            partitions = _determine_partitions(self, path.rstrip("/").split("/")[-1], row_count)
+            if partitions:
+                writer = writer.partitionBy(*partitions)
+                logger.info(f">>> {elapsed()} Tabular write: partitioning by {', '.join(partitions)}")
 
         # Default overwriteSchema to True for overwrite mode unless explicitly set
         if mode == "overwrite" and "overwriteSchema" not in options:

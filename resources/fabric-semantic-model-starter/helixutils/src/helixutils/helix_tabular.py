@@ -1,34 +1,106 @@
 """
 Tabular model utilities for HelixData.
 
-The portable transform applied on every ``write_delta(tabular=True)`` lives in
-``process_tabular``: derive a date-typed ``DIM_CalendarKey`` from an integer
-``DIM_DateId`` so DirectLake facts can partition and relate on a real calendar
-key. Two reusable primitives -- ``replace_dateid_with_calendarkey`` and
-``replace_dim_alt_key`` -- are provided so you can extend ``process_tabular``
-with model-specific steps (alt-key replacement via a bridge table, dimension
-filtering, etc.) for your own star schema.
+``process_tabular`` is the portable transform applied on every
+``write_delta(tabular=True)`` -- it shapes a dataprod table for DirectLake
+semantic-model consumption:
+
+1. Derive a date-typed ``DIM_CalendarKey`` from the integer ``DIM_DateId`` so
+   facts relate to (and can partition by) a real calendar key.
+2. **Reduce each fact to the rows that survive in the trimmed dimensions** --
+   a left-semi join per dimension (see ``TABULAR_DIMENSIONS``). The tabular
+   model never carries fact rows pointing at a dimension member that was
+   filtered out upstream, so reducing the fact to the model's actual dimension
+   grain is the single biggest size lever on the tabular side.
+
+``replace_dim_alt_key`` is a reusable primitive for swapping a surrogate key
+for its model-facing alternate via a bridge table -- wire it into
+``process_tabular`` for keys whose source still carries the raw id.
+
+Partitioning for large tabular writes is decided by ``_determine_partitions``
+(used by ``write_delta``): a per-table override in ``CUSTOM_PARTITIONS``, else
+auto-partition ``FACT_``/``BRIDGE_`` tables above ``TABULAR_PARTITION_THRESHOLD``
+rows by ``DIM_CalendarKey``.
+
+Every step is guarded by column / target presence, so ``process_tabular`` is
+safe to call on any DataFrame -- steps that don't apply are skipped.
 """
 
+from pyspark.sql import DataFrame
 from pyspark.sql.functions import col
 
+from helixutils._var import connection, spark
 
-def process_tabular(df, target_path: str = ""):  # noqa: ARG001
+# Dimensions the model trims, each with the alias key its facts join on plus the
+# connection + folder its Delta table lives in. ``process_tabular`` left-semi
+# joins every fact against these so only fact rows whose dimension members
+# survived the trim are kept. Add an entry per dimension you reduce on.
+TABULAR_DIMENSIONS = [
+    {"table": "DIM_Capacity", "key": "DIM_CapacityId_Alt", "connection": "tabular_default"},
+    {"table": "DIM_Environment", "key": "DIM_EnvironmentId", "connection": "tabular_default"},
+]
+
+# Per-table partition overrides: table name -> ordered partition columns. Use
+# for large facts you want partitioned on something other than the
+# DIM_CalendarKey default. Missing columns fall back to automatic partitioning.
+CUSTOM_PARTITIONS: dict[str, list[str]] = {
+    # "FACT_FabricCapacityUnits": ["DIM_CalendarKey", "DIM_CapacityId_Alt"],
+}
+
+# Auto-partition FACT_/BRIDGE_ tabular tables at or above this row count by
+# DIM_CalendarKey. Overridable per write via the
+# ``helixutils.tabular.partition_threshold`` Spark conf.
+TABULAR_PARTITION_THRESHOLD = 10_000_000
+
+
+def process_tabular(df: DataFrame, target_path: str = "") -> DataFrame:
     """
-    Prepare a DataFrame for tabular (semantic-model) consumption.
+    Shape a DataFrame for tabular (semantic-model) consumption.
 
-    Applies the portable step shipped with this starter -- deriving
-    ``DIM_CalendarKey`` from ``DIM_DateId`` -- and returns the result. Extend
-    this with your own model-specific transforms (e.g. ``replace_dim_alt_key``
-    against a bridge table, or left-semi dimension filtering) as needed.
+    Derives ``DIM_CalendarKey``, then reduces facts to the rows present in the
+    trimmed dimensions via left-semi joins (see ``TABULAR_DIMENSIONS``). Extend
+    with ``replace_dim_alt_key`` for surrogate-key swaps if your source still
+    carries the raw ids.
 
     Args:
         df: DataFrame to process.
-        target_path: Reserved for extensions that need the write target (e.g.
-            to skip a self-join when writing a dimension table).
+        target_path: Write target -- used to skip a dimension's own self-join.
 
     """
-    return replace_dateid_with_calendarkey(df)
+    df = replace_dateid_with_calendarkey(df)
+
+    # Reduce facts to valid dimension members. left_semi = keep matching rows,
+    # add no columns. Skip the self-join when writing the dimension itself.
+    for dim in TABULAR_DIMENSIONS:
+        dim_path = connection[dim["connection"]] + f"/{dim['table']}/"
+        if dim["key"] in df.columns and target_path != dim_path:
+            dim_keys = spark.read.format("delta").load(dim_path).select(dim["key"]).distinct()
+            df = df.join(dim_keys, dim["key"], "left_semi")
+
+    return df
+
+
+def _determine_partitions(df: DataFrame, table_name: str, row_count: int | None = None) -> list[str] | None:
+    """
+    Pick partition columns for a tabular write.
+
+    Returns the ``CUSTOM_PARTITIONS`` override when all its columns exist, else
+    ``["DIM_CalendarKey"]`` for ``FACT_``/``BRIDGE_`` tables at or above the row
+    threshold, else ``None`` (no partitioning).
+    """
+    if table_name in CUSTOM_PARTITIONS:
+        cols = CUSTOM_PARTITIONS[table_name]
+        if all(c in df.columns for c in cols):
+            return cols
+
+    if (table_name.startswith("FACT_") or table_name.startswith("BRIDGE_")) and "DIM_CalendarKey" in df.columns:
+        threshold = int(str(spark.conf.get("helixutils.tabular.partition_threshold", str(TABULAR_PARTITION_THRESHOLD))))
+        if row_count is None:
+            row_count = df.count()
+        if row_count >= threshold:
+            return ["DIM_CalendarKey"]
+
+    return None
 
 
 def replace_dim_alt_key(df, df_bridge, key_name):

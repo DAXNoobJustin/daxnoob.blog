@@ -32,7 +32,7 @@ HelixUtils is a Python library that provides specialized utilities for Microsoft
 
 ### 🏗️ Tabular & Delta Management
 
--   **Tabular Processing**: `write_delta(tabular=True)` derives `DIM_CalendarKey` for DirectLake prep, with reusable key-replacement helpers to extend for your own star schema
+-   **Tabular Processing**: `write_delta(tabular=True)` preps a table for DirectLake — derives `DIM_CalendarKey`, reduces facts to surviving dimension members (left-semi join), and auto-partitions large facts by `DIM_CalendarKey` (with per-table overrides). Reusable key-replacement helpers extend it for your own star schema
 -   **Delta Table Management**: Vacuum with retention, plus version-aware rollback
 
 ## Documentation
@@ -43,7 +43,7 @@ HelixUtils is a Python library that provides specialized utilities for Microsoft
 -   **`helix_check` / `CheckConfig`**: PyDeequ-based data-quality checks (uniqueness, completeness, row-count drift)
 -   **`helix_monitoring`**: Incident webhook + alerting (prod-gated)
 -   **`helix_vault`**: Azure Key Vault integration and secure secret management
--   **`helix_tabular`**: Tabular processing for DirectLake — calendar-key derivation + reusable key-replacement helpers
+-   **`helix_tabular`**: Tabular processing for DirectLake — calendar-key derivation, dimension reduction (left-semi), partitioning, + reusable key-replacement helpers
 -   **`helix_delta`**: Delta Lake operations and table management
 
 ### Common Patterns
