@@ -194,7 +194,7 @@ python emit_model.py --slug <slug> --update-golden
 ```
 
 The emitted table carries
-`annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}`,
+`annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_USERS_MISSING_TABLE_PERMISSION"]}`,
 matching every other AskADIA framework calc table; the table is role-readable by
 default (no `tablePermission` entry needed).
 

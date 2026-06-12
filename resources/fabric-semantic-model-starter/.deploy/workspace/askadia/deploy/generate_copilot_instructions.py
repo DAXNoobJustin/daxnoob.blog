@@ -10,7 +10,7 @@ shared `_COPILOT_*` / `_INFO_*` tables (injected by `merge_shared_scaffold`),
 they are generated into the staged model during pre_process, before publish.
 Like those siblings, `_COPILOT_INSTRUCTIONS` is not listed in any role (readable
 under `modelPermission: read`); the emitted table carries the
-`ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION` BPA ignore annotation.
+`ROLE_ALL_USERS_MISSING_TABLE_PERMISSION` BPA ignore annotation.
 Canonical (`askadia/instructions/`) is the single source of truth.
 
 Canonical source of truth:

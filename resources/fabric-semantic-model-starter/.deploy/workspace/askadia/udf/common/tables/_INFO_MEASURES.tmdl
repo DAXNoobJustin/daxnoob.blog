@@ -72,4 +72,4 @@ table _INFO_MEASURES
 
 	annotation TabularEditor_TableGroup = Other
 
-	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}
+	annotation BestPracticeAnalyzer_IgnoreRules = {"RuleIDs":["ROLE_ALL_USERS_MISSING_TABLE_PERMISSION"]}

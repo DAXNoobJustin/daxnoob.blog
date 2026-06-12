@@ -492,13 +492,13 @@ annotation BestPracticeAnalyzer =
 		    "CompatibilityLevel": 1560
 		  },
 		  {
-		    "ID": "ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION",
-		    "Name": "AzureDataInsights_All_Msft role missing table permission",
+		    "ID": "ROLE_ALL_USERS_MISSING_TABLE_PERMISSION",
+		    "Name": "AzureDataInsights_All_Users role missing table permission",
 		    "Category": "Custom",
-		    "Description": "All tables and calculated tables must have an explicit tablePermission (read or none) declared in the AzureDataInsights_All_Msft role. Add the missing entry to the role's TMDL file.",
+		    "Description": "All tables and calculated tables must have an explicit tablePermission (read or none) declared in the AzureDataInsights_All_Users role. Add the missing entry to the role's TMDL file.",
 		    "Severity": 3,
 		    "Scope": "Table, CalculatedTable",
-		    "Expression": "Model.Roles.Any(Name == \"AzureDataInsights_All_Msft\")\r\nand\r\nnot Model.Roles[\"AzureDataInsights_All_Msft\"].TablePermissions.Any(Table.Name == current.Name)",
+		    "Expression": "Model.Roles.Any(Name == \"AzureDataInsights_All_Users\")\r\nand\r\nnot Model.Roles[\"AzureDataInsights_All_Users\"].TablePermissions.Any(Table.Name == current.Name)",
 		    "CompatibilityLevel": 1560
 		  },
 		  {

@@ -58,7 +58,7 @@ FOOTER = (
     "\n\n\tannotation TabularEditor_TableGroup = Other\n"
     "\n"
     "\tannotation BestPracticeAnalyzer_IgnoreRules = "
-    '{"RuleIDs":["ROLE_ALL_MSFT_MISSING_TABLE_PERMISSION"]}\n'
+    '{"RuleIDs":["ROLE_ALL_USERS_MISSING_TABLE_PERMISSION"]}\n'
 )
 
 
