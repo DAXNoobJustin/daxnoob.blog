@@ -61,6 +61,7 @@ image: assets/images/posts/<slug>/hero-image.png
 - **File location:** `docs/posts/YYYY/<slug>.md`
 - **Images:** Place in `docs/assets/images/posts/<slug>/`. Reference with relative path `../../assets/images/posts/<slug>/image.png`.
 - **Downloadable resources:** Place in `resources/<slug>/`. Link from the post.
+- **Update the README index:** The root [`README.md`](README.md) is the repo's public entry point and indexes the `resources/` folders. When you add or rename a `resources/<slug>/` folder — or publish the post that accompanies one — add or update its row in the README's **Code from the posts** table, and swap any _Coming soon_ for the live article link.
 - **Excerpt marker:** Use `<!-- more -->` to mark where the blog index preview cuts off.
 - **WordPress redirects:** If the post replaces an old WordPress URL, add a redirect entry in `mkdocs.yml` under `plugins > redirects > redirect_maps`.
 
