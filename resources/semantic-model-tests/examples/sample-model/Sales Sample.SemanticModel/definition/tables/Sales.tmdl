@@ -1,0 +1,62 @@
+/// Sales fact: one row per sale. Import mode with a Power Query (M) partition
+/// that generates 240 deterministic rows (a pure function of the row index), so
+/// every refresh produces identical data - which is what makes snapshot tests
+/// reproducible.
+table Sales
+
+	measure 'Total Amount' = SUM ( Sales[Amount] )
+		formatString: \$#,0
+
+	measure 'Total Quantity' = SUM ( Sales[Quantity] )
+		formatString: #,0
+
+	measure 'Order Count' = COUNTROWS ( Sales )
+		formatString: #,0
+
+	measure 'Average Order Value' = DIVIDE ( [Total Amount], [Order Count] )
+		formatString: \$#,0.00
+
+	column SaleId
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		summarizeBy: none
+		sourceColumn: SaleId
+
+	column ProductKey
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: ProductKey
+
+	column Quantity
+		dataType: int64
+		summarizeBy: sum
+		sourceColumn: Quantity
+
+	column Amount
+		dataType: int64
+		summarizeBy: sum
+		sourceColumn: Amount
+
+	partition Sales = m
+		mode: import
+		source =
+				let
+				    RowCount = 240,
+				    Prices = {10, 25, 40, 100, 60},
+				    Rows = List.Transform(
+				        {0 .. RowCount - 1},
+				        (i) =>
+				            let
+				                ProductKey = Number.Mod(i, 5) + 1,
+				                Quantity = Number.Mod(i, 4) + 1,
+				                UnitPrice = Prices{ProductKey - 1},
+				                Amount = Quantity * UnitPrice
+				            in
+				                [SaleId = i + 1, ProductKey = ProductKey, Quantity = Quantity, Amount = Amount]
+				    ),
+				    Result = Table.FromRecords(Rows, type table [SaleId = Int64.Type, ProductKey = Int64.Type, Quantity = Int64.Type, Amount = Int64.Type])
+				in
+				    Result

@@ -1,0 +1,42 @@
+/// Product dimension: one row per product, with its category and unit price.
+/// Import mode with a Power Query (M) partition that generates its own rows -
+/// no external data source, so the model deploys and refreshes on its own.
+table Product
+
+	column ProductKey
+		dataType: int64
+		isHidden
+		isUnique
+		isKey
+		summarizeBy: none
+		sourceColumn: ProductKey
+
+	column Product
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Product
+
+	column Category
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Category
+
+	column UnitPrice
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: UnitPrice
+
+	partition Product = m
+		mode: import
+		source =
+				let
+				    Rows = {
+				        [ProductKey = 1, Product = "Widget", Category = "Hardware", UnitPrice = 10],
+				        [ProductKey = 2, Product = "Gadget", Category = "Hardware", UnitPrice = 25],
+				        [ProductKey = 3, Product = "Gizmo", Category = "Hardware", UnitPrice = 40],
+				        [ProductKey = 4, Product = "License", Category = "Software", UnitPrice = 100],
+				        [ProductKey = 5, Product = "Support", Category = "Services", UnitPrice = 60]
+				    },
+				    Result = Table.FromRecords(Rows, type table [ProductKey = Int64.Type, Product = text, Category = text, UnitPrice = Int64.Type])
+				in
+				    Result
