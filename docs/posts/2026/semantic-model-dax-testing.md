@@ -36,7 +36,7 @@ The tester is a small Python command line tool that takes a folder of YAML test 
 
 - **structural**: checks the *shape* of the result (row count, columns, or whether a value is present).
 - **negative**: the query *must* fail, and the error must match a regex. For example, does a bad reference return the error you expect?
-- **snapshot**: saves the exact result to a file the first time it runs, then fails if the result ever changes. This is useful for locking in the output of a calculation.
+- **snapshot**: compares the result to a saved copy in a separate `__snapshots__/` file next to your test file. You capture it with `--update-snapshots`, review it, and commit it. After that, the test fails if the result ever changes. This is useful for locking in the output of a calculation.
 
 ```yaml
 cases:
