@@ -76,9 +76,9 @@ The tool exits with `0` if everything passes, `1` if an assertion fails, or `2` 
 
 ## Part 2: a disposable model per pull request
 
-Everything above assumes you already have a deployed model to test. That works, but there's a gap. You're testing *a* model, not necessarily *the change* in your PR. Someone has to remember to deploy the branch first, and if they don't, the build passes against last week's model.
+The framework above assumes that you have a model to test against, but how can you test the changes before you actually make them to your production model? 
 
-So in our pipelines, we use `--deploy-from`. Instead of pointing at a deployed model, you point it at the `*.SemanticModel/` folder in your repo:
+In our pipelines, we use `--deploy-from` which allows you point at the `*.SemanticModel/` folder in your repo and deploy a new copy of your model to the service to test again:
 
 ```mermaid
 flowchart TD
@@ -93,18 +93,13 @@ flowchart TD
 
 Here's what each step does:
 
-**Stage.** Copies the TMDL to a temp folder and changes the `displayName` in `.platform`. The rename is important. fabric-cicd matches existing items by **type + display name**, so a new name creates a second model instead of overwriting your real one. It also removes `definition/roles/`, since the service principal isn't a member of any RLS role.
+**Stage.** Copies the TMDL to a temp folder and changes the `displayName` in `.platform`. fabric-cicd matches existing items by **type + display name**, so a new name creates a second model instead of overwriting your real one. It also removes `definition/roles/`, since the service principal isn't a member of any RLS role.
 
-**Publish.** Uses [fabric-cicd](https://github.com/microsoft/fabric-cicd) with `unpublish.skip: true`. This setting is really important. By default, fabric-cicd removes anything in the workspace that isn't in your source folder, and in this case your source folder only has the one staged model. Without it, you'd delete everything else in the workspace.
+**Publish.** Uses [fabric-cicd](https://github.com/microsoft/fabric-cicd) with `unpublish.skip: true`. By default, fabric-cicd removes anything in the workspace that isn't in your source folder, and in this case your source folder only has the one staged model. Without it, you'd delete other model in the workspace.
 
-**Bind.** A newly published DirectLake model doesn't have any connections bound to it, so the refresh fails until you add them. The tool binds an existing connection. It doesn't create one. You need to set up the connection in Fabric ahead of time and give the identity running the tests `Use` permission on it. You don't need read access on the upstream workspace. The refresh runs under the connection's identity, which is how a temporary model in a dev workspace can still refresh against prod data.
+**Bind.** A newly published DirectLake model doesn't have any connections bound to it, so the refresh could fail until you add them. The tool will locate an existing connection the identity connecting to the model has access to and bind the connections. You need to set up the connection in Fabric ahead of time and give the identity running the tests `Use` permission on it. The refresh runs under the connection's identity, which is how a temporary model in a dev workspace can still refresh against prod data.
 
 **Delete.** Runs in a `finally` block, so the temporary model gets deleted even if an assertion fails or the publish errors out. If the model id was never captured, it looks the model up by name before giving up. If the pipeline gets killed, the `finally` block won't run, so if you're running this a lot, it's a good idea to schedule a cleanup job for leftover `TEST_*` models.
-
-!!! danger "📸 SCREENSHOT PLACEHOLDER — the throwaway model in the workspace"
-    The workspace item list mid-run, showing `TEST_<Model>_<hex>` next to the
-    real model, then the same list after teardown. Replace with:
-    `![](../../assets/images/posts/semantic-model-dax-testing/throwaway.png)`
 
 ### DirectLake vs. Import
 
