@@ -32,7 +32,7 @@ In this post, I'll walk through how we accomplished this. I'll start with the te
 
 ## Part 1: the tester
 
-The tester is a small Python command line tool. You give it a folder of YAML test cases and point it at a deployed model. It runs the DAX for each case over the XMLA endpoint and prints a pass/fail summary. There are three types of assertions:
+The tester is a small Python command line tool that takes a folder of YAML test cases and runs the DAX for each case over the XMLA endpoint and prints a pass/fail summary. There are three types of assertions:
 
 - **structural**: checks the *shape* of the result (row count, columns, or whether a value is present).
 - **negative**: the query *must* fail, and the error must match a regex. For example, does a bad reference return the error you expect?
@@ -65,19 +65,14 @@ flowchart LR
     R --> P["pass / fail + exit code"]
 ```
 
-The tool exits with `0` if everything passes, `1` if an assertion fails, or `2` if the tool itself couldn't run (bad login, can't reach the model, etc.). Splitting out `1` and `2` is helpful in a pipeline because you can tell the difference between "a test failed" and "the pipeline broke."
+The tool exits with `0` if everything passes, `1` if an assertion fails, or `2` if the tool itself couldn't run (bad login, can't reach the model, etc.).
 
 !!! warning "Snapshots include your data"
     A snapshot compares the result of the model *and* the data, so a normal data refresh can change it too. Point your snapshots at stable test data so a failed build means something actually broke, not that yesterday's numbers changed.
 
-## Why XMLA (and not the REST API)
-
-Each query runs over the XMLA endpoint using the AdomdClient .NET library, which is loaded into Python with [pythonnet](https://github.com/pythonnet/pythonnet). I went with XMLA instead of the `executeQueries` REST API because **XMLA isn't controlled by the "Dataset Execute Queries REST API" tenant setting**. That means it works for a service principal in a pipeline, where the REST API is often blocked. The library is downloaded from NuGet the first time you run the tool and cached after that, so there aren't any binaries in the repo.
-
-There are a couple of things to know:
-
-- AdomdClient's `net45` build requires .NET Framework, so this is a Windows-only tool. That's fine for us since our semantic model pipelines already run on Windows agents.
-- XMLA only accepts user tokens from a Power BI-registered client, so a regular `az login` token gets rejected when it connects. Use `--interactive-auth` when running locally. Service principals work without any changes.
+!!! note "Requirements"
+    - **Windows only.** Queries run over XMLA using the AdomdClient .NET library, which requires .NET Framework. It's downloaded from NuGet the first time you run the tool.
+    - **Auth.** A regular `az login` token gets rejected by the XMLA endpoint, so use `--interactive-auth` when running locally. Service principals work as-is.
 
 ## Part 2: a disposable model per pull request
 
