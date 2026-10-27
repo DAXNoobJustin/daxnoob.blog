@@ -1,6 +1,6 @@
 ---
 title: "Unit-Testing Power BI Semantic Models with DAX Assertions over XMLA"
-description: "A tool that runs YAML-defined DAX assertions against your semantic models over the XMLA endpoint, and on DirectLake, deploys a temporary copy of the model for each pull request to test the change."
+description: "A tool that runs YAML-defined DAX assertions against your semantic models over the XMLA endpoint, and on Direct Lake, deploys a temporary copy of the model for each pull request to test the change."
 draft: true
 date:
   created: 2026-10-27
@@ -22,11 +22,11 @@ image: assets/images/posts/semantic-model-dax-testing/hero.png
 
 ## Introduction
 
-Our team is constantly making changes to our semantic models (adding new measures, renaming columns, adding tables, etc.). Just because the changes still result in a valid schema and refreshes are still successful, it doesn't tell you that our queries still return the expected results.
+Our team is constantly making changes to our semantic models (adding new measures, renaming columns, adding tables, etc.). Just because the changes still result in a valid schema and refreshes are still successful doesn't mean our queries still return the expected results.
 
 I wanted a way to write some DAX, define what the result should look like, and fail the build/deployment if it doesn't match expectations.
 
-In this post, I'll walk through how we accomplished this. I'll start with the tester  and then show how we use it in our pull requests, where each PR publishes a temporary copy of the model, tests it, and then deletes it. You can find the code here: [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests).
+In this post, I'll walk through how we accomplished this. I'll start with the tester and then show how we use it in our pull requests, where each PR publishes a temporary copy of the model, tests it, and then deletes it. You can find the code here: [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests).
 
 <!-- more -->
 
@@ -97,40 +97,26 @@ Here's what each step does:
 
 **Publish.** Uses [fabric-cicd](https://github.com/microsoft/fabric-cicd) with `unpublish.skip: true`. By default, fabric-cicd removes anything in the workspace that isn't in your source folder, and in this case your source folder only has the one staged model. Without it, you'd delete the other models in the workspace.
 
-**Bind.** A newly published DirectLake model doesn't have any connections bound to it, so the refresh could fail until you add them. The tool binds the connection(s) you pass in with `--connection-id`. You need to set up the connection in Fabric ahead of time and give the identity running the tests `Use` permission on it. The refresh runs under the connection's identity, which is how a temporary model in a dev workspace can still refresh against prod data.
+**Bind.** A newly published Direct Lake model doesn't have any connections bound to it, so the refresh could fail until you add them. The tool binds the connection(s) you pass in with `--connection-id`. You need to set up the connection in Fabric ahead of time and give the identity running the tests `Use` permission on it. The refresh runs under the connection's identity, which is how a temporary model in a dev workspace can still refresh against prod data.
 
 **Delete.** Runs in a `finally` block, so the temporary model gets deleted even if an assertion fails or the publish errors out. If the model id was never captured, it looks the model up by name before giving up. If the pipeline gets killed, the `finally` block won't run, so if you're running this a lot, it's a good idea to schedule a cleanup job for leftover `TEST_*` models.
 
-### DirectLake vs. Import
+### Direct Lake/DirectQuery vs. Import
 
-Whether this works well for you mostly depends on your storage mode.
+Many of the benefits of this system depend on having a Direct Lake or DirectQuery model. Both of these model types don't need a long refresh process before you can query them which enables us to quickly spin up a net new model and tear it down on each pull request. Import models have to load all of their data before any data assertion can run, and a `Full` refresh on large models would be impractical. If you're using Import, unless the full refresh is fast, I'd stick with Part 1 and keep your PR tests to metadata and shape checks (does the measure resolve, does the query run, does a bad reference still error, etc.). None of those need data loaded.
 
-**DirectLake** doesn't load data into the model. It reads directly from the lakehouse. So the temporary model doesn't have anything to process, and a `Calculate` refresh finishes in a few seconds. That's why we're able to do this on a large enterprise model for every pull request.
-
-**Import** is different. The copy has to load all of its data before any data assertion can run, and a `Full` refresh can take anywhere from a few minutes to tens of minutes. If you do that on every PR, people will start ignoring the check. If you're using Import, I'd stick with Part 1 and keep your PR tests to metadata and shape checks (does the measure resolve, does the query run, does a bad reference still error, etc.). None of those need data loaded.
-
-There's another benefit to refreshing the temporary model. It proves that the connections bind, the credentials work, and the upstream schema still matches. If someone renamed a lakehouse column, the refresh fails in the PR instead of in tomorrow's scheduled refresh. Keep in mind that a successful refresh doesn't mean there's data, since an empty table refreshes just fine. If you want to check for that, add an assertion:
+There's another benefit to refreshing the temporary model during testing: it proves that the connections bind, the credentials work, and the upstream schema still matches. If someone renamed a lakehouse column, the refresh fails in the PR instead of in tomorrow's scheduled refresh or during query time. Keep in mind that a successful refresh doesn't mean there's data, since an empty table refreshes just fine. If you want to check for that, add an assertion:
 
 ```yaml
   - id: sales_has_rows
     category: structural
-    dax: "EVALUATE ROW ( \"n\", COUNTROWS ( Sales ) )"
-    contains_none: ["n: 0"]
+    dax: "EVALUATE TOPN ( 1, Sales )"
+    expected_row_count: { min: 1 }
 ```
-
-## What else is out there
-
-There aren't many tools for testing semantic model query results in a pipeline, but here are a few others worth checking out:
-
-- **[Tabular Editor's Best Practice Analyzer](https://docs.tabulareditor.com/)** checks the model *definition* for things like naming, missing keys, and anti-patterns. It works well alongside this tool since it checks the structure, not what a query returns.
-- **[semantic-link-labs / sempy](https://github.com/microsoft/semantic-link-labs)** has `evaluate_dax()` in Python, which is great for ad-hoc validation in a Fabric notebook.
-- **[John Kerski's `Invoke-DQVTesting`](https://github.com/kerski/fabric-dataops-patterns)** is the most similar. It also runs DAX over XMLA in a pipeline, but it's written in PowerShell and the tests live inside the PBIP project.
-
-The main differences with this tool are that the tests live in separate YAML files, it supports snapshot and negative tests, and it can deploy and delete the model it's testing.
 
 ## Trying it
 
-`examples/sample.yml` has an example of each assertion type. Copy it and swap in your own DAX. There are also pipeline templates in `ci/` for both modes.
+`examples/sample.yml` has an example of each assertion type. There are also pipeline templates in `ci/` for both modes.
 
 ```powershell
 pip install -r requirements.txt
@@ -160,7 +146,7 @@ Here is what a Part 2 run looks like:
 ==> Cases:      4 from 1 dir(s)
 ==> Publishing throwaway
 ==> Model id:   aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
-    Refreshing (Full/transactional, poll timeout 1200s)
+    Refreshing (Calculate/transactional, poll timeout 1200s)
 ==> Refresh complete in 5.1s
 ==> Running 4 case(s) via AdomdClient (XMLA)
 ==> AdomdClient XMLA batch: 4 queries
@@ -187,19 +173,10 @@ The whole thing (deploy, refresh, four assertions, and teardown) took about 25 s
            +[{"Product[Category]": "Hardware", "[Total Amount]": 9000}, ...
 ```
 
-!!! danger "📸 SCREENSHOT PLACEHOLDER — a red PR build"
-    The Azure DevOps PR page with the check failed, and the log showing the
-    snapshot mismatch. Replace with:
-    `![](../../assets/images/posts/semantic-model-dax-testing/red-build.png)`
-
 The [README](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests) has all of the parameters, the auth details, and the permissions each mode needs (Viewer for Part 1, Contributor for Part 2 since it creates and deletes items).
 
 ## Conclusion
 
-You don't need a big framework to test your semantic models. You just need a way to run some DAX, check the result, and add it to your pipeline. With a few YAML files, you can check that your measures resolve, your values make sense, your errors behave the way you expect, and (with snapshots) that a calculation still returns the same result.
-
-If you're using DirectLake, I'd recommend letting your pipeline deploy and delete the model for you. That way you're testing the exact model in your branch, and you don't have to worry about "it worked in dev."
-
-The full source code is on [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests). I hope you find it helpful.
+This framework has given us a lot of peace of mind and has stopped us from shipping mistakes several times. The full source code is on [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests). I hope you find it helpful.
 
 Like always, if you have any questions or feedback, please reach out. I'd love to hear from you!
