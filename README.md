@@ -9,7 +9,6 @@ Source and companion code for **[daxnoob.blog](https://daxnoob.blog/)** — Just
 
 | Resource | Article |
 |---|---|
-| [`fabric-semantic-model-starter/`](resources/fabric-semantic-model-starter/) | [Open-source starter →](https://daxnoob.blog/starter) |
 | [`agentic-power-query-development/`](resources/agentic-power-query-development/) | [Iterating on Power Query with an LLM](https://daxnoob.blog/agentic-power-query-development/) |
 | [`extending-fabric-cicd/`](resources/extending-fabric-cicd/) | [Extending fabric-cicd with Pre and Post-Processing Operations](https://daxnoob.blog/extending-fabric-cicd-with-pre-post-processing/) |
 | [`remove-unused-measures/`](resources/remove-unused-measures/) | [Report Maintenance: Remove Unused Report Measures](https://daxnoob.blog/report-maintenance-remove-unused-report-measures/) |
