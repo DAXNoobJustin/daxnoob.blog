@@ -101,7 +101,7 @@ Here's what each step does:
 
 **Delete.** Runs in a `finally` block, so the temporary model gets deleted even if an assertion fails or the publish errors out. If the model id was never captured, it looks the model up by name before giving up. If the pipeline gets killed, the `finally` block won't run, so if you're running this a lot, it's a good idea to schedule a cleanup job for leftover `TEST_*` models.
 
-### Direct Lake/DirectQuery vs. Import
+### Direct Lake vs. Import
 
 Many of the benefits of this system depend on having a Direct Lake or DirectQuery model. Both of these model types don't need a long refresh process before you can query them which enables us to quickly spin up a net new model and tear it down on each pull request. Import models have to load all of their data before any data assertion can run, and a `Full` refresh on large models would be impractical. If you're using Import, unless the full refresh is fast, I'd stick with Part 1 and keep your PR tests to metadata and shape checks (does the measure resolve, does the query run, does a bad reference still error, etc.). None of those need data loaded.
 
