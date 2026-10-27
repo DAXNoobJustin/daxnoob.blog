@@ -1,5 +1,5 @@
 ---
-title: "Unit-Testing Power BI Semantic Models with DAX Assertions over XMLA"
+title: "Unit Testing Semantic Models with DAX"
 description: "A tool that runs YAML-defined DAX assertions against your semantic models over the XMLA endpoint, and on Direct Lake, deploys a temporary copy of the model for each pull request to test the change."
 draft: true
 date:
