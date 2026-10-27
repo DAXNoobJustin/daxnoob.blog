@@ -137,6 +137,120 @@ def test_numeric_contains_needle_does_not_crash():
     assert ok_any and ok_all
 
 
+def test_unknown_case_key_rejected():
+    """A misspelled assertion key must raise, not be silently dropped -- otherwise
+    the case runs its DAX and asserts nothing while reporting PASS."""
+    typo = """\
+cases:
+  - id: typo_case
+    category: structural
+    dax: "EVALUATE { 1 }"
+    expected_row_counts: { exact: 1 }
+"""
+    with tempfile.TemporaryDirectory() as d:
+        cat = _catalog(Path(d), typo)
+        _expect_value_error(cat, "expected_row_counts")
+
+
+def test_contains_none_asserts_absence():
+    """contains_none fails when the needle IS present and passes when it isn't."""
+    r = {"ok": True, "rows": [{"[Status]": "Error"}], "columns": ["[Status]"], "error": None}
+    present, _ = run_tests._assert_structural(
+        run_tests.TestCase(id="a", category="structural", dax="E", contains_none=["Error"]), r
+    )
+    absent, _ = run_tests._assert_structural(
+        run_tests.TestCase(id="b", category="structural", dax="E", contains_none=["Fatal"]), r
+    )
+    assert not present
+    assert absent
+
+
+def test_contains_matching_is_column_scoped():
+    """A 'Column: value' needle targets one column; a bare needle matches values
+    only, so it can't be satisfied by a column NAME."""
+    r = {
+        "ok": True,
+        "rows": [{"[Region]": "East", "Product[Category]": "Widget"}],
+        "columns": ["[Region]", "Product[Category]"],
+        "error": None,
+    }
+
+    def structural(**kw):
+        return run_tests._assert_structural(
+            run_tests.TestCase(id="x", category="structural", dax="E", **kw), r
+        )[0]
+
+    # Qualified needles target their own column.
+    assert structural(contains_all=["Region: East"])
+    assert not structural(contains_all=["Region: Widget"])
+    # Table-qualified column names must not be mangled by bracket stripping.
+    assert structural(contains_all=["Product[Category]: Widget"])
+    # A bare needle matches values, never a column name.
+    assert structural(contains_any=["East"])
+    assert not structural(contains_any=["Region"])
+    assert structural(contains_none=["Region"])
+
+
+def test_column_label_only_unwraps_fully_bracketed_names():
+    """strip('[]') would turn 'Product[Category]' into 'Product[Category'."""
+    assert run_tests._column_label("[Total Amount]") == "Total Amount"
+    assert run_tests._column_label("Product[Category]") == "Product[Category]"
+    assert run_tests._column_label("Sales[Amount]") == "Sales[Amount]"
+
+
+def test_key_from_other_category_rejected():
+    """A key that is valid elsewhere is as inert as a typo, so reject it too."""
+    misplaced = """\
+cases:
+  - id: struct_with_error_regex
+    category: structural
+    dax: "EVALUATE { 1 }"
+    expected_error_regex: "boom"
+"""
+    with tempfile.TemporaryDirectory() as d:
+        cat = _catalog(Path(d), misplaced)
+        _expect_value_error(cat, "expected_error_regex")
+
+
+def test_scalar_list_field_rejected():
+    """`contains_none: Error` would be iterated character by character."""
+    scalar = """\
+cases:
+  - id: scalar_needle
+    category: structural
+    dax: "EVALUATE { 1 }"
+    contains_none: Error
+"""
+    with tempfile.TemporaryDirectory() as d:
+        cat = _catalog(Path(d), scalar)
+        _expect_value_error(cat, "must be a list")
+
+
+def test_negative_case_cannot_carry_contains_none():
+    """A negative case only checks the error, so structural keys must be rejected."""
+    mixed = """\
+cases:
+  - id: neg_case
+    category: negative
+    dax: "EVALUATE { [Nope] }"
+    expected_error_regex: "cannot be determined"
+    contains_none: ["boom"]
+"""
+    with tempfile.TemporaryDirectory() as d:
+        cat = _catalog(Path(d), mixed)
+        _expect_value_error(cat, "contains_none")
+
+
+def test_redaction_scrubs_connection_string_lines():
+    """A leaked connection string or bearer token must not reach a CI log."""
+    text = "line one\nProvider=MSOLAP;Data Source=powerbi://api.powerbi.com/v1.0/myorg/ws\nline three"
+    out = run_tests._redact_sensitive_text(text)
+    assert "MSOLAP" not in out
+    assert "powerbi://" not in out
+    assert "line one" in out
+    assert "line three" in out
+
+
 def _expect_value_error(catalog_dir: Path, needle: str) -> None:
     raised: str | None = None
     try:

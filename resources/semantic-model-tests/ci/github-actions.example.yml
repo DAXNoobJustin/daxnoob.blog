@@ -5,6 +5,11 @@
 # Framework) and signs in as a service principal via OIDC, whose token XMLA accepts
 # without the "Dataset Execute Queries REST API" tenant setting.
 #
+# This tests a model that is already deployed and refreshed. To instead publish a
+# throwaway copy from the PR branch and tear it down after, swap --model for
+# --deploy-from and grant the SP Contributor on the workspace — see
+# ci/azure-pipelines.ephemeral.example.yml for the full shape.
+#
 # Prereqs (one-time):
 #   1. An Entra service principal added to the target Fabric workspace (Viewer is
 #      enough to read/query a deployed, refreshed model).
@@ -28,7 +33,7 @@ permissions:
 
 env:
   WORKSPACE_ID: "YOUR-WORKSPACE-GUID"
-  MODEL_NAME: "Sales Sample" # the deployed model to test
+  MODEL_NAME: "YOUR MODEL NAME" # the deployed model to test
 
 jobs:
   test:

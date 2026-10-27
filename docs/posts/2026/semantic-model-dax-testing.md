@@ -1,9 +1,9 @@
 ---
 title: "Unit-Testing Power BI Semantic Models with DAX Assertions over XMLA"
-description: "A small, model-agnostic tool that runs YAML-defined DAX assertions against a deployed Power BI / Fabric semantic model over the XMLA endpoint - so a model change can't quietly break a downstream number."
+description: "A model-agnostic tool that runs YAML-defined DAX assertions over the XMLA endpoint - and, on DirectLake, spins up a disposable copy of the model per pull request to test the change itself."
 draft: true
 date:
-  created: 2026-07-14
+  created: 2026-10-27
 categories:
   - DevOps
   - DAX
@@ -20,21 +20,29 @@ slug: semantic-model-dax-testing
 image: assets/images/posts/semantic-model-dax-testing/hero.png
 ---
 
-## The problem
+## Introduction
 
 We ship changes to semantic models constantly - a new measure, a renamed column, a tweaked filter, a refactored calculation group. Any one of those can quietly break something downstream, and a semantic model has no equivalent of "run the unit tests." A refresh that *succeeds* only tells you the model loaded - not that `[Total Revenue]` still returns the number it did yesterday.
 
-What I wanted was boring and obvious: **write some DAX, say what the result should look like, and fail the build if it doesn't.** So I built a small tool that does exactly that and open-sourced it. It's model-agnostic - it works against any semantic model you can reach over XMLA - and it's on [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests), MIT licensed.
+What I wanted was boring and obvious: **write some DAX, say what the result should look like, and fail the build if it doesn't.** So I built a small tool that does exactly that and open-sourced it. It works against any semantic model you can reach over XMLA, and it's on [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests), MIT licensed.
+
+This post has two halves: the tester itself, and then how we actually use it - every pull request publishes a disposable copy of the model, tests it, and deletes it.
 
 <!-- more -->
 
-## What it is
+## Part 1: the tester
 
-A tiny Python CLI. You give it a folder of YAML **test cases** and point it at a deployed model; it runs each case's DAX over the **XMLA endpoint** and prints a pass/fail summary. There are three kinds of assertion:
+A tiny Python CLI. You give it a folder of YAML test cases and point it at a deployed model; it runs each case's DAX over the XMLA endpoint and prints a pass/fail summary. There are three kinds of assertion:
 
 - **structural** - assert on the *shape* of the result (row count, columns, a value is present).
 - **negative** - the query *must* fail, and the error must match a regex (does a bad reference error correctly?).
 - **snapshot** - capture the exact result once into a sidecar file, then fail on any drift (great for locking a calculation's output).
+
+!!! danger "📸 SCREENSHOT PLACEHOLDER — the YAML catalog in an editor"
+    A catalog file open in VS Code showing a few real cases, so readers can see
+    the shape before reading the abridged sample below. Delete this admonition
+    and replace with:
+    `![](../../assets/images/posts/semantic-model-dax-testing/catalog.png)`
 
 ```yaml
 cases:
@@ -65,60 +73,147 @@ flowchart LR
 
 The runner exits `0` (all pass), `1` (an assertion failed), or `2` (the harness itself couldn't run - bad login, can't reach the model). That 1-vs-2 split matters in CI: it tells "a test failed" apart from "the pipeline broke."
 
-One thing to be honest about up front: a snapshot compares the **combined model-and-data** result, so a legitimate data refresh can change it too. Point snapshots at stable test data (or a fixed historical slice) so a red build means a real regression, not yesterday's numbers moving.
+One thing to be honest about: a snapshot compares the combined model-and-data result, so a legitimate data refresh can change it too. Point snapshots at stable test data so a red build means a real regression, not yesterday's numbers moving.
 
 ## Why XMLA (and not the REST API)
 
-Each query runs over the **XMLA endpoint** via the AdomdClient .NET assembly, loaded in-process with [pythonnet](https://github.com/pythonnet/pythonnet). That's a deliberate choice over the `executeQueries` REST API: **XMLA isn't gated by the "Dataset Execute Queries REST API" tenant setting**, so it keeps working for a **service principal** in CI, where the REST path is often rejected. The assembly is pulled from NuGet on first run and cached - nothing binary lives in the repo.
+Each query runs over the XMLA endpoint via the AdomdClient .NET assembly, loaded in-process with [pythonnet](https://github.com/pythonnet/pythonnet). That's deliberate: **XMLA isn't gated by the "Dataset Execute Queries REST API" tenant setting**, so it keeps working for a service principal in CI, where the REST path is often rejected. The assembly comes from NuGet on first run and is cached - nothing binary lives in the repo.
 
-The catch: AdomdClient's `net45` build wants **.NET Framework**, so this is a Windows tool - which suits a semantic-model CI that already runs on Windows agents. (One auth wrinkle worth knowing: the XMLA endpoint only accepts user tokens from a *Power BI-registered* client, so a plain `az login` token can be refused at connect time - the tool's `--interactive-auth` handles that, and service principals are already approved. The README has the details.)
+Two catches. AdomdClient's `net45` build wants .NET Framework, so this is a Windows tool - which suits a semantic-model CI already running on Windows agents. And XMLA only accepts user tokens from a *Power BI-registered* client, so a plain `az login` token gets refused at connect time; `--interactive-auth` handles that locally, and service principals are already approved.
 
-## The honest caveat: Import models and the refresh wall
+## Part 2: a disposable model per pull request
 
-This tool tests a model that's **already deployed and refreshed** - it doesn't deploy or refresh anything itself. That's on purpose, and it's the thing to be clear-eyed about.
+Everything above assumes you already have a model deployed to point at. That works, but it has an awkward gap: you're testing *a* model, not necessarily *the change*. Somebody has to remember to deploy the branch first, and if they don't, you get a green build that validated last week's model.
 
-A freshly deployed, metadata-only copy of a large **Import** model has to be processed before any data assertion can run, and a full refresh of a real enterprise model can take **many minutes**. So a throwaway-copy-per-PR pattern - deploy, refresh, test, all on every run - gets painfully slow for Import. (DirectLake shifts the cost: it reads live from the lakehouse, so there's no data load to pay on the model itself.)
+So the mode we actually run in CI is `--deploy-from`. Instead of naming a deployed model, you hand it the `*.SemanticModel/` directory in the repo:
 
-So the practical pattern for Import is:
+```mermaid
+flowchart TD
+    S["Source TMDL in the PR branch"] --> ST["Stage: copy, rename,<br/>strip RLS"]
+    ST --> P["Publish throwaway<br/>TEST_Model_a1b2c3d4"]
+    P --> B["Bind connections"]
+    B --> R["Refresh"]
+    R --> T["Run the catalog over XMLA"]
+    T --> D["DELETE the throwaway"]
+    D --> X["pass / fail + exit code"]
+```
 
-- **Data assertions** ("revenue is positive", "the Fabric product exists") - point the tool at a long-lived model you already deployed and refreshed once (your dev model), so the expensive refresh happens on *your* schedule, not per test run.
-- **Metadata / shape / error assertions** (does the measure resolve? does the query compile? does a bad reference error?) - these don't depend on current business data, so they're cheap against any deployed model.
+Here are the steps that are worth a closer look:
 
-It's not a full data-pipeline test harness, and it doesn't try to be. It's a fast way to assert the *contracts* of a model.
+**Stage.** Copy the TMDL to a temp dir and rewrite `displayName` in `.platform`. That rename is the load-bearing part: fabric-cicd matches an already-deployed item by **type + display name**, so a new name is what creates a second item instead of overwriting your source. It also strips `definition/roles/`, since the service principal isn't a member of any RLS role.
+
+**Publish.** Straight [fabric-cicd](https://github.com/microsoft/fabric-cicd), with one setting that matters a lot: `unpublish.skip: true`. Its default is to treat anything in the workspace that isn't in your source directory as an orphan and remove it - and your source directory holds exactly one staged model. Leave that off at your peril.
+
+**Bind.** A freshly published DirectLake model has no bound connections, so the refresh fails until you attach them. Note that the tool binds an existing connection - it doesn't create one. You need the connection object already set up in Fabric, and the identity running the tests needs `Use` permission on it. That's a smaller grant than it sounds: `Use` on the connection is enough, with no read access on the upstream workspace. Refresh then flows through the connection's own identity, which is why a throwaway in a dev workspace can still refresh against prod data.
+
+**Delete.** In a `finally`, and if the id was never captured the runner re-resolves by the unique name before giving up - so a failed assertion or a mid-publish error still tears down. A hard kill can't honour a `finally`, so at scale, pair it with a scheduled sweep for stray `TEST_*` models.
+
+!!! danger "📸 SCREENSHOT PLACEHOLDER — the throwaway model in the workspace"
+    The workspace item list mid-run, showing `TEST_<Model>_<hex>` sitting next to
+    the real model, then the same list after teardown. Two side-by-side shots
+    sell the "it's gone" half better than prose can. Replace with:
+    `![](../../assets/images/posts/semantic-model-dax-testing/throwaway.png)`
+
+### Why this is practical (and when it isn't)
+
+Storage mode decides everything here, and it's the honest reason the pattern works for us.
+
+**DirectLake** doesn't load data into the model - it reads live from the lakehouse. So the throwaway has nothing to process and a `Calculate` refresh comes back in seconds. That's what makes deploy-test-destroy viable on a real enterprise model, per pull request.
+
+**Import** is a different story. The copy has to load its data before a single data assertion can run, and a cold `Full` refresh is minutes to tens of minutes. Do that on every PR and your team will (correctly) start ignoring the gate. If you're on Import, stay with Part 1 and keep the per-PR suite to metadata and shape assertions - does the measure resolve, does the query compile, does a bad reference still error - none of which need loaded data.
+
+There's a bonus in the refresh itself. A throwaway that has to actually refresh proves things a metadata diff never will: the connections bind, the credentials work, and the upstream schema still matches. A renamed lakehouse column that would break tomorrow's refresh breaks *this* one, in the PR. Just don't over-read it - a refresh succeeding doesn't mean the data is there, since an empty table refreshes perfectly happily. If you want to gate on that, assert it:
+
+```yaml
+  - id: sales_has_rows
+    category: structural
+    dax: "EVALUATE ROW ( \"n\", COUNTROWS ( Sales ) )"
+    contains_none: ["n: 0"]
+```
 
 ## What else is out there
 
-Testing a semantic model's *query results* from CI is a surprisingly sparse space, so it's worth being fair about the neighbors:
+Testing a semantic model's *query results* from CI is a sparse space, but there are a few neighbors worth knowing:
 
-- **[Tabular Editor's Best Practice Analyzer](https://docs.tabulareditor.com/)** lints the model *definition* (naming, missing keys, anti-patterns). It's great, and complementary - but it checks structure, not what a query returns.
-- **[semantic-link-labs / sempy](https://github.com/microsoft/semantic-link-labs)** gives you `evaluate_dax()` in Python and shines for ad-hoc validation *inside a Fabric notebook* - but it's notebook-first, not a standalone CI runner.
-- **[John Kerski's `Invoke-DQVTesting`](https://github.com/kerski/fabric-dataops-patterns)** is the closest in spirit: it also runs DAX over XMLA in CI, but it's PowerShell and expects the tests to live *inside* the PBIP project as specially-formatted DAX.
+- **[Tabular Editor's Best Practice Analyzer](https://docs.tabulareditor.com/)** lints the model *definition* - naming, missing keys, anti-patterns. Complementary rather than competing: it checks structure, not what a query returns.
+- **[semantic-link-labs / sempy](https://github.com/microsoft/semantic-link-labs)** gives you `evaluate_dax()` in Python, and it's excellent for ad-hoc validation inside a Fabric notebook.
+- **[John Kerski's `Invoke-DQVTesting`](https://github.com/kerski/fabric-dataops-patterns)** is closest in spirit - also DAX over XMLA in CI, in PowerShell, with the tests living inside the PBIP project.
 
-What's different here is a small combination: assertions live in **external YAML** (drop the folder next to any deployed model), it runs over **XMLA** (so SP-in-CI works), and it treats **snapshot** and **negative** cases as first-class. Nothing revolutionary - just a focused CI runner for the gap between "the model refreshed" and "the numbers are still right."
+What's different here is the combination: assertions in external YAML, snapshot and negative cases as first-class citizens, and the ability to stand up and tear down the model it tests.
 
 ## Trying it
 
-The repo ships a tiny, self-contained **sample model** (`examples/sample-model/`) - an Import model that generates its own 240 rows in Power Query, so you can deploy it, capture a snapshot, and watch a green run without wiring up any data. There are also anonymized **CI templates** for Azure DevOps and GitHub Actions in `ci/`.
+`examples/sample.yml` has one worked example of each assertion category - copy it and swap in your own DAX. There are anonymized CI templates in `ci/` for both modes.
 
 ```powershell
 pip install -r requirements.txt
 az login   # or add --interactive-auth to the commands below
 
-# Once, after deploying + refreshing the sample: capture the snapshot baseline
-python run_tests.py --workspace-id <ws-guid> --model "Sales Sample" `
-    --catalog-dir examples/sample-model/tests --update-snapshots
+# Part 1: test a model you've already deployed.
+# Capture the snapshot baseline once, review the sidecar, commit it:
+python run_tests.py --workspace-id <ws-guid> --model "Your Model" `
+    --catalog-dir tests --update-snapshots
 
-# Then run the suite
-python run_tests.py --workspace-id <ws-guid> --model "Sales Sample" `
-    --catalog-dir examples/sample-model/tests
+python run_tests.py --workspace-id <ws-guid> --model "Your Model" `
+    --catalog-dir tests
+
+# Part 2: publish a throwaway from the TMDL in your branch, test it, delete it.
+python run_tests.py --workspace-id <ws-guid> `
+    --deploy-from "MODELS/Your Model.SemanticModel" `
+    --connection-id <connection-guid> `
+    --catalog-dir tests
 ```
 
-The [sample walkthrough](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests/examples/sample-model) has the full step-by-step.
+Here is what a Part 2 run looks like end to end:
 
-## Wrapping up
+```terminal
+==> Source:     MODELS/Your Model.SemanticModel
+==> Throwaway:  TEST_YourModel_530c9cee
+==> Workspace:  11111111-2222-3333-4444-555555555555
+==> Cases:      4 from 1 dir(s)
+==> Publishing throwaway
+==> Model id:   aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+    Refreshing (Full/transactional, poll timeout 1200s)
+==> Refresh complete in 5.1s
+==> Running 4 case(s) via AdomdClient (XMLA)
+==> AdomdClient XMLA batch: 4 queries
+==> All queries complete in 4.9s
+==> Teardown:   deleted
 
-You don't need a heavyweight framework to get real confidence in a semantic model - you need a way to say "run this DAX, expect this" and wire it into CI. In practice that means deploying the candidate model to a test workspace, running these assertions against it, and gating promotion to production on a green result - so a change that quietly breaks a number can't ride through. Keeping the assertions in plain YAML and running them over XMLA covers a surprising amount of ground: measure contracts, value sanity, error handling, and - via snapshots - the exact output of a calculation.
+================================================================================
+  4 run, 4 passed, 0 failed
+================================================================================
+  [PASS] structural  order_count_resolves                     (0.00s)
+  [PASS] structural  product_categories_present               (0.00s)
+  [PASS] negative    missing_measure_errors                   (0.00s)
+  [PASS] snapshot    total_amount_by_category                 (0.00s)
+```
 
-Just go in clear-eyed about the Import refresh wall, and lean on an already-refreshed model for anything that needs loaded data.
+Deploy, refresh, four assertions and teardown - about 25 seconds. And when a snapshot drifts, you get the diff:
 
-Code's on [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests) - point it at your own model and let me know what you catch with it.
+```terminal
+  [FAIL] snapshot    total_amount_by_category                 (0.00s)
+           snapshot mismatch:
+           --- expected
+           +++ actual
+           -[{"Product[Category]": "Hardware", "[Total Amount]": 9999}, ...
+           +[{"Product[Category]": "Hardware", "[Total Amount]": 9000}, ...
+```
+
+!!! danger "📸 SCREENSHOT PLACEHOLDER — a red PR build"
+    The payoff shot: the Azure DevOps PR page with the check failed, and the log
+    showing the snapshot mismatch. This is the one image that explains why any of
+    this matters, so it's worth getting right. Replace with:
+    `![](../../assets/images/posts/semantic-model-dax-testing/red-build.png)`
+
+The [README](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests) has the full flag reference, the auth gotchas, and the permissions each mode needs (Viewer for Part 1; Contributor for Part 2, since it creates and deletes items).
+
+## Conclusion
+
+You don't need a heavyweight framework to get real confidence in a semantic model - you need a way to say "run this DAX, expect this" and wire it into CI. Plain YAML over XMLA covers a surprising amount of ground: measure contracts, value sanity, error handling, and - via snapshots - the exact output of a calculation.
+
+If you're on DirectLake, go the extra step and let CI stand the model up and tear it down for you. Testing the exact artifact your branch produces removes a whole category of "well, it worked in dev."
+
+The full source code is on [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests). I hope you find it helpful.
+
+Like always, if you have any questions or feedback, please reach out. I'd love to hear from you!

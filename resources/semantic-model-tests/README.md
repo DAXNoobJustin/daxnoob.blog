@@ -1,8 +1,15 @@
 # Semantic-model DAX tester
 
 A small, standalone tool for **testing Power BI / Microsoft Fabric semantic models** by
-running YAML-defined DAX assertions against an already-deployed model over the **XMLA
-endpoint**. Point it at a model, give it a folder of DAX cases, get a pass/fail report.
+running YAML-defined DAX assertions over the **XMLA endpoint**. Give it a folder of DAX
+cases, get a pass/fail report.
+
+It runs in two modes:
+
+- **`--model`** — test a model that is already deployed and refreshed.
+- **`--deploy-from`** — publish a **disposable copy** of a `*.SemanticModel/` tree, bind
+  its connections, refresh it, test it, and delete it. The thing under test is then the
+  model *as it exists in the branch*, not whatever is sitting in the workspace.
 
 It is model-agnostic — it works against any semantic model you can reach over XMLA,
 Import or DirectLake — and it's built to run in CI as a **service principal**, because
@@ -16,20 +23,19 @@ MIT licensed.
 ## What it does
 
 - Loads DAX **test cases** from one or more YAML catalog directories.
+- Optionally publishes a throwaway copy of a model to test against (see
+  [Disposable model mode](#disposable-model-mode)).
 - Runs each case over the Power BI **XMLA endpoint** via the AdomdClient .NET assembly,
   loaded in-process with `pythonnet`.
 - Asserts results three ways:
   - **structural** — `expected_columns`, `expected_row_count` (`exact` / `min` / `max`),
-    `contains_any`, `contains_all`.
+    `contains_any`, `contains_all`, `contains_none`.
   - **negative** — the query must fail and the error must match `expected_error_regex`.
   - **snapshot** — exact match against a captured value stored in a generated
     `__snapshots__/` sidecar next to each catalog file (lock the exact result, fail on drift).
 - Prints a pass/fail summary and exits **0** (all pass), **1** (assertion failures), or
   **2** (fatal setup/infra error — e.g. can't reach the model). The 0/1/2 split lets a CI
   gate tell "the model regressed" apart from "the harness broke".
-
-It only runs queries and assertions: the target model must already be deployed, and any
-data your tests read must already be loaded (refreshed) in it.
 
 ---
 
@@ -50,39 +56,43 @@ az login   # or pass --interactive-auth
 
 ---
 
-## Quick start (bundled sample)
+## Quick start
 
-The repo ships a tiny, self-contained sample model so you can see it work end to end.
-See [`examples/sample-model/README.md`](examples/sample-model/README.md) for the full
-walkthrough; the short version:
+[`examples/sample.yml`](examples/sample.yml) is a reference catalog with one worked
+example of each assertion category. Copy it, swap the DAX for your own model, then:
 
 ```powershell
-# 1. Deploy examples/sample-model/"Sales Sample.SemanticModel" to a workspace
-#    (Power BI Desktop, Tabular Editor, or fabric-cicd) and refresh it once.
+pip install -r requirements.txt
+az login   # or pass --interactive-auth
 
-# 2. Capture the snapshot baseline (one time), review + commit the sidecar:
-python run_tests.py --workspace-id <ws-guid> --model "Sales Sample" `
-    --catalog-dir examples/sample-model/tests --update-snapshots
+# Capture the snapshot baseline (one time), then review + commit the sidecar:
+python run_tests.py --workspace-id <ws-guid> --model "Your Model" `
+    --catalog-dir tests --update-snapshots
 
-# 3. Run the suite:
-python run_tests.py --workspace-id <ws-guid> --model "Sales Sample" `
-    --catalog-dir examples/sample-model/tests
+# Run the suite:
+python run_tests.py --workspace-id <ws-guid> --model "Your Model" `
+    --catalog-dir tests
 ```
-
-Point it at your own model by passing your workspace GUID + model display name and a
-folder of your own catalog files.
 
 ### Flags
 
 | Flag | Purpose |
 |---|---|
 | `--workspace-id <guid>` | Target Fabric workspace GUID (required). |
-| `--model <name>` | Target semantic model display name (required). |
+| `--model <name>` | Display name of an already-deployed model to test. Mutually exclusive with `--deploy-from`. |
+| `--deploy-from <dir>` | Path to a source `*.SemanticModel/` directory; publish a throwaway copy and test that. Mutually exclusive with `--model`. |
 | `--catalog-dir <dir> [<dir> ...]` | One or more catalog dirs; cases merge, IDs must be globally unique (required). |
 | `--update-snapshots` | Capture current results into the `__snapshots__/` sidecars instead of asserting. |
 | `--interactive-auth` | Browser sign-in instead of Azure CLI (see auth note below). |
 | `--filter <substr>` | Run only cases whose `id` contains the substring. |
 | `--xmla-endpoint <host>` | Override the XMLA host (default `api.powerbi.com`). |
+| `--api-root <url>` | Override the Fabric API root (default `https://api.fabric.microsoft.com`). |
+| `--connection-id <guid>` | Connection to bind before refreshing; repeatable. `--deploy-from` only. |
+| `--refresh-type <type>` | Refresh after publish: `Calculate` (default), `Full`, `DataOnly`, `Automatic`, `None`. `--deploy-from` only. |
+| `--refresh-timeout <sec>` | Override the refresh poll ceiling (default 240s Calculate / 1200s Full). `--deploy-from` only. |
+| `--environment <name>` | Environment passed to fabric-cicd for `parameter.yml` selection (default `dev`). `--deploy-from` only. |
+| `--keep-rls` | Keep RLS roles in the staged copy (stripped by default). `--deploy-from` only. |
+| `--keep-model` | Skip teardown of the throwaway, for debugging. `--deploy-from` only. |
 
 ---
 
@@ -101,7 +111,22 @@ A catalog file is YAML with a `cases:` list. Every case has a globally-unique `i
 | `expected_columns` | structural | List of column names that must be present. |
 | `contains_any` | structural | At least one of these substrings must appear in the result. |
 | `contains_all` | structural | All of these substrings must appear in the result. |
+| `contains_none` | structural | None of these substrings may appear in the result. |
 | `expected_error_regex` | negative | The query **must** error, and the message must match this regex (matched case-insensitively). |
+
+Unknown keys are rejected at load time, and so are keys that belong to a different category
+(`expected_error_regex` on a `structural` case asserts nothing, so it's an error rather than a
+silent no-op). List fields must be lists — a bare `contains_none: Error` would otherwise be
+iterated character by character.
+
+`contains_*` needles match **values** by default, so a needle can't be satisfied by a column
+*name*. A needle written as `Column: value` instead matches a column-labelled view, which
+targets one column:
+
+```yaml
+    contains_all: ["Category: Hardware"]   # only matches the Category column
+    contains_any: ["Hardware"]             # matches any value in any column
+```
 
 ```yaml
 cases:
@@ -138,14 +163,83 @@ runs. Until a snapshot has a captured baseline, a normal run stops up front with
 
 ---
 
+## Disposable model mode
+
+`--deploy-from` points at a `*.SemanticModel/` directory in your repo and runs the whole
+lifecycle:
+
+1. **Stage** — copy the TMDL tree to a temp dir, rewrite `.platform` `displayName` (and issue a
+   fresh `logicalId`), and strip `definition/roles/`. The display name is the load-bearing part:
+   fabric-cicd resolves an already-deployed item by **type + display name**, so publishing under a
+   new name is what creates a second item rather than overwriting the source.
+2. **Publish** — deploy the staged copy with [fabric-cicd](https://github.com/microsoft/fabric-cicd)
+   as `TEST_<Model>_<8hex>`, with `unpublish.skip: true` so orphan cleanup can't remove other
+   semantic models in the workspace.
+3. **Bind** — attach each `--connection-id` to the new model. A freshly-published
+   DirectLake copy has no bound connections and cannot refresh until it does.
+
+   The connection must **already exist** in Fabric — this tool binds an existing
+   connection, it never creates one. Set it up once (Fabric portal → Manage
+   connections and gateways, or the Connections REST API), grab its GUID, and grant
+   the test identity `Use` permission on it. `Use` is all that's needed: no read
+   access on the upstream workspace. Refresh then flows through the connection's own
+   identity, which is why a throwaway published into a dev workspace can still
+   refresh against production data.
+4. **Refresh** — Enhanced Refresh REST, polled to a terminal state. Override the poll
+   ceiling with `--refresh-timeout` for a large Import model.
+5. **Test** — run the catalog over XMLA, exactly as in `--model` mode.
+6. **Delete** — in a `finally`. If the id was never captured (publish raised late, or the
+   list call was eventually consistent) the runner re-resolves by the unique name before
+   giving up, and a failed teardown exits **2** rather than reporting success. A hard kill
+   can't honour a `finally`, so at scale pair this with a scheduled sweep for stray `TEST_*`
+   models.
+
+```powershell
+python run_tests.py --workspace-id <ws-guid> `
+    --deploy-from "MODELS/Your Model.SemanticModel" `
+    --connection-id <connection-guid> `
+    --refresh-type Calculate `
+    --catalog-dir tests
+```
+
+The service principal needs **Contributor** on the workspace for this (it creates and
+deletes items), where `--model` mode only needs Viewer.
+
+### Is this practical for your model?
+
+It depends entirely on refresh cost, which is a storage-mode question:
+
+- **DirectLake** — the model reads live from the lakehouse, so there is no data to load.
+  A `Calculate` refresh recomputes calculated columns and tables (measures are evaluated at
+  query time, not at refresh) and lands in seconds. A throwaway per PR is cheap, so this is
+  the mode the pattern is built for.
+- **Import** — the copy has to actually load its data before any data assertion can run,
+  and a cold `Full` refresh on a real model runs minutes to tens of minutes. Per PR, that
+  gets painful fast. Prefer `--model` against a long-lived model you refresh on your own
+  schedule, and keep the per-PR suite to metadata and shape assertions, which don't need
+  loaded data at all.
+
+A refresh that succeeds proves the connections bind, the credentials work, and the upstream
+schema still matches. It does **not** prove the data is there — an empty table refreshes
+fine. To gate on that, assert it explicitly with a row-count case.
+
+---
+
 ## Continuous integration
 
 Wire this into a PR gate so a model change that breaks a contract fails the build. The
-[`ci/`](ci) folder has anonymized templates for **Azure DevOps**
-([`azure-pipelines.example.yml`](ci/azure-pipelines.example.yml)) and **GitHub Actions**
-([`github-actions.example.yml`](ci/github-actions.example.yml)). Both run on a Windows
-agent, sign in as a service principal, `pip install -r requirements.txt`, and run the
-suite — the non-zero exit fails the build.
+[`ci/`](ci) folder has anonymized templates:
+
+| Template | Mode |
+|---|---|
+| [`azure-pipelines.example.yml`](ci/azure-pipelines.example.yml) | Test an already-deployed model. |
+| [`azure-pipelines.ephemeral.example.yml`](ci/azure-pipelines.ephemeral.example.yml) | Publish a throwaway from the PR branch, test it, tear it down. |
+| [`github-actions.example.yml`](ci/github-actions.example.yml) | Test an already-deployed model. |
+
+All run on a Windows agent, sign in as a service principal, `pip install -r
+requirements.txt`, and run the suite — the non-zero exit fails the build. The disposable
+pattern isn't ADO-specific; the GitHub Actions template ports by swapping `--model` for
+`--deploy-from` and granting the service principal Contributor.
 
 ---
 
@@ -168,6 +262,8 @@ and the XMLA connection itself.
 
 Other common failures: not logged in (`az login`), the SP/user not added to the workspace,
 XMLA read-write disabled on the capacity, or a wrong workspace GUID / model display name.
+With `--deploy-from`, also check that the caller has **Contributor** on the workspace and
+`Use` on every connection passed to `--connection-id`.
 
 ---
 
@@ -177,13 +273,17 @@ XMLA read-write disabled on the capacity, or a wrong workspace GUID / model disp
 semantic-model-tests/
 ├── README.md
 ├── requirements.txt
-├── run_tests.py            the XMLA runner + assertion engine (one file)
+├── run_tests.py            the XMLA runner + assertion engine
 ├── test_catalog.py         offline self-test of the catalog + snapshot loader
 ├── lib/
-│   └── auth.py             Azure CLI / interactive-browser credential wrapper
+│   ├── auth.py             Azure CLI / interactive-browser credential wrapper
+│   ├── staging.py          copy + rebrand a TMDL tree for a throwaway publish
+│   ├── deploy.py           publish the staged copy via fabric-cicd
+│   ├── connections.py      item lookup, connection binding, teardown
+│   └── refresh.py          Enhanced Refresh REST + poll
 ├── ci/                     example PR-validation pipelines (ADO + GitHub Actions)
 └── examples/
-    └── sample-model/       a runnable, self-contained model + its test catalog
+    └── sample.yml          reference catalog: one case per assertion category
 ```
 
 ## Offline self-test

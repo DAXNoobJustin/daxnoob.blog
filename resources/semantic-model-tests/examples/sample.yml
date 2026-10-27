@@ -1,17 +1,17 @@
-# Example test catalog for the bundled "Sales Sample" semantic model.
+# Reference catalog: one worked example of each assertion category.
 #
-# Deploy examples/sample-model/Sales Sample.SemanticModel to a workspace (Power BI
-# Desktop, Tabular Editor, or fabric-cicd), then run:
+# This is a template to copy, not a runnable suite - the table and measure names
+# below ("Sales Sample" with a Product dimension) are illustrative. Point it at
+# your own model by swapping the DAX, then:
 #
 #   python run_tests.py \
 #       --workspace-id <your-workspace-guid> \
-#       --model "Sales Sample" \
-#       --catalog-dir examples/sample-model/tests
+#       --model "<Your Model>" \
+#       --catalog-dir examples
 #
-# The sample model generates its own data in Power Query (240 deterministic rows),
-# so a refresh is instant and every refresh yields identical data - which is what
-# makes the snapshot case below reproducible.
-source_model: Sales Sample
+# A note on snapshots: they lock the combined model-AND-data result, so aim them
+# at something stable (a closed period, a fixed historical slice, a reference
+# dimension). Pointed at live data, a legitimate refresh turns the build red.
 cases:
   # -- structural: the query must return a result of the expected SHAPE ----------
 
@@ -48,10 +48,10 @@ cases:
   # stops up front with exit code 2 ("snapshot case(s) have no captured value").
   # Capture the baseline once with --update-snapshots:
   #
-  #   python run_tests.py --workspace-id <ws> --model "Sales Sample" \
-  #       --catalog-dir examples/sample-model/tests --update-snapshots
+  #   python run_tests.py --workspace-id <ws> --model "<Your Model>" \
+  #       --catalog-dir examples --update-snapshots
   #
-  # then review + commit the generated examples/sample-model/tests/__snapshots__/sample.yml.
+  # then review + commit the generated examples/__snapshots__/sample.yml.
   # After that, every run asserts the result is byte-for-byte unchanged - so a
   # changed calculation, a dropped category, or a data regression fails the build.
   - id: total_amount_by_category

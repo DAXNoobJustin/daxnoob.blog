@@ -1,0 +1,90 @@
+# Example Azure DevOps pipeline: gate PRs with a throwaway copy of the model.
+#
+# This is a TEMPLATE — replace the ALL-CAPS placeholders for your setup.
+#
+# Where the simple template (azure-pipelines.example.yml) points at a model you
+# already deployed, this one publishes a disposable copy of the model *as it
+# exists in the PR branch*, tests that, and deletes it. So the thing under test
+# is the change itself, not a model somebody refreshed last week.
+#
+# Practical for DirectLake, where the copy reads live from the lakehouse and a
+# Calculate refresh lands in seconds. For Import, a cold Full refresh can run
+# many minutes per PR — use the simple template against a long-lived model instead.
+#
+# Prereqs (one-time):
+#   1. An Azure Resource Manager service connection backed by a service principal.
+#   2. That SP added to the workspace as Contributor (it must create and delete items).
+#   3. The data connection(s) ALREADY CREATED in Fabric, with that SP granted 'Use'
+#      on each. This tool binds an existing connection; it does not create one.
+#   4. Service principals enabled for Fabric/Power BI APIs at the tenant level.
+
+trigger: none
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - MODELS/** # your semantic-model TMDL
+      - tests/** # your test catalogs
+
+variables:
+  serviceConnection: "YOUR-ARM-SERVICE-CONNECTION"
+  workspaceId: "YOUR-WORKSPACE-GUID"
+  # Path to the *.SemanticModel/ directory in this repo.
+  modelDir: "MODELS/Your Model.SemanticModel"
+
+pool:
+  vmImage: windows-latest # AdomdClient net45 needs .NET Framework -> Windows
+
+jobs:
+  - job: SemanticModelTests
+    displayName: "Semantic model: publish throwaway, test, tear down"
+    # Sized for publish + refresh + queries. Raise it if you switch to a Full
+    # refresh on a large model.
+    timeoutInMinutes: 30
+    steps:
+      - checkout: self
+
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: "3.12"
+          addToPath: true
+
+      - task: AzureCLI@2
+        displayName: "Run DAX assertions against a throwaway model"
+        inputs:
+          azureSubscription: $(serviceConnection)
+          scriptType: ps
+          scriptLocation: inlineScript
+          inlineScript: |
+            python -m pip install --upgrade pip
+            python -m pip install -r requirements.txt
+
+            # AzureCLI@2 has already logged the SP in, so the default
+            # AzureCliCredential picks up its token (no --interactive-auth).
+            #
+            # --deploy-from stages a renamed copy of the model, publishes it,
+            # binds the connections, refreshes, runs the catalog, and deletes the
+            # copy in a finally block — so a failed assertion still tears down.
+            #
+            # RLS roles are stripped from the staged copy by default: the SP is
+            # not a member of any role, so it could not query through one. Pass
+            # --keep-rls if you need them.
+            python run_tests.py `
+              --workspace-id "$(workspaceId)" `
+              --deploy-from "$(modelDir)" `
+              --connection-id "YOUR-CONNECTION-GUID" `
+              --refresh-type Calculate `
+              --catalog-dir tests
+
+            # Exit 1 = an assertion failed (the model regressed).
+            # Exit 2 = the harness broke (auth, publish, refresh) — not a model bug.
+            if ($LASTEXITCODE -eq 1) {
+              Write-Error "Semantic-model assertions failed"
+              exit 1
+            } elseif ($LASTEXITCODE -ne 0) {
+              Write-Error "Test harness failed to run (exit $LASTEXITCODE)"
+              exit $LASTEXITCODE
+            }

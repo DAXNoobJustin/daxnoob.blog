@@ -1,6 +1,11 @@
 """
-Run YAML-defined DAX assertions against an existing Power BI /
-Microsoft Fabric semantic model over the XMLA endpoint.
+Run YAML-defined DAX assertions against a Power BI / Microsoft Fabric semantic
+model over the XMLA endpoint.
+
+Two modes:
+  --model <name>          test a model that is already deployed and refreshed
+  --deploy-from <dir>     publish a throwaway copy of a *.SemanticModel/ tree,
+                          bind connections, refresh, test it, then delete it
 
 Exit code: 0 = all pass / snapshots updated. 1 = at least one failure. 2 = fatal.
 """
@@ -11,6 +16,7 @@ import argparse
 import difflib
 import json
 import re
+import shutil
 import sys
 import tempfile
 import time
@@ -24,6 +30,7 @@ from typing import Any
 import requests
 import yaml
 
+from lib import connections, deploy, refresh, staging
 from lib.auth import (
     DEFAULT_FABRIC_API,
     FABRIC_SCOPE,
@@ -33,6 +40,22 @@ from lib.auth import (
 
 # --- Constants ----------------------------------------------------------------
 VALID_CATEGORIES = {"snapshot", "structural", "negative"}
+# Unknown keys were silently ignored, so a typo read as a passing test that asserted nothing.
+_COMMON_CASE_KEYS = {"id", "category", "dax", "description"}
+_STRUCTURAL_KEYS = {
+    "expected_columns", "expected_row_count", "contains_any", "contains_all", "contains_none",
+}
+# Per-category so a key that is valid *somewhere* can't sit inertly on the wrong
+# category -- e.g. expected_error_regex on a structural case asserts nothing.
+CASE_KEYS_BY_CATEGORY = {
+    "structural": _COMMON_CASE_KEYS | _STRUCTURAL_KEYS,
+    "negative": _COMMON_CASE_KEYS | {"expected_error_regex"},
+    "snapshot": _COMMON_CASE_KEYS,
+}
+VALID_CASE_KEYS = set().union(*CASE_KEYS_BY_CATEGORY.values())
+# Assertion fields that must be lists: a bare string would otherwise be iterated
+# character by character, so `contains_none: Error` would test for "E", "r", ...
+_LIST_CASE_KEYS = {"expected_columns", "contains_any", "contains_all", "contains_none"}
 
 # The retail.amd64 net45 AdomdClient build is a self-contained managed assembly
 # (XMLA over HTTPS; no MSOLAP OLE DB install needed). Downloaded at runtime so
@@ -46,6 +69,21 @@ _SIDECAR_HEADER = (
     "# Recapture with:  python run_tests.py ... --update-snapshots\n"
     "# The hand-authored case definitions live in the sibling .yml file.\n"
 )
+
+# CI logs are frequently public. Scrub anything that looks like a credential or a
+# connection string before printing an exception or a failure message.
+_SENSITIVE_OUTPUT_RE = re.compile(
+    r"(Provider=MSOLAP;|Password\s*=|Authorization\s*[:=]|Bearer\s+\S+|powerbi://)",
+    re.IGNORECASE,
+)
+
+
+def _redact_sensitive_text(text: object) -> str:
+    """Drop any line that looks like it carries a token or connection string."""
+    return "\n".join(
+        "[redacted potentially sensitive output line]" if _SENSITIVE_OUTPUT_RE.search(line) else line
+        for line in str(text).splitlines()
+    )
 
 
 # --- Catalog ------------------------------------------------------------------
@@ -70,6 +108,7 @@ class TestCase:
     expected_row_count: dict | None = None
     contains_any: list[str] | None = None
     contains_all: list[str] | None = None
+    contains_none: list[str] | None = None
     expected_error_regex: str | None = None
     source_file: Path = field(default_factory=Path)
 
@@ -144,10 +183,36 @@ def _validate(raw: dict, path: Path, seen: set[str]) -> TestCase:
     if cid in seen:
         msg = f"{path}: duplicate id {cid!r}"
         raise ValueError(msg)
+    # Checked before the unknown-key sweep below so this specific, actionable
+    # message wins over a generic "unknown key" for a common mistake.
+    if "expected_snapshot" in raw or "expected_value" in raw:
+        msg = (
+            f"{path}/{cid}: inline 'expected_snapshot'/'expected_value' is not allowed; "
+            f"snapshot values live in the __snapshots__/ sidecar (use --update-snapshots)"
+        )
+        raise ValueError(msg)
+    # Reject unknown keys: a misspelled assertion key would otherwise be dropped
+    # silently, leaving a case that runs its DAX and asserts nothing.
+    unknown = sorted(set(raw) - VALID_CASE_KEYS)
+    if unknown:
+        msg = f"{path}/{cid}: unknown key(s) {unknown}; valid keys are {sorted(VALID_CASE_KEYS)}"
+        raise ValueError(msg)
     cat = raw.get("category")
     if cat not in VALID_CATEGORIES:
         msg = f"{path}/{cid}: category must be one of {VALID_CATEGORIES}"
         raise ValueError(msg)
+    # A key valid for another category is just as inert as a typo, so reject it too.
+    misplaced = sorted(set(raw) - CASE_KEYS_BY_CATEGORY[cat])
+    if misplaced:
+        msg = (
+            f"{path}/{cid}: key(s) {misplaced} do not apply to a '{cat}' case "
+            f"(valid here: {sorted(CASE_KEYS_BY_CATEGORY[cat])})"
+        )
+        raise ValueError(msg)
+    for key in _LIST_CASE_KEYS & set(raw):
+        if raw[key] is not None and not isinstance(raw[key], list):
+            msg = f"{path}/{cid}: '{key}' must be a list, got {type(raw[key]).__name__}"
+            raise ValueError(msg)
     if not raw.get("dax"):
         msg = f"{path}/{cid}: 'dax' is required"
         raise ValueError(msg)
@@ -167,14 +232,8 @@ def _validate(raw: dict, path: Path, seen: set[str]) -> TestCase:
             msg = f"{path}/{cid}: expected_row_count min ({rc['min']}) > max ({rc['max']})"
             raise ValueError(msg)
     if cat == "negative":
-        stray = [
-            k
-            for k in ("expected_columns", "expected_row_count", "contains_any", "contains_all")
-            if raw.get(k) is not None
-        ]
-        if stray:
-            msg = f"{path}/{cid}: negative case cannot carry structural assertions {stray} (it only checks the error)"
-            raise ValueError(msg)
+        # Structural keys on a negative case are already rejected by the
+        # per-category check above; this only validates the regex compiles.
         try:
             re.compile(raw["expected_error_regex"])
         except re.error as exc:
@@ -195,6 +254,7 @@ def _validate(raw: dict, path: Path, seen: set[str]) -> TestCase:
         expected_row_count=raw.get("expected_row_count"),
         contains_any=raw.get("contains_any"),
         contains_all=raw.get("contains_all"),
+        contains_none=raw.get("contains_none"),
         expected_error_regex=raw.get("expected_error_regex"),
         source_file=path,
     )
@@ -421,6 +481,18 @@ def _assert_snapshot(case: TestCase, result: dict) -> tuple[bool, str]:
     return False, _diff(case.expected_snapshot, actual)
 
 
+def _column_label(col: str) -> str:
+    """
+    Human-readable column label for `contains_*` matching.
+
+    XMLA returns bare measures as `[Total Amount]` and grouped columns as
+    `Product[Category]`. Only unwrap when the WHOLE name is bracketed -- a
+    blanket strip('[]') would turn `Product[Category]` into `Product[Category`.
+    """
+    m = re.fullmatch(r"\[(.*)\]", col)
+    return m.group(1) if m else col
+
+
 def _assert_structural(case: TestCase, result: dict) -> tuple[bool, str]:
     if not result["ok"]:
         return False, f"query failed: {result['error']['message']}"
@@ -439,16 +511,31 @@ def _assert_structural(case: TestCase, result: dict) -> tuple[bool, str]:
             fail.append(f"row count {n} < min {rc['min']}")
         if "max" in rc and n > rc["max"]:
             fail.append(f"row count {n} > max {rc['max']}")
-    if case.contains_any or case.contains_all:
-        flat = "\n".join(str(v) for r in rows for v in r.values() if v is not None)
-        # Needles come from YAML and may parse as ints (unquoted `contains_any: [1000]`),
-        # so compare their string form against the flattened result text.
-        if case.contains_any and not any(str(n) in flat for n in case.contains_any):
+    if case.contains_any or case.contains_all or case.contains_none:
+        # Two views of the result. Bare needles match values only (so a needle
+        # can't be satisfied by a column *name*); a needle written as
+        # "Column: value" matches the labelled view, which targets one column.
+        flat_values = "\n".join(str(r[c]) for r in rows for c in cols if r.get(c) is not None)
+        flat_labelled = "\n".join(
+            f"{_column_label(c)}: {r[c]}" for r in rows for c in cols if r.get(c) is not None
+        )
+
+        def matches(needle: object) -> bool:
+            # Needles come from YAML and may parse as ints (unquoted
+            # `contains_any: [1000]`), so compare their string form.
+            n = str(needle)
+            return n in flat_labelled if ": " in n else n in flat_values
+
+        if case.contains_any and not any(matches(n) for n in case.contains_any):
             fail.append(f"contains_any {case.contains_any} matched none")
         if case.contains_all:
             for needle in case.contains_all:
-                if str(needle) not in flat:
+                if not matches(needle):
                     fail.append(f"contains_all missing {needle!r}")
+        if case.contains_none:
+            for needle in case.contains_none:
+                if matches(needle):
+                    fail.append(f"contains_none matched {needle!r}")
     if fail:
         return False, " | ".join(fail)
     return True, f"{len(rows)} rows, {len(cols)} cols OK"
@@ -487,7 +574,58 @@ def parse_args() -> argparse.Namespace:
         description="Run YAML-defined DAX assertions against a Power BI / Fabric semantic model over XMLA.",
     )
     p.add_argument("--workspace-id", required=True, help="Target Fabric workspace GUID.")
-    p.add_argument("--model", required=True, help="Display name of the target semantic model.")
+    p.add_argument(
+        "--model",
+        help="Display name of an already-deployed semantic model to test. "
+        "Mutually exclusive with --deploy-from.",
+    )
+    p.add_argument(
+        "--deploy-from",
+        type=Path,
+        help="Path to a source *.SemanticModel/ directory. Stages a renamed copy, publishes it "
+        "as a throwaway, tests it, and ALWAYS deletes it. Mutually exclusive with --model.",
+    )
+    p.add_argument(
+        "--connection-id",
+        action="append",
+        default=[],
+        metavar="GUID",
+        help="Connection to bind to the throwaway before refreshing (repeatable). "
+        "Required for DirectLake, which cannot refresh unbound. The connection must "
+        "already exist in Fabric and the caller needs 'Use' on it. Only with --deploy-from.",
+    )
+    p.add_argument(
+        "--refresh-type",
+        default="Calculate",
+        choices=["Calculate", "Full", "DataOnly", "Automatic", "None"],
+        help="Refresh to run after publishing. 'Calculate' (default) suits DirectLake; "
+        "Import needs 'Full' to load data. 'None' skips the refresh. Only with --deploy-from.",
+    )
+    p.add_argument(
+        "--refresh-timeout",
+        type=int,
+        metavar="SECONDS",
+        help="Override the refresh poll ceiling (default: 240s for Calculate, 1200s for Full). "
+        "Raise it for a large Import model. Only with --deploy-from.",
+    )
+    p.add_argument(
+        "--environment",
+        default="dev",
+        help="Environment name passed to fabric-cicd, selecting which parameter.yml value "
+        "set applies. Only meaningful if the source model has a parameter.yml. "
+        "Only with --deploy-from.",
+    )
+    p.add_argument(
+        "--keep-model",
+        action="store_true",
+        help="Skip teardown of the throwaway model (debugging). Only with --deploy-from.",
+    )
+    p.add_argument(
+        "--keep-rls",
+        action="store_true",
+        help="Keep RLS roles in the staged copy. By default roles are stripped, since a "
+        "service principal is rarely a member of any role. Only with --deploy-from.",
+    )
     p.add_argument(
         "--catalog-dir",
         required=True,
@@ -512,7 +650,23 @@ def parse_args() -> argparse.Namespace:
         help="Use InteractiveBrowserCredential (local browser sign-in) instead of AzureCliCredential.",
     )
     p.add_argument("--filter", help="Only run cases whose id contains this substring.")
-    return p.parse_args()
+    args = p.parse_args()
+
+    if bool(args.model) == bool(args.deploy_from):
+        p.error("supply exactly one of --model (test a deployed model) or --deploy-from (publish a throwaway)")
+    deploy_only = {
+        "--connection-id": args.connection_id,
+        "--refresh-type": args.refresh_type != "Calculate",
+        "--refresh-timeout": args.refresh_timeout is not None,
+        "--environment": args.environment != "dev",
+        "--keep-model": args.keep_model,
+        "--keep-rls": args.keep_rls,
+    }
+    if args.model:
+        stray = sorted(flag for flag, used in deploy_only.items() if used)
+        if stray:
+            p.error(f"{', '.join(stray)} only applies with --deploy-from")
+    return args
 
 
 def _load_cases_or_exit(args: argparse.Namespace) -> list[TestCase]:
@@ -577,7 +731,7 @@ def _run_and_collect(
             else:
                 passed, msg = assert_case(case, result)
         except Exception as exc:
-            passed, msg = False, f"runner exception: {exc}"
+            passed, msg = False, f"runner exception: {_redact_sensitive_text(exc)}"
         results.append((case, passed, msg, time.time() - ct0))
     return results
 
@@ -614,11 +768,149 @@ def run_suite(args: argparse.Namespace) -> int:
     return _finish(results, args.update_snapshots)
 
 
+def run_suite_ephemeral(args: argparse.Namespace) -> int:
+    """
+    Publish a throwaway copy of a model, test it, and always tear it down.
+
+    Load the catalog first so a bad case file fails before anything is deployed.
+    Teardown lives in a `finally` so a failed assertion, a failed refresh, or a
+    crash still can't leak a stray model into the workspace.
+    """
+    cases = _load_cases_or_exit(args)
+    auth = Auth(interactive=args.interactive_auth)
+    auth.warm()
+    fabric_api = args.api_root.rstrip("/")
+
+    source_dir = args.deploy_from.resolve()
+    source_name = source_dir.name.removesuffix(".SemanticModel")
+    test_model_name = staging.make_test_model_name("TEST", source_name)
+    print(f"==> Source:     {source_dir}")
+    print(f"==> Throwaway:  {test_model_name}")
+    print(f"==> Workspace:  {args.workspace_id}")
+    print(f"==> Cases:      {len(cases)} from {len(args.catalog_dir)} dir(s)")
+
+    model_id: str | None = None
+    staging_dir: Path | None = None
+    results: list[tuple[TestCase, bool, str, float]] = []
+    teardown_ok = True
+    try:
+        staging_dir = Path(tempfile.mkdtemp(prefix="smt-stage-"))
+        staging.stage_model(
+            source_dir=source_dir,
+            model_name=test_model_name,
+            output_dir=staging_dir,
+            strip_rls=not args.keep_rls,
+        )
+        # A parameter.yml sits beside the model dir, not inside it. Carry it over
+        # so fabric-cicd's find/replace still fires against the staged copy.
+        source_parameter_yml = source_dir.parent / "parameter.yml"
+        if source_parameter_yml.exists():
+            shutil.copy2(source_parameter_yml, staging_dir / "parameter.yml")
+
+        print("==> Publishing throwaway")
+        deploy.publish_staged_model(
+            staging_dir=staging_dir,
+            workspace_id=args.workspace_id,
+            fabric_api_root=fabric_api,
+            token_credential=auth.cred,
+            environment=args.environment,
+        )
+
+        model_id = connections.resolve_item_id(
+            fabric_api=fabric_api,
+            workspace_id=args.workspace_id,
+            display_name=test_model_name,
+            item_type="SemanticModel",
+            auth=auth,
+        )
+        if not model_id:
+            msg = f"{test_model_name} not found in the workspace after publish"
+            raise RuntimeError(msg)
+        print(f"==> Model id:   {model_id}")
+        if args.connection_id:
+            n = connections.bind_connections(
+                fabric_api=fabric_api,
+                workspace_id=args.workspace_id,
+                model_id=model_id,
+                connection_ids=args.connection_id,
+                auth=auth,
+            )
+            print(f"==> Bound {n} connection(s)")
+
+        if args.refresh_type != "None":
+            t0 = time.time()
+            refresh.refresh_model(
+                workspace_id=args.workspace_id,
+                fabric_api=fabric_api,
+                auth=auth,
+                dataset_id=model_id,
+                refresh_type=args.refresh_type,
+                poll_timeout_sec=args.refresh_timeout,
+            )
+            print(f"==> Refresh complete in {time.time() - t0:.1f}s")
+
+        results = _run_and_collect(
+            cases,
+            model_name=test_model_name,
+            workspace_id=args.workspace_id,
+            fabric_api=fabric_api,
+            xmla_endpoint=args.xmla_endpoint,
+            auth=auth,
+            update_snapshots=args.update_snapshots,
+        )
+    finally:
+        if staging_dir and staging_dir.exists():
+            shutil.rmtree(staging_dir, ignore_errors=True)
+        if not args.keep_model:
+            # Re-resolve when publish created the item but we never captured its
+            # id (publish raised late, or the list call was eventually consistent).
+            # The name is unique per run, so anything under it belongs to this run.
+            if model_id is None:
+                try:
+                    model_id = connections.resolve_item_id(
+                        fabric_api=fabric_api,
+                        workspace_id=args.workspace_id,
+                        display_name=test_model_name,
+                        item_type="SemanticModel",
+                        auth=auth,
+                    )
+                    if model_id:
+                        print(f"==> Teardown:   recovered orphan {test_model_name} ({model_id})")
+                except Exception as exc:
+                    print(f"==> Teardown lookup failed: {_redact_sensitive_text(exc)}", file=sys.stderr)
+            if model_id:
+                try:
+                    teardown_ok = connections.delete_model(
+                        fabric_api=fabric_api,
+                        workspace_id=args.workspace_id,
+                        model_id=model_id,
+                        auth=auth,
+                    )
+                except Exception as exc:
+                    teardown_ok = False
+                    print(f"==> Teardown error: {_redact_sensitive_text(exc)}", file=sys.stderr)
+                if teardown_ok:
+                    print("==> Teardown:   deleted")
+                else:
+                    print(
+                        f"==> Teardown:   FAILED -- delete {test_model_name} ({model_id}) manually",
+                        file=sys.stderr,
+                    )
+        elif model_id:
+            print(f"==> --keep-model: leaving {test_model_name} ({model_id}) in the workspace")
+
+    # A leaked model is an infra failure, not a test result: surface it as exit 2
+    # so a CI gate can't report success while leaving an item behind.
+    if not teardown_ok and not args.keep_model:
+        return 2
+    return _finish(results, args.update_snapshots)
+
+
 def main() -> int:
     """Run the suite. Returns 0=pass, 1=failures, 2=fatal (infra/setup)."""
     args = parse_args()
     try:
-        return run_suite(args)
+        return run_suite_ephemeral(args) if args.deploy_from else run_suite(args)
     except SystemExit:
         # Explicit fatal paths (e.g. no cases / uncaptured snapshots) already carry
         # their own exit code (2) -- let them through unchanged.
@@ -627,8 +919,9 @@ def main() -> int:
         # Setup/infra errors (bad --catalog-dir, missing az login, XMLA connect, ...)
         # are fatal, NOT assertion failures. Exit 2 so a CI gate can distinguish
         # "the harness/infra broke" from "the model regressed" (exit 1).
-        print(f"==> FATAL: {exc}", file=sys.stderr)
-        traceback.print_exc()
+        # Redacted: an XMLA connect failure can echo the connection string.
+        print(f"==> FATAL: {_redact_sensitive_text(exc)}", file=sys.stderr)
+        print(_redact_sensitive_text(traceback.format_exc()), file=sys.stderr)
         return 2
 
 
@@ -644,7 +937,11 @@ def _print_summary(results: Iterable[tuple[TestCase, bool, str, float]]) -> None
         marker = "PASS" if ok else "FAIL"
         print(f"  [{marker}] {case.category:11s} {case.id:40s} ({dur:.2f}s)")
         if not ok:
-            for line in msg.splitlines() or [msg]:
+            # Redact here rather than at each failure site: this is the single
+            # boundary every assertion message flows through on its way to a
+            # (frequently public) CI log, and a raw ADOMD error can echo the
+            # connection string -- which carries the bearer token.
+            for line in _redact_sensitive_text(msg).splitlines() or [msg]:
                 print(f"           {line}")
 
 

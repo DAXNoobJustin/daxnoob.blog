@@ -5,6 +5,10 @@
 # Framework) and authenticates as the pipeline's service principal, which XMLA
 # accepts without the "Dataset Execute Queries REST API" tenant setting.
 #
+# This tests a model that is already deployed and refreshed. For the variant that
+# publishes a throwaway copy from the PR branch and deletes it afterwards, see
+# azure-pipelines.ephemeral.example.yml.
+#
 # Prereqs (one-time):
 #   1. An Azure Resource Manager service connection backed by a service principal.
 #   2. That service principal added to the target Fabric workspace (Viewer is
@@ -25,7 +29,7 @@ pr:
 variables:
   serviceConnection: "YOUR-ARM-SERVICE-CONNECTION"
   workspaceId: "YOUR-WORKSPACE-GUID"
-  modelName: "Sales Sample" # the deployed model to test
+  modelName: "YOUR MODEL NAME" # the deployed model to test
 
 pool:
   vmImage: windows-latest # AdomdClient net45 needs .NET Framework -> Windows

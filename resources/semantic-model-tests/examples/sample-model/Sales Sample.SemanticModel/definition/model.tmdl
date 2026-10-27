@@ -1,7 +1,0 @@
-model 'Sales Sample'
-	culture: en-US
-	defaultPowerBIDataSourceVersion: powerBI_V3
-	discourageImplicitMeasures
-	sourceQueryCulture: en-US
-
-annotation TabularEditor_SerializeOptions = {"IgnoreInferredObjects":true,"IgnoreInferredProperties":true,"IgnoreTimestamps":true,"IgnoreLineageTags":true,"SplitMultilineStrings":true,"TmdlOptions":{"IncludeRefs":false,"NewLineStyle":"UnixStyle"}}
