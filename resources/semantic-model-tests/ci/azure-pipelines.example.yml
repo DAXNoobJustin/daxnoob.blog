@@ -29,6 +29,7 @@ pr:
 variables:
   serviceConnection: "YOUR-ARM-SERVICE-CONNECTION"
   workspaceId: "YOUR-WORKSPACE-GUID"
+  testerDir: "semantic-model-tests" # where you copied this tool in your repo
   modelName: "YOUR MODEL NAME" # the deployed model to test
 
 pool:
@@ -50,11 +51,11 @@ steps:
       scriptLocation: inlineScript
       inlineScript: |
         python -m pip install --upgrade pip
-        python -m pip install -r requirements.txt
+        python -m pip install -r "$(testerDir)/requirements.txt"
 
         # The AzureCLI@2 task has already logged in the service principal, so the
         # tool's default AzureCliCredential picks up its token (no --interactive-auth).
-        python run_tests.py `
+        python "$(testerDir)/run_tests.py" `
           --workspace-id "$(workspaceId)" `
           --model "$(modelName)" `
           --catalog-dir tests

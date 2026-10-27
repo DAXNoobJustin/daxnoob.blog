@@ -33,6 +33,7 @@ permissions:
 
 env:
   WORKSPACE_ID: "YOUR-WORKSPACE-GUID"
+  TESTER_DIR: "semantic-model-tests" # where you copied this tool in your repo
   MODEL_NAME: "YOUR MODEL NAME" # the deployed model to test
 
 jobs:
@@ -56,11 +57,11 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          python -m pip install -r "$env:TESTER_DIR/requirements.txt"
 
           # azure/login has logged in the service principal, so the tool's default
           # AzureCliCredential picks up its token (no --interactive-auth).
-          python run_tests.py `
+          python "$env:TESTER_DIR/run_tests.py" `
             --workspace-id "$env:WORKSPACE_ID" `
             --model "$env:MODEL_NAME" `
             --catalog-dir tests

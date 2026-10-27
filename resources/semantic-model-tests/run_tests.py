@@ -498,8 +498,8 @@ def _assert_structural(case: TestCase, result: dict) -> tuple[bool, str]:
         return False, f"query failed: {result['error']['message']}"
     rows, cols = result["rows"], result["columns"]
     fail: list[str] = []
-    # Column check: skip when 0 rows (XMLA may not return column metadata for empty results)
-    if case.expected_columns and rows:
+    # Column check: skip only when XMLA returned no rows and no column metadata
+    if case.expected_columns and (rows or cols):
         missing = set(case.expected_columns) - set(cols)
         if missing:
             fail.append(f"missing columns: {sorted(missing)}")
@@ -865,18 +865,22 @@ def run_suite_ephemeral(args: argparse.Namespace) -> int:
             # id (publish raised late, or the list call was eventually consistent).
             # The name is unique per run, so anything under it belongs to this run.
             if model_id is None:
-                try:
-                    model_id = connections.resolve_item_id(
-                        fabric_api=fabric_api,
-                        workspace_id=args.workspace_id,
-                        display_name=test_model_name,
-                        item_type="SemanticModel",
-                        auth=auth,
-                    )
-                    if model_id:
-                        print(f"==> Teardown:   recovered orphan {test_model_name} ({model_id})")
-                except Exception as exc:
-                    print(f"==> Teardown lookup failed: {_redact_sensitive_text(exc)}", file=sys.stderr)
+                for attempt in range(3):
+                    if attempt:
+                        time.sleep(10)
+                    try:
+                        model_id = connections.resolve_item_id(
+                            fabric_api=fabric_api,
+                            workspace_id=args.workspace_id,
+                            display_name=test_model_name,
+                            item_type="SemanticModel",
+                            auth=auth,
+                        )
+                        if model_id:
+                            print(f"==> Teardown:   recovered orphan {test_model_name} ({model_id})")
+                            break
+                    except Exception as exc:
+                        print(f"==> Teardown lookup failed: {_redact_sensitive_text(exc)}", file=sys.stderr)
             if model_id:
                 try:
                     teardown_ok = connections.delete_model(

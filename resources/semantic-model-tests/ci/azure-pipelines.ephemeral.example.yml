@@ -32,6 +32,7 @@ pr:
 variables:
   serviceConnection: "YOUR-ARM-SERVICE-CONNECTION"
   workspaceId: "YOUR-WORKSPACE-GUID"
+  testerDir: "semantic-model-tests" # where you copied this tool in your repo
   # Path to the *.SemanticModel/ directory in this repo.
   modelDir: "MODELS/Your Model.SemanticModel"
 
@@ -60,7 +61,7 @@ jobs:
           scriptLocation: inlineScript
           inlineScript: |
             python -m pip install --upgrade pip
-            python -m pip install -r requirements.txt
+            python -m pip install -r "$(testerDir)/requirements.txt"
 
             # AzureCLI@2 has already logged the SP in, so the default
             # AzureCliCredential picks up its token (no --interactive-auth).
@@ -72,7 +73,7 @@ jobs:
             # RLS roles are stripped from the staged copy by default: the SP is
             # not a member of any role, so it could not query through one. Pass
             # --keep-rls if you need them.
-            python run_tests.py `
+            python "$(testerDir)/run_tests.py" `
               --workspace-id "$(workspaceId)" `
               --deploy-from "$(modelDir)" `
               --connection-id "YOUR-CONNECTION-GUID" `
