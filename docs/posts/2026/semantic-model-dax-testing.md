@@ -22,7 +22,7 @@ image: assets/images/posts/semantic-model-dax-testing/hero.png
 
 ## Introduction
 
-Our team is constantly making changes to our semantic models (adding new measures, renaming columns, adding tables, etc.). Just because the changes still result in a valid schema and refreshes are still successful doesn't mean our queries still return the expected results.
+Our team is constantly making changes to our semantic models (adding new measures, renaming columns, adding tables, etc.). Just because the changes result in a valid schema and the refreshes succeed doesn't mean our queries still return the expected results.
 
 I wanted a way to write some DAX, define what the result should look like, and fail the build/deployment if it doesn't match expectations.
 
