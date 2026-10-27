@@ -22,11 +22,11 @@ image: assets/images/posts/semantic-model-dax-testing/hero.png
 
 ## Introduction
 
-Our team makes changes to our semantic models all the time. We add new measures, rename columns, update filters, refactor calculation groups, etc. Any one of those changes can break something downstream without anyone noticing. A successful refresh only tells you the model loaded. It doesn't tell you that `[Total Revenue]` still returns the same number it did yesterday.
+Our team is constantly making changes to our semantic models (adding new measures, renaming columns, adding tables, etc.). Just because the changes still result in a valid schema and refreshes are still successful, it doesn't tell you that our queries still return the expected results.
 
-What I wanted was simple: **write some DAX, define what the result should look like, and fail the build if it doesn't match.** So I built a small tool that does that. It works against any semantic model you can connect to over XMLA, and the full source code is on [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests).
+I wanted a way to write some DAX, define what the result should look like, and fail the build/deployment if it doesn't match expectations.
 
-In this post, I'll walk through the tester first and then show how we use it in our pull requests, where each PR publishes a temporary copy of the model, tests it, and then deletes it.
+In this post, I'll walk through how we accomplished this. I'll start with the tester  and then show how we use it in our pull requests, where each PR publishes a temporary copy of the model, tests it, and then deletes it. You can find the code here: [GitHub](https://github.com/DAXNoobJustin/daxnoob.blog/tree/main/resources/semantic-model-tests).
 
 <!-- more -->
 
@@ -37,12 +37,6 @@ The tester is a small Python command line tool. You give it a folder of YAML tes
 - **structural**: checks the *shape* of the result (row count, columns, or whether a value is present).
 - **negative**: the query *must* fail, and the error must match a regex. For example, does a bad reference return the error you expect?
 - **snapshot**: saves the exact result to a file the first time it runs, then fails if the result ever changes. This is useful for locking in the output of a calculation.
-
-!!! danger "📸 SCREENSHOT PLACEHOLDER — the YAML catalog in an editor"
-    A catalog file open in VS Code showing a few real cases, so readers can see
-    the shape before reading the abridged sample below. Delete this admonition
-    and replace with:
-    `![](../../assets/images/posts/semantic-model-dax-testing/catalog.png)`
 
 ```yaml
 cases:
@@ -186,16 +180,16 @@ Here is what a Part 2 run looks like:
 ================================================================================
   4 run, 4 passed, 0 failed
 ================================================================================
-  [PASS] structural  order_count_resolves                     (0.00s)
-  [PASS] structural  product_categories_present               (0.00s)
-  [PASS] negative    missing_measure_errors                   (0.00s)
-  [PASS] snapshot    total_amount_by_category                 (0.00s)
+  [PASS] structural  order_count_resolves
+  [PASS] structural  product_categories_present
+  [PASS] negative    missing_measure_errors
+  [PASS] snapshot    total_amount_by_category
 ```
 
 The whole thing (deploy, refresh, four assertions, and teardown) took about 25 seconds. When a snapshot changes, you get the diff:
 
 ```terminal
-  [FAIL] snapshot    total_amount_by_category                 (0.00s)
+  [FAIL] snapshot    total_amount_by_category
            snapshot mismatch:
            --- expected
            +++ actual

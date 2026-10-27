@@ -700,9 +700,9 @@ def _run_and_collect(
     xmla_endpoint: str,
     auth: Auth,
     update_snapshots: bool,
-) -> list[tuple[TestCase, bool, str, float]]:
+) -> list[tuple[TestCase, bool, str]]:
     """Run every case over XMLA, then assert (or capture snapshots). Returns result tuples."""
-    results: list[tuple[TestCase, bool, str, float]] = []
+    results: list[tuple[TestCase, bool, str]] = []
     print(f"==> Running {len(cases)} case(s) via AdomdClient (XMLA)")
     t0 = time.time()
     dax_results = run_cases_xmla(
@@ -719,7 +719,6 @@ def _run_and_collect(
             case.id,
             {"ok": False, "rows": [], "columns": [], "error": {"message": "no result from runner"}},
         )
-        ct0 = time.time()
         try:
             if update_snapshots:
                 if result["ok"]:
@@ -732,11 +731,11 @@ def _run_and_collect(
                 passed, msg = assert_case(case, result)
         except Exception as exc:
             passed, msg = False, f"runner exception: {_redact_sensitive_text(exc)}"
-        results.append((case, passed, msg, time.time() - ct0))
+        results.append((case, passed, msg))
     return results
 
 
-def _finish(results: list[tuple[TestCase, bool, str, float]], update_snapshots: bool) -> int:
+def _finish(results: list[tuple[TestCase, bool, str]], update_snapshots: bool) -> int:
     """Print the summary and return the process exit code."""
     _print_summary(results)
     if update_snapshots:
@@ -744,7 +743,7 @@ def _finish(results: list[tuple[TestCase, bool, str, float]], update_snapshots: 
             "==> NOTE: snapshot sidecars were (re)written; review the diff before "
             "committing -- a changed snapshot is a real behavior change to vet.",
         )
-    fails = sum(1 for _, p, _, _ in results if not p)
+    fails = sum(1 for _, p, _ in results if not p)
     return 1 if fails else 0
 
 def run_suite(args: argparse.Namespace) -> int:
@@ -791,7 +790,7 @@ def run_suite_ephemeral(args: argparse.Namespace) -> int:
 
     model_id: str | None = None
     staging_dir: Path | None = None
-    results: list[tuple[TestCase, bool, str, float]] = []
+    results: list[tuple[TestCase, bool, str]] = []
     teardown_ok = True
     try:
         staging_dir = Path(tempfile.mkdtemp(prefix="smt-stage-"))
@@ -925,17 +924,17 @@ def main() -> int:
         return 2
 
 
-def _print_summary(results: Iterable[tuple[TestCase, bool, str, float]]) -> None:
+def _print_summary(results: Iterable[tuple[TestCase, bool, str]]) -> None:
     results = list(results)
-    passed = sum(1 for _, p, _, _ in results if p)
+    passed = sum(1 for _, p, _ in results if p)
     failed = len(results) - passed
     print()
     print("=" * 80)
     print(f"  {len(results)} run, {passed} passed, {failed} failed")
     print("=" * 80)
-    for case, ok, msg, dur in results:
+    for case, ok, msg in results:
         marker = "PASS" if ok else "FAIL"
-        print(f"  [{marker}] {case.category:11s} {case.id:40s} ({dur:.2f}s)")
+        print(f"  [{marker}] {case.category:11s} {case.id}")
         if not ok:
             # Redact here rather than at each failure site: this is the single
             # boundary every assertion message flows through on its way to a
