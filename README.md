@@ -9,7 +9,6 @@ Source and companion code for **[daxnoob.blog](https://daxnoob.blog/)** — Just
 
 | Resource | Article |
 |---|---|
-| [`fabric-semantic-model-starter/`](resources/fabric-semantic-model-starter/) | [Open-source starter →](https://daxnoob.blog/starter) |
 | [`semantic-model-tests/`](resources/semantic-model-tests/) | [Unit Testing Semantic Models with DAX](https://daxnoob.blog/semantic-model-dax-testing/) |
 | [`agentic-power-query-development/`](resources/agentic-power-query-development/) | [Iterating on Power Query with an LLM](https://daxnoob.blog/agentic-power-query-development/) |
 | [`extending-fabric-cicd/`](resources/extending-fabric-cicd/) | [Extending fabric-cicd with Pre and Post-Processing Operations](https://daxnoob.blog/extending-fabric-cicd-with-pre-post-processing/) |
