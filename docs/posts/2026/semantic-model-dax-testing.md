@@ -1,7 +1,7 @@
 ---
 title: "Unit Testing Semantic Models with DAX"
 description: "A tool that runs YAML-defined DAX assertions against your semantic models over the XMLA endpoint, and on Direct Lake, deploys a temporary copy of the model for each pull request to test the change."
-draft: true
+draft: false
 date:
   created: 2026-10-27
 categories:
