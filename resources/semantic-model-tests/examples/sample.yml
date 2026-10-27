@@ -1,0 +1,66 @@
+# Reference catalog: one worked example of each assertion category.
+#
+# This is a template to copy, not a runnable suite - the table and measure names
+# below ("Sales Sample" with a Product dimension) are illustrative. Point it at
+# your own model by swapping the DAX, then:
+#
+#   python run_tests.py \
+#       --workspace-id <your-workspace-guid> \
+#       --model "<Your Model>" \
+#       --catalog-dir examples
+#
+# A note on snapshots: they lock the combined model-AND-data result, so aim them
+# at something stable (a closed period, a fixed historical slice, a reference
+# dimension). Pointed at live data, a legitimate refresh turns the build red.
+cases:
+  # -- structural: the query must return a result of the expected SHAPE ----------
+
+  # Needs only that the model loaded (no data required): a measure resolves and
+  # the query returns exactly one scalar row.
+  - id: order_count_resolves
+    description: "[Order Count] resolves and returns a single scalar row."
+    category: structural
+    dax: "EVALUATE { [Order Count] }"
+    expected_row_count:
+      exact: 1
+
+  # Needs loaded data: the Product dimension has rows, including a known value.
+  - id: product_categories_present
+    description: The Product dimension exposes its categories, including Hardware.
+    category: structural
+    dax: "EVALUATE VALUES ( Product[Category] )"
+    expected_row_count:
+      min: 1
+    contains_any:
+      - Hardware
+
+  # -- negative: the query MUST fail, and the error MUST match the regex ---------
+
+  - id: missing_measure_errors
+    description: Referencing a measure that does not exist must raise (proves error handling).
+    category: negative
+    dax: "EVALUATE { [No Such Measure 12345] }"
+    expected_error_regex: "(?i)(cannot be determined|not a valid|no such|cannot find|does not exist)"
+
+  # -- snapshot: capture the exact result once, then fail on any drift -----------
+  #
+  # A snapshot case needs a captured baseline. Until you capture one, a normal run
+  # stops up front with exit code 2 ("snapshot case(s) have no captured value").
+  # Capture the baseline once with --update-snapshots:
+  #
+  #   python run_tests.py --workspace-id <ws> --model "<Your Model>" \
+  #       --catalog-dir examples --update-snapshots
+  #
+  # then review + commit the generated examples/__snapshots__/sample.yml.
+  # After that, every run asserts the result is byte-for-byte unchanged - so a
+  # changed calculation, a dropped category, or a data regression fails the build.
+  - id: total_amount_by_category
+    description: Total Amount per Category - locked so any calc/data change is caught.
+    category: snapshot
+    dax: |
+      EVALUATE
+      SUMMARIZECOLUMNS (
+          Product[Category],
+          "Total Amount", [Total Amount]
+      )
+      ORDER BY Product[Category]

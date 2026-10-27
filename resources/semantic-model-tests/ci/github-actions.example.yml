@@ -1,0 +1,67 @@
+# Example GitHub Actions workflow: gate PRs by running semantic-model DAX assertions.
+#
+# This is a TEMPLATE — replace the placeholders and configure the secrets below.
+# It runs on a Windows runner (required: the AdomdClient net45 assembly needs .NET
+# Framework) and signs in as a service principal via OIDC, whose token XMLA accepts
+# without the "Dataset Execute Queries REST API" tenant setting.
+#
+# This tests a model that is already deployed and refreshed. To instead publish a
+# throwaway copy from the PR branch and tear it down after, swap --model for
+# --deploy-from and grant the SP Contributor on the workspace — see
+# ci/azure-pipelines.ephemeral.example.yml for the full shape.
+#
+# Prereqs (one-time):
+#   1. An Entra service principal added to the target Fabric workspace (Viewer is
+#      enough to read/query a deployed, refreshed model).
+#   2. Service principals enabled for Fabric/Power BI APIs at the tenant level.
+#   3. A federated credential on the app for this repo, and these repo secrets:
+#        AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#      (or swap azure/login for a client-secret login if you prefer.)
+
+name: semantic-model-tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "MODELS/**" # your semantic-model TMDL
+      - "tests/**" # your test catalogs
+
+permissions:
+  id-token: write # for azure/login OIDC
+  contents: read
+
+env:
+  WORKSPACE_ID: "YOUR-WORKSPACE-GUID"
+  TESTER_DIR: "semantic-model-tests" # where you copied this tool in your repo
+  MODEL_NAME: "YOUR MODEL NAME" # the deployed model to test
+
+jobs:
+  test:
+    runs-on: windows-latest # AdomdClient net45 needs .NET Framework -> Windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Azure login (service principal via OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run semantic-model DAX assertions
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r "$env:TESTER_DIR/requirements.txt"
+
+          # azure/login has logged in the service principal, so the tool's default
+          # AzureCliCredential picks up its token (no --interactive-auth).
+          python "$env:TESTER_DIR/run_tests.py" `
+            --workspace-id "$env:WORKSPACE_ID" `
+            --model "$env:MODEL_NAME" `
+            --catalog-dir tests

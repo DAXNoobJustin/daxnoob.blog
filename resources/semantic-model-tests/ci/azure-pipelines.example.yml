@@ -1,0 +1,66 @@
+# Example Azure DevOps pipeline: gate PRs by running semantic-model DAX assertions.
+#
+# This is a TEMPLATE — anonymize/replace the ALL-CAPS placeholders for your setup.
+# It runs on a Windows agent (required: the AdomdClient net45 assembly needs .NET
+# Framework) and authenticates as the pipeline's service principal, which XMLA
+# accepts without the "Dataset Execute Queries REST API" tenant setting.
+#
+# This tests a model that is already deployed and refreshed. For the variant that
+# publishes a throwaway copy from the PR branch and deletes it afterwards, see
+# azure-pipelines.ephemeral.example.yml.
+#
+# Prereqs (one-time):
+#   1. An Azure Resource Manager service connection backed by a service principal.
+#   2. That service principal added to the target Fabric workspace (Viewer is
+#      enough to read/query a model; the model must already be deployed + refreshed).
+#   3. Service principals enabled for Fabric/Power BI APIs at the tenant level.
+
+trigger: none # run on PRs, not on every push
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - MODELS/** # your semantic-model TMDL
+      - tests/** # your test catalogs
+
+variables:
+  serviceConnection: "YOUR-ARM-SERVICE-CONNECTION"
+  workspaceId: "YOUR-WORKSPACE-GUID"
+  testerDir: "semantic-model-tests" # where you copied this tool in your repo
+  modelName: "YOUR MODEL NAME" # the deployed model to test
+
+pool:
+  vmImage: windows-latest # AdomdClient net45 needs .NET Framework -> Windows
+
+steps:
+  - checkout: self
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.12"
+      addToPath: true
+
+  - task: AzureCLI@2
+    displayName: "Run semantic-model DAX assertions"
+    inputs:
+      azureSubscription: $(serviceConnection)
+      scriptType: ps
+      scriptLocation: inlineScript
+      inlineScript: |
+        python -m pip install --upgrade pip
+        python -m pip install -r "$(testerDir)/requirements.txt"
+
+        # The AzureCLI@2 task has already logged in the service principal, so the
+        # tool's default AzureCliCredential picks up its token (no --interactive-auth).
+        python "$(testerDir)/run_tests.py" `
+          --workspace-id "$(workspaceId)" `
+          --model "$(modelName)" `
+          --catalog-dir tests
+
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Semantic-model tests failed (exit $LASTEXITCODE)"
+          exit $LASTEXITCODE
+        }

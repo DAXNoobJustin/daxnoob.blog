@@ -1,0 +1,10 @@
+azure-identity>=1.17.0,<2
+requests>=2.32.0,<3
+PyYAML>=6.0,<7
+# pythonnet loads the AdomdClient .NET assembly in-process to run DAX over the
+# Power BI XMLA endpoint (no separate MSOLAP/OLE DB install needed).
+pythonnet>=3.0.3,<4
+# Only needed for --deploy-from (publishing a throwaway model). Imported lazily,
+# so the plain --model mode runs without it. deploy_with_config + the
+# `unpublish.skip` config setting both require 0.1.26 or newer.
+fabric-cicd>=0.1.26
