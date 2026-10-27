@@ -596,10 +596,11 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--refresh-type",
-        default="Calculate",
+        default="Full",
         choices=["Calculate", "Full", "DataOnly", "Automatic", "None"],
-        help="Refresh to run after publishing. 'Calculate' (default) suits DirectLake; "
-        "Import needs 'Full' to load data. 'None' skips the refresh. Only with --deploy-from.",
+        help="Refresh to run after publishing. 'Full' (default) frames DirectLake tables "
+        "and loads Import data; 'Calculate' alone leaves a fresh DirectLake copy unframed. "
+        "'None' skips the refresh. Only with --deploy-from.",
     )
     p.add_argument(
         "--refresh-timeout",
@@ -656,7 +657,7 @@ def parse_args() -> argparse.Namespace:
         p.error("supply exactly one of --model (test a deployed model) or --deploy-from (publish a throwaway)")
     deploy_only = {
         "--connection-id": args.connection_id,
-        "--refresh-type": args.refresh_type != "Calculate",
+        "--refresh-type": args.refresh_type != "Full",
         "--refresh-timeout": args.refresh_timeout is not None,
         "--environment": args.environment != "dev",
         "--keep-model": args.keep_model,

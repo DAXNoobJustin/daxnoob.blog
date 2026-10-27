@@ -15,10 +15,9 @@ import requests
 
 from .auth import PBI_SCOPE, Auth
 
-# Poll ceilings per refresh type. A Calculate on a freshly-published DirectLake
-# model finishes in well under a minute -- there is no data load, the model reads
-# from the lakehouse. A cold Full on an Import model is a different animal
-# (minutes to tens of minutes), so it gets far more headroom.
+# Poll ceilings per refresh type. A Full on a freshly-published DirectLake model
+# only frames the tables and finishes in seconds. A cold Full on an Import model
+# is a different animal (minutes to tens of minutes), hence the headroom.
 _REST_POLL_TIMEOUTS_SEC = {
     "Calculate": 240,
     "ClearValues": 240,
@@ -117,7 +116,7 @@ def refresh_model(
     fabric_api: str,
     auth: Auth,
     dataset_id: str,
-    refresh_type: str = "Calculate",
+    refresh_type: str = "Full",
     poll_timeout_sec: int | None = None,
     commit_mode: str = "transactional",
     retry_count: int = 0,
@@ -131,8 +130,8 @@ def refresh_model(
         auth: Auth instance for token acquisition.
         dataset_id: The published semantic model's dataset ID.
         refresh_type: "Calculate", "Full", "Defragment", "ClearValues", "DataOnly"
-            or "Automatic". Defaults to "Calculate" -- the cheapest, and all a
-            DirectLake model needs to recompute calculated columns and measures.
+            or "Automatic". Defaults to "Full": it frames a fresh DirectLake
+            copy (Calculate does not) and loads Import data.
         poll_timeout_sec: Override the poll ceiling. Defaults to a per-type lookup.
         commit_mode: "transactional" (all-or-nothing) or "partialBatch" (each
             command commits individually, so one failing table doesn't roll back

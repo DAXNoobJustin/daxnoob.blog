@@ -88,7 +88,7 @@ python run_tests.py --workspace-id <ws-guid> --model "Your Model" `
 | `--xmla-endpoint <host>` | Override the XMLA host (default `api.powerbi.com`). |
 | `--api-root <url>` | Override the Fabric API root (default `https://api.fabric.microsoft.com`). |
 | `--connection-id <guid>` | Connection to bind before refreshing; repeatable. `--deploy-from` only. |
-| `--refresh-type <type>` | Refresh after publish: `Calculate` (default), `Full`, `DataOnly`, `Automatic`, `None`. `--deploy-from` only. |
+| `--refresh-type <type>` | Refresh after publish: `Full` (default), `Calculate`, `DataOnly`, `Automatic`, `None`. `--deploy-from` only. |
 | `--refresh-timeout <sec>` | Override the refresh poll ceiling (default 240s Calculate / 1200s Full). `--deploy-from` only. |
 | `--environment <name>` | Environment passed to fabric-cicd for `parameter.yml` selection (default `dev`). `--deploy-from` only. |
 | `--keep-rls` | Keep RLS roles in the staged copy (stripped by default). `--deploy-from` only. |
@@ -198,7 +198,6 @@ lifecycle:
 python run_tests.py --workspace-id <ws-guid> `
     --deploy-from "MODELS/Your Model.SemanticModel" `
     --connection-id <connection-guid> `
-    --refresh-type Calculate `
     --catalog-dir tests
 ```
 
@@ -210,9 +209,10 @@ deletes items), where `--model` mode only needs Viewer.
 It depends entirely on refresh cost, which is a storage-mode question:
 
 - **DirectLake** — the model reads live from the lakehouse, so there is no data to load.
-  A `Calculate` refresh recomputes calculated columns and tables (measures are evaluated at
-  query time, not at refresh) and lands in seconds. A throwaway per PR is cheap, so this is
-  the mode the pattern is built for.
+  A `Full` refresh just frames the tables (points them at the current Delta versions) and
+  lands in seconds. Don't drop to `Calculate`: it leaves a freshly published copy unframed,
+  so its tables can't be queried. A throwaway per PR is cheap, so this is the mode the
+  pattern is built for.
 - **Import** — the copy has to actually load its data before any data assertion can run,
   and a cold `Full` refresh on a real model runs minutes to tens of minutes. Per PR, that
   gets painful fast. Prefer `--model` against a long-lived model you refresh on your own

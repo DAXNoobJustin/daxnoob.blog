@@ -146,7 +146,7 @@ Here is what a Part 2 run looks like:
 ==> Cases:      4 from 1 dir(s)
 ==> Publishing throwaway
 ==> Model id:   aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
-    Refreshing (Calculate/transactional, poll timeout 1200s)
+    Refreshing (Full/transactional, poll timeout 1200s)
 ==> Refresh complete in 5.1s
 ==> Running 4 case(s) via AdomdClient (XMLA)
 ==> AdomdClient XMLA batch: 4 queries
